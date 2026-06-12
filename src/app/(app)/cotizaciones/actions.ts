@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { createElement } from "react";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { calcularTotales } from "@/lib/totals";
+import { formatCLP } from "@/lib/money";
+import { generarPdfCotizacion } from "@/lib/pdf/cotizacion-pdf";
+import { CotizacionEmail } from "@/lib/email/cotizacion-email";
+import { enviarCorreoCotizacion } from "@/lib/email/send";
 
 export type CotizacionFormState = {
   error?: string;
@@ -198,6 +203,151 @@ export async function actualizarCotizacion(
   revalidatePath("/cotizaciones");
   revalidatePath(`/cotizaciones/${id}`);
   redirect(`/cotizaciones/${id}`);
+}
+
+export type EnviarCotizacionResult = {
+  error?: string;
+  success?: boolean;
+};
+
+function formatFechaCorta(value: string) {
+  const [anio, mes, dia] = value.slice(0, 10).split("-");
+  return `${dia}-${mes}-${anio}`;
+}
+
+export async function enviarCotizacion(
+  id: string
+): Promise<EnviarCotizacionResult> {
+  const supabase = await createClient();
+
+  const { data: cotizacion, error: readError } = await supabase
+    .from("cotizaciones")
+    .select(
+      `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
+       token_aceptacion, notas, created_at,
+       clientes(nombre, rut, correo, direccion),
+       cotizacion_items(sku, descripcion, cantidad, precio, posicion)`
+    )
+    .eq("id", id)
+    .single();
+
+  if (readError || !cotizacion) {
+    console.error("Error al leer cotización a enviar:", readError?.message);
+    return { error: "No se encontró la cotización." };
+  }
+
+  const cliente = cotizacion.clientes as unknown as {
+    nombre: string;
+    rut: string | null;
+    correo: string;
+    direccion: string | null;
+  } | null;
+  const items = [
+    ...(cotizacion.cotizacion_items as unknown as {
+      sku: string;
+      descripcion: string;
+      cantidad: number;
+      precio: number;
+      posicion: number;
+    }[]),
+  ].sort((a, b) => a.posicion - b.posicion);
+
+  if (cotizacion.estado !== "borrador") {
+    return { error: "Solo se pueden enviar borradores" };
+  }
+  if (items.length === 0) {
+    return { error: "La cotización no tiene ítems" };
+  }
+  if (!cliente?.correo?.trim()) {
+    return { error: "El cliente no tiene correo" };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) {
+    return {
+      error:
+        "Falta configurar NEXT_PUBLIC_APP_URL. Revisa las variables de entorno.",
+    };
+  }
+
+  // El perfil es opcional: puede no existir todavía.
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("razon_social, rut_empresa, direccion_empresa, telefono_empresa")
+    .limit(1)
+    .maybeSingle();
+
+  const empresa = perfil?.razon_social || "Ferre Pooley";
+  const linkAceptar = `${appUrl}/cotizacion/${cotizacion.token_aceptacion}`;
+
+  try {
+    const pdf = await generarPdfCotizacion({
+      cotizacion: {
+        folio: cotizacion.folio,
+        created_at: cotizacion.created_at,
+        fecha_validez: cotizacion.fecha_validez,
+        flete: cotizacion.flete,
+        subtotal_neto: cotizacion.subtotal_neto,
+        iva: cotizacion.iva,
+        total: cotizacion.total,
+        notas: cotizacion.notas,
+      },
+      items,
+      cliente,
+      perfil,
+    });
+
+    await enviarCorreoCotizacion({
+      para: cliente.correo,
+      asunto: `Cotización ${cotizacion.folio} — ${empresa}`,
+      react: createElement(CotizacionEmail, {
+        folio: cotizacion.folio,
+        clienteNombre: cliente.nombre,
+        total: formatCLP(cotizacion.total),
+        validaHasta: formatFechaCorta(cotizacion.fecha_validez),
+        linkAceptar,
+        empresa,
+      }),
+      adjuntoPdf: pdf,
+      nombreAdjunto: `${cotizacion.folio}.pdf`,
+    });
+  } catch (error) {
+    console.error("Error al enviar cotización por correo:", error);
+    return {
+      error:
+        "No se pudo enviar el correo. Revisa la configuración de Resend e intenta de nuevo.",
+    };
+  }
+
+  // El correo ya salió; recién ahora cambiamos el estado. El .eq("estado")
+  // garantiza la transición atómica si otra pestaña la envió en paralelo.
+  const { data: updated, error: updateError } = await supabase
+    .from("cotizaciones")
+    .update({ estado: "enviada", enviada_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("estado", "borrador")
+    .select("id");
+
+  if (updateError) {
+    console.error(
+      `Correo de cotización ${cotizacion.folio} enviado pero falló el cambio de estado:`,
+      updateError.message
+    );
+    return {
+      error:
+        "El correo se envió pero no se pudo actualizar el estado. Intenta nuevamente.",
+    };
+  }
+  if (!updated?.length) {
+    console.error(
+      `Correo de cotización ${cotizacion.folio} enviado pero ya no era borrador.`
+    );
+    return { error: "La cotización ya no es un borrador" };
+  }
+
+  revalidatePath("/cotizaciones");
+  revalidatePath(`/cotizaciones/${id}`);
+  return { success: true };
 }
 
 export async function duplicarCotizacion(id: string): Promise<void> {

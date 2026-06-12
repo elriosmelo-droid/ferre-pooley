@@ -5,6 +5,7 @@ import { formatCLP } from "@/lib/money";
 import { duplicarCotizacion } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
+import { EnviarButton } from "./enviar-button";
 
 type ItemRow = {
   id: string;
@@ -103,14 +104,7 @@ export default async function DetalleCotizacionPage({
               >
                 Editar
               </Link>
-              <button
-                type="button"
-                disabled
-                title="Disponible próximamente"
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white opacity-50"
-              >
-                Enviar al cliente
-              </button>
+              <EnviarButton cotizacionId={cotizacion.id} />
             </>
           )}
           <form action={duplicar}>
