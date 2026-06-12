@@ -111,8 +111,10 @@ create policy "own perfil" on perfiles for all to authenticated using (auth.uid(
 
 -- Aceptación atómica: solo gana la primera transición desde 'enviada'.
 -- Crea la nota de venta con snapshot de ítems en la misma transacción.
+-- "transicion" indica si esta llamada cambió el estado: las repeticiones
+-- (replay del mismo token) devuelven false y no deben generar avisos.
 create or replace function responder_cotizacion(p_token uuid, p_aceptar boolean)
-returns table (resultado text, nota_venta_folio text)
+returns table (resultado text, nota_venta_folio text, transicion boolean)
 language plpgsql security definer set search_path = public as $$
 declare
   v_cot cotizaciones%rowtype;
@@ -120,14 +122,14 @@ declare
 begin
   select * into v_cot from cotizaciones where token_aceptacion = p_token for update;
   if not found then
-    return query select 'no_existe'::text, null::text; return;
+    return query select 'no_existe'::text, null::text, false; return;
   end if;
   if v_cot.estado <> 'enviada' then
-    return query select v_cot.estado::text, null::text; return;
+    return query select v_cot.estado::text, null::text, false; return;
   end if;
   if v_cot.fecha_validez < current_date then
     update cotizaciones set estado = 'vencida' where id = v_cot.id;
-    return query select 'vencida'::text, null::text; return;
+    return query select 'vencida'::text, null::text, true; return;
   end if;
   if p_aceptar then
     update cotizaciones set estado = 'aceptada', respondida_at = now() where id = v_cot.id;
@@ -137,10 +139,10 @@ begin
     insert into nota_venta_items (nota_venta_id, sku, descripcion, cantidad, costo, precio, posicion)
       select v_nv.id, sku, descripcion, cantidad, costo, precio, posicion
       from cotizacion_items where cotizacion_id = v_cot.id;
-    return query select 'aceptada'::text, v_nv.folio;
+    return query select 'aceptada'::text, v_nv.folio, true;
   else
     update cotizaciones set estado = 'rechazada', respondida_at = now() where id = v_cot.id;
-    return query select 'rechazada'::text, null::text;
+    return query select 'rechazada'::text, null::text, true;
   end if;
 end $$;
 

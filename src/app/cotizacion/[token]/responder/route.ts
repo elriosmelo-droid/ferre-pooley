@@ -114,7 +114,7 @@ export async function POST(
   }
 
   const fila = (Array.isArray(data) ? data[0] : data) as
-    | { resultado: string; nota_venta_folio: string | null }
+    | { resultado: string; nota_venta_folio: string | null; transicion: boolean }
     | undefined;
 
   if (!fila) {
@@ -124,11 +124,11 @@ export async function POST(
     );
   }
 
-  // Solo avisar cuando hubo transición real: una aceptación siempre trae el
-  // folio de la nota de venta; una cotización ya aceptada antes lo trae null.
+  // Solo avisar cuando hubo transición real: la función devuelve
+  // transicion=false en replays (token ya respondido), evitando reenvíos.
   if (
-    (fila.resultado === "aceptada" && fila.nota_venta_folio) ||
-    fila.resultado === "rechazada"
+    fila.transicion &&
+    (fila.resultado === "aceptada" || fila.resultado === "rechazada")
   ) {
     await enviarAvisoInterno(
       supabase,
