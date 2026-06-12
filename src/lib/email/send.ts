@@ -15,6 +15,34 @@ function getResend(): Resend {
   return resendClient;
 }
 
+export async function enviarCorreo({
+  para,
+  asunto,
+  react,
+}: {
+  para: string;
+  asunto: string;
+  react: ReactNode;
+}): Promise<void> {
+  const from = process.env.RESEND_FROM;
+  if (!from) {
+    throw new Error(
+      'RESEND_FROM no está configurada. Define la variable de entorno (p. ej. "Ferre Pooley <onboarding@resend.dev>").'
+    );
+  }
+
+  const { error } = await getResend().emails.send({
+    from,
+    to: para,
+    subject: asunto,
+    react,
+  });
+
+  if (error) {
+    throw new Error(`Resend rechazó el envío: ${error.message}`);
+  }
+}
+
 export async function enviarCorreoCotizacion({
   para,
   asunto,
