@@ -75,6 +75,15 @@ export default async function DashboardPage() {
       .limit(5),
   ]);
 
+  const hayErrores = [
+    enviadasResult,
+    aceptadasMesResult,
+    porCobrarResult,
+    ventasMesResult,
+    ultimasCotizacionesResult,
+    ultimasNotasResult,
+  ].some((r) => r.error);
+
   const stats = [
     {
       label: "Cotizaciones enviadas",
@@ -106,6 +115,12 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+
+      {hayErrores && (
+        <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          No se pudieron cargar todas las métricas. Recarga la página.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (

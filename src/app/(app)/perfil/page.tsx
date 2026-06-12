@@ -8,7 +8,7 @@ export default async function PerfilPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: perfil } = user
+  const { data: perfil, error } = user
     ? await supabase
         .from("perfiles")
         .select(
@@ -16,7 +16,11 @@ export default async function PerfilPage() {
         )
         .eq("user_id", user.id)
         .maybeSingle()
-    : { data: null };
+    : { data: null, error: null };
+
+  if (error) {
+    throw new Error("No se pudo cargar el perfil.");
+  }
 
   return (
     <div className="flex flex-col gap-6">

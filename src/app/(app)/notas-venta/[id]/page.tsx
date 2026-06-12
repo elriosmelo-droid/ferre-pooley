@@ -48,7 +48,7 @@ export default async function DetalleNotaVentaPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("notas_venta")
     .select(
       `id, folio, estado, flete, subtotal_neto, iva, total, pagada_at, created_at,
@@ -59,6 +59,10 @@ export default async function DetalleNotaVentaPage({
     .eq("id", id)
     .single();
 
+  // PGRST116 = sin filas: eso sí es un 404. Otros errores son fallas de DB.
+  if (error && error.code !== "PGRST116") {
+    throw new Error("No se pudo cargar la nota de venta.");
+  }
   if (!data) {
     notFound();
   }
