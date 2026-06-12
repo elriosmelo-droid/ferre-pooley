@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { formatCLP } from "@/lib/money";
@@ -54,7 +54,7 @@ const itemInputClass =
   "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
 // uid: clave estable de React por fila; se descarta al serializar al servidor.
-type ItemRow = CotizacionItemInput & { uid: number };
+type ItemRow = CotizacionItemInput & { uid: string };
 
 export function CotizacionForm({
   clientes,
@@ -63,9 +63,8 @@ export function CotizacionForm({
   action,
 }: CotizacionFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
-  const nextUid = useRef(0);
   const [items, setItems] = useState<ItemRow[]>(() =>
-    (cotizacion?.items ?? []).map((item) => ({ ...item, uid: nextUid.current++ }))
+    (cotizacion?.items ?? []).map((item, i) => ({ ...item, uid: `init-${i}` }))
   );
   const [flete, setFlete] = useState(cotizacion?.flete ?? 0);
 
@@ -75,7 +74,7 @@ export function CotizacionForm({
     setItems((prev) => [
       ...prev,
       {
-        uid: nextUid.current++,
+        uid: crypto.randomUUID(),
         producto_id: producto.id,
         sku: producto.sku,
         descripcion: producto.descripcion,
@@ -90,7 +89,7 @@ export function CotizacionForm({
     setItems((prev) => [
       ...prev,
       {
-        uid: nextUid.current++,
+        uid: crypto.randomUUID(),
         producto_id: null,
         sku: "",
         descripcion: "",
