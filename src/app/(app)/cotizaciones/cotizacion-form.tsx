@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { formatCLP } from "@/lib/money";
@@ -53,6 +53,9 @@ function fechaValidezDefault() {
 const itemInputClass =
   "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
+// uid: clave estable de React por fila; se descarta al serializar al servidor.
+type ItemRow = CotizacionItemInput & { uid: number };
+
 export function CotizacionForm({
   clientes,
   productos,
@@ -60,8 +63,9 @@ export function CotizacionForm({
   action,
 }: CotizacionFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
-  const [items, setItems] = useState<CotizacionItemInput[]>(
-    cotizacion?.items ?? []
+  const nextUid = useRef(0);
+  const [items, setItems] = useState<ItemRow[]>(() =>
+    (cotizacion?.items ?? []).map((item) => ({ ...item, uid: nextUid.current++ }))
   );
   const [flete, setFlete] = useState(cotizacion?.flete ?? 0);
 
@@ -71,6 +75,7 @@ export function CotizacionForm({
     setItems((prev) => [
       ...prev,
       {
+        uid: nextUid.current++,
         producto_id: producto.id,
         sku: producto.sku,
         descripcion: producto.descripcion,
@@ -85,6 +90,7 @@ export function CotizacionForm({
     setItems((prev) => [
       ...prev,
       {
+        uid: nextUid.current++,
         producto_id: null,
         sku: "",
         descripcion: "",
@@ -110,7 +116,11 @@ export function CotizacionForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
-      <input type="hidden" name="items" value={JSON.stringify(items)} />
+      <input
+        type="hidden"
+        name="items"
+        value={JSON.stringify(items.map(({ uid: _uid, ...item }) => item))}
+      />
 
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
@@ -205,7 +215,7 @@ export function CotizacionForm({
                 items.map((item, index) => {
                   const esLibre = item.producto_id === null;
                   return (
-                    <tr key={index} className="text-slate-700">
+                    <tr key={item.uid} className="text-slate-700">
                       <td className="px-3 py-2">
                         <input
                           type="text"

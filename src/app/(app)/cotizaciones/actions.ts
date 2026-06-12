@@ -153,16 +153,23 @@ export async function actualizarCotizacion(
     return { error: "Solo se pueden editar borradores" };
   }
 
-  const { error: updateError } = await supabase
+  // .eq("estado") hace la transición atómica: si otra pestaña ya la envió,
+  // el update no afecta filas y se rechaza.
+  const { data: updated, error: updateError } = await supabase
     .from("cotizaciones")
     .update(toCotizacionRow(parsed.data))
-    .eq("id", id);
+    .eq("id", id)
+    .eq("estado", "borrador")
+    .select("id");
 
   if (updateError) {
     console.error("Error al actualizar cotización:", updateError.message);
     return {
       error: "No se pudo actualizar la cotización. Intenta nuevamente.",
     };
+  }
+  if (!updated?.length) {
+    return { error: "Solo se pueden editar borradores" };
   }
 
   const { error: deleteError } = await supabase
