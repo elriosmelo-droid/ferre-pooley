@@ -118,7 +118,16 @@ export function CotizacionForm({
       <input
         type="hidden"
         name="items"
-        value={JSON.stringify(items.map(({ uid: _uid, ...item }) => item))}
+        value={JSON.stringify(
+          items.map((item) => ({
+            producto_id: item.producto_id,
+            sku: item.sku,
+            descripcion: item.descripcion,
+            cantidad: item.cantidad,
+            costo: item.costo,
+            precio: item.precio,
+          }))
+        )}
       />
 
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
