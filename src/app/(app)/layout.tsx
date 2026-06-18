@@ -19,7 +19,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen bg-slate-50">
       <Sidebar />
-      <main className="ml-[220px] p-8">{children}</main>
+      <main className="p-4 sm:p-6 lg:ml-[220px] lg:p-8">{children}</main>
     </div>
   );
 }
