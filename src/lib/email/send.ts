@@ -1,5 +1,6 @@
 import { Resend } from "resend";
-import type { ReactNode } from "react";
+import { render } from "@react-email/render";
+import type { ReactElement } from "react";
 
 let resendClient: Resend | null = null;
 
@@ -22,7 +23,7 @@ export async function enviarCorreo({
 }: {
   para: string;
   asunto: string;
-  react: ReactNode;
+  react: ReactElement;
 }): Promise<void> {
   const from = process.env.RESEND_FROM;
   if (!from) {
@@ -31,11 +32,15 @@ export async function enviarCorreo({
     );
   }
 
+  // Renderizamos a HTML aquí en vez de pasar `react`: así no dependemos de que
+  // Resend resuelva @react-email/render dentro del bundle serverless.
+  const html = await render(react);
+
   const { error } = await getResend().emails.send({
     from,
     to: para,
     subject: asunto,
-    react,
+    html,
   });
 
   if (error) {
@@ -52,7 +57,7 @@ export async function enviarCorreoCotizacion({
 }: {
   para: string;
   asunto: string;
-  react: ReactNode;
+  react: ReactElement;
   adjuntoPdf: Buffer;
   nombreAdjunto: string;
 }): Promise<void> {
@@ -63,11 +68,13 @@ export async function enviarCorreoCotizacion({
     );
   }
 
+  const html = await render(react);
+
   const { error } = await getResend().emails.send({
     from,
     to: para,
     subject: asunto,
-    react,
+    html,
     attachments: [{ filename: nombreAdjunto, content: adjuntoPdf }],
   });
 
