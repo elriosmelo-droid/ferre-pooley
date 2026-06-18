@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
+import { formatearRut } from "@/lib/rut";
 import type { ClienteFormState } from "./actions";
 
 type ClienteFormProps = {
@@ -22,6 +23,7 @@ type ClienteFormProps = {
 
 export function ClienteForm({ action, cliente, submitLabel }: ClienteFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
+  const [rut, setRut] = useState(formatearRut(cliente?.rut ?? ""));
 
   return (
     <form action={formAction} className="flex max-w-lg flex-col gap-4">
@@ -48,7 +50,10 @@ export function ClienteForm({ action, cliente, submitLabel }: ClienteFormProps) 
           id="rut"
           name="rut"
           type="text"
-          defaultValue={cliente?.rut ?? ""}
+          inputMode="text"
+          placeholder="12.345.678-9"
+          value={rut}
+          onChange={(e) => setRut(formatearRut(e.target.value))}
           className={inputClass}
         />
         <FieldErrors errors={state.fieldErrors?.rut} />
