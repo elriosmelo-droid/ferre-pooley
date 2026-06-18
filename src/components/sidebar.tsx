@@ -29,15 +29,15 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 flex w-[220px] flex-col bg-slate-900">
-      <div className="flex justify-center px-4 py-5">
-        <Link href="/dashboard" className="rounded-lg bg-white px-3 py-2">
+      <div className="flex justify-center border-b border-slate-800 px-4 py-6">
+        <Link href="/dashboard">
           <Image
-            src="/logo.png"
+            src="/logo-marca.png"
             alt="Tulbless"
-            width={160}
-            height={173}
+            width={310}
+            height={229}
             priority
-            className="h-auto w-[140px]"
+            className="h-auto w-[150px]"
           />
         </Link>
       </div>
