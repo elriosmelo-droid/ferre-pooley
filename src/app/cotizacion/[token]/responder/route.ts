@@ -14,6 +14,8 @@ const bodySchema = z
     // Solo se exigen al aceptar; data URL PNG de la firma y nombre del firmante.
     firma: z.string().startsWith("data:image/").max(2_000_000).optional(),
     firmante: z.string().trim().min(1).max(120).optional(),
+    // Comentario opcional del cliente al rechazar.
+    motivo: z.string().trim().max(1000).optional(),
   })
   .refine((b) => b.accion !== "aceptar" || (b.firma && b.firmante), {
     message: "La aceptación requiere firma y nombre.",
@@ -23,7 +25,8 @@ async function enviarAvisoInterno(
   supabase: ReturnType<typeof createAdminClient>,
   token: string,
   aceptada: boolean,
-  notaVentaFolio: string | null
+  notaVentaFolio: string | null,
+  motivo: string | null
 ) {
   try {
     const { data: perfil } = await supabase
@@ -69,6 +72,7 @@ async function enviarAvisoInterno(
         aceptada,
         notaVentaFolio,
         linkNotasVenta,
+        motivo,
       }),
     });
   } catch (err) {
@@ -112,6 +116,7 @@ export async function POST(
     p_aceptar: esAceptar,
     p_firma: esAceptar ? (parsed.data.firma ?? null) : null,
     p_firmante: esAceptar ? (parsed.data.firmante ?? null) : null,
+    p_motivo: esAceptar ? null : (parsed.data.motivo ?? null),
   });
 
   if (error) {
@@ -143,7 +148,8 @@ export async function POST(
       supabase,
       token,
       fila.resultado === "aceptada",
-      fila.nota_venta_folio
+      fila.nota_venta_folio,
+      fila.resultado === "rechazada" ? (parsed.data.motivo ?? null) : null
     );
   }
 

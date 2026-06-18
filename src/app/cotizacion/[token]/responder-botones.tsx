@@ -8,12 +8,14 @@ export function ResponderBotones({ token }: { token: string }) {
   const router = useRouter();
   const firmaRef = useRef<FirmaCanvasHandle>(null);
   const [firmante, setFirmante] = useState("");
+  const [mostrarRechazo, setMostrarRechazo] = useState(false);
+  const [motivo, setMotivo] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function enviar(
     accion: "aceptar" | "rechazar",
-    extra?: { firma: string; firmante: string }
+    extra?: Record<string, string>
   ) {
     setError(null);
     setIsPending(true);
@@ -51,11 +53,8 @@ export function ResponderBotones({ token }: { token: string }) {
     enviar("aceptar", { firma, firmante: nombre });
   }
 
-  function rechazar() {
-    if (!confirm("¿Rechazar la cotización?")) {
-      return;
-    }
-    enviar("rechazar");
+  function confirmarRechazo() {
+    enviar("rechazar", motivo.trim() ? { motivo: motivo.trim() } : undefined);
   }
 
   return (
@@ -78,24 +77,64 @@ export function ResponderBotones({ token }: { token: string }) {
         <FirmaCanvas ref={firmaRef} />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={rechazar}
-          disabled={isPending}
-          className="rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
-        >
-          Rechazar
-        </button>
-        <button
-          type="button"
-          onClick={aceptar}
-          disabled={isPending}
-          className="rounded-md bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
-        >
-          {isPending ? "Procesando…" : "Aceptar y firmar"}
-        </button>
-      </div>
+      {mostrarRechazo ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4">
+          <label
+            htmlFor="motivo"
+            className="mb-1 block text-sm font-medium text-slate-700"
+          >
+            ¿Por qué rechazas la cotización? (opcional)
+          </label>
+          <textarea
+            id="motivo"
+            rows={3}
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ej: el precio supera el presupuesto, plazos, etc."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+          />
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setMostrarRechazo(false)}
+              disabled={isPending}
+              className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              Volver
+            </button>
+            <button
+              type="button"
+              onClick={confirmarRechazo}
+              disabled={isPending}
+              className="rounded-md bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
+            >
+              {isPending ? "Procesando…" : "Confirmar rechazo"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMostrarRechazo(true);
+            }}
+            disabled={isPending}
+            className="rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            Rechazar
+          </button>
+          <button
+            type="button"
+            onClick={aceptar}
+            disabled={isPending}
+            className="rounded-md bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
+          >
+            {isPending ? "Procesando…" : "Aceptar y firmar"}
+          </button>
+        </div>
+      )}
       {error && <p className="text-right text-sm text-red-600">{error}</p>}
     </div>
   );

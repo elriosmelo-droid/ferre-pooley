@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCLP } from "@/lib/money";
 import { ResponderBotones } from "./responder-botones";
@@ -183,9 +184,21 @@ export default async function CotizacionPublicaPage({
   return (
     <Shell>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-900 px-6 py-5 sm:px-8">
-          <p className="text-lg font-bold text-white">{empresa}</p>
-          <p className="text-sm text-slate-300">Cotización {cotizacion.folio}</p>
+        <div className="flex items-center gap-4 border-b border-slate-200 bg-slate-900 px-6 py-5 sm:px-8">
+          <Image
+            src="/logo-marca.png"
+            alt={empresa}
+            width={310}
+            height={229}
+            priority
+            className="h-auto w-[120px]"
+          />
+          <div>
+            <p className="text-lg font-bold text-white">{empresa}</p>
+            <p className="text-sm text-slate-300">
+              Cotización {cotizacion.folio}
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-6 px-6 py-6 sm:px-8">

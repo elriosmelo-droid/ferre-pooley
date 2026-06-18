@@ -15,6 +15,7 @@ export type AvisoRespuestaEmailProps = {
   aceptada: boolean;
   notaVentaFolio: string | null;
   linkNotasVenta: string | null;
+  motivo?: string | null;
 };
 
 export function AvisoRespuestaEmail({
@@ -23,6 +24,7 @@ export function AvisoRespuestaEmail({
   aceptada,
   notaVentaFolio,
   linkNotasVenta,
+  motivo,
 }: AvisoRespuestaEmailProps) {
   return (
     <Html lang="es">
@@ -59,6 +61,21 @@ export function AvisoRespuestaEmail({
             {aceptada ? "aceptó" : "rechazó"} la cotización{" "}
             <strong>{folio}</strong>.
           </Text>
+          {!aceptada && motivo && (
+            <Text
+              style={{
+                backgroundColor: "#fef2f2",
+                borderRadius: "6px",
+                color: "#334155",
+                fontSize: "14px",
+                lineHeight: "22px",
+                margin: "12px 0",
+                padding: "12px 16px",
+              }}
+            >
+              <strong>Motivo del rechazo:</strong> {motivo}
+            </Text>
+          )}
           {aceptada && notaVentaFolio && (
             <Text
               style={{ color: "#334155", fontSize: "14px", lineHeight: "22px" }}

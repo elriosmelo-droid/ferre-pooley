@@ -32,6 +32,7 @@ type CotizacionDetalle = {
   notas: string | null;
   firma: string | null;
   firmante: string | null;
+  motivo_rechazo: string | null;
   enviada_at: string | null;
   respondida_at: string | null;
   created_at: string;
@@ -68,7 +69,7 @@ export default async function DetalleCotizacionPage({
     .from("cotizaciones")
     .select(
       `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
-       token_aceptacion, notas, firma, firmante, enviada_at, respondida_at, created_at,
+       token_aceptacion, notas, firma, firmante, motivo_rechazo, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
        cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, posicion)`
     )
@@ -254,6 +255,17 @@ export default async function DetalleCotizacionPage({
           </h2>
           <p className="whitespace-pre-wrap text-sm text-slate-700">
             {cotizacion.notas}
+          </p>
+        </div>
+      )}
+
+      {cotizacion.estado === "rechazada" && cotizacion.motivo_rechazo && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-red-700">
+            Motivo del rechazo
+          </h2>
+          <p className="whitespace-pre-wrap text-sm text-slate-700">
+            {cotizacion.motivo_rechazo}
           </p>
         </div>
       )}

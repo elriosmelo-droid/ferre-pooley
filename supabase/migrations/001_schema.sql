@@ -39,6 +39,9 @@ create table cotizaciones (
   total integer not null default 0,
   token_aceptacion uuid not null unique default gen_random_uuid(),
   notas text,
+  firma text,            -- data URL de la firma del cliente al aceptar
+  firmante text,         -- nombre de quien firma
+  motivo_rechazo text,   -- comentario del cliente al rechazar
   enviada_at timestamptz,
   respondida_at timestamptz,
   created_at timestamptz not null default now()
@@ -121,7 +124,8 @@ create or replace function responder_cotizacion(
   p_token uuid,
   p_aceptar boolean,
   p_firma text default null,
-  p_firmante text default null
+  p_firmante text default null,
+  p_motivo text default null
 )
 returns table (resultado text, nota_venta_folio text, transicion boolean)
 language plpgsql security definer set search_path = public as $$
@@ -153,10 +157,11 @@ begin
       from cotizacion_items where cotizacion_id = v_cot.id;
     return query select 'aceptada'::text, v_nv.folio, true;
   else
-    update cotizaciones set estado = 'rechazada', respondida_at = now() where id = v_cot.id;
+    update cotizaciones set estado = 'rechazada', respondida_at = now(),
+      motivo_rechazo = p_motivo where id = v_cot.id;
     return query select 'rechazada'::text, null::text, true;
   end if;
 end $$;
 
 revoke execute on function responder_cotizacion(uuid, boolean) from public, anon, authenticated;
-revoke execute on function responder_cotizacion(uuid, boolean, text, text) from public, anon, authenticated;
+revoke execute on function responder_cotizacion(uuid, boolean, text, text, text) from public, anon, authenticated;
