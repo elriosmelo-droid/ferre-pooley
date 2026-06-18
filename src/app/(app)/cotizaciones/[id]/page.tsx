@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
+import { APP_URL } from "@/lib/app-url";
 import { duplicarCotizacion } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
@@ -28,6 +29,8 @@ type CotizacionDetalle = {
   total: number;
   token_aceptacion: string;
   notas: string | null;
+  firma: string | null;
+  firmante: string | null;
   enviada_at: string | null;
   respondida_at: string | null;
   created_at: string;
@@ -64,7 +67,7 @@ export default async function DetalleCotizacionPage({
     .from("cotizaciones")
     .select(
       `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
-       token_aceptacion, notas, enviada_at, respondida_at, created_at,
+       token_aceptacion, notas, firma, firmante, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
        cotizacion_items(id, sku, descripcion, cantidad, costo, precio, posicion)`
     )
@@ -80,7 +83,7 @@ export default async function DetalleCotizacionPage({
     (a, b) => a.posicion - b.posicion
   );
   const cliente = cotizacion.clientes;
-  const linkPublico = `${process.env.NEXT_PUBLIC_APP_URL}/cotizacion/${cotizacion.token_aceptacion}`;
+  const linkPublico = `${APP_URL}/cotizacion/${cotizacion.token_aceptacion}`;
   const mostrarLinkPublico = ["enviada", "aceptada", "rechazada"].includes(
     cotizacion.estado
   );
@@ -245,6 +248,28 @@ export default async function DetalleCotizacionPage({
           <p className="whitespace-pre-wrap text-sm text-slate-700">
             {cotizacion.notas}
           </p>
+        </div>
+      )}
+
+      {cotizacion.firma && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Aceptación firmada
+          </h2>
+          {cotizacion.firmante && (
+            <p className="mb-2 text-sm text-slate-700">
+              Firmado por:{" "}
+              <span className="font-medium">{cotizacion.firmante}</span>
+              {cotizacion.respondida_at &&
+                ` · ${formatFechaHora(cotizacion.respondida_at)}`}
+            </p>
+          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cotizacion.firma}
+            alt="Firma del cliente"
+            className="max-h-40 rounded-md border border-slate-200 bg-white"
+          />
         </div>
       )}
 

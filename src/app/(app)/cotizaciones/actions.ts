@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { calcularTotales } from "@/lib/totals";
 import { formatCLP } from "@/lib/money";
+import { APP_URL } from "@/lib/app-url";
 import { generarPdfCotizacion } from "@/lib/pdf/cotizacion-pdf";
 import { CotizacionEmail } from "@/lib/email/cotizacion-email";
 import { enviarCorreoCotizacion } from "@/lib/email/send";
@@ -262,14 +263,6 @@ export async function enviarCotizacion(
     return { error: "El cliente no tiene correo" };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) {
-    return {
-      error:
-        "Falta configurar NEXT_PUBLIC_APP_URL. Revisa las variables de entorno.",
-    };
-  }
-
   // El perfil es opcional: puede no existir todavía.
   const { data: perfil } = await supabase
     .from("perfiles")
@@ -278,7 +271,7 @@ export async function enviarCotizacion(
     .maybeSingle();
 
   const empresa = perfil?.razon_social || "Tulbless";
-  const linkAceptar = `${appUrl}/cotizacion/${cotizacion.token_aceptacion}`;
+  const linkAceptar = `${APP_URL}/cotizacion/${cotizacion.token_aceptacion}`;
 
   try {
     const pdf = await generarPdfCotizacion({

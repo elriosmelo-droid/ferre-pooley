@@ -3,13 +3,21 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreo } from "@/lib/email/send";
 import { AvisoRespuestaEmail } from "@/lib/email/aviso-respuesta-email";
+import { APP_URL } from "@/lib/app-url";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const bodySchema = z.object({
-  accion: z.enum(["aceptar", "rechazar"]),
-});
+const bodySchema = z
+  .object({
+    accion: z.enum(["aceptar", "rechazar"]),
+    // Solo se exigen al aceptar; data URL PNG de la firma y nombre del firmante.
+    firma: z.string().startsWith("data:image/").max(2_000_000).optional(),
+    firmante: z.string().trim().min(1).max(120).optional(),
+  })
+  .refine((b) => b.accion !== "aceptar" || (b.firma && b.firmante), {
+    message: "La aceptación requiere firma y nombre.",
+  });
 
 async function enviarAvisoInterno(
   supabase: ReturnType<typeof createAdminClient>,
@@ -50,9 +58,7 @@ async function enviarAvisoInterno(
     const asunto = aceptada
       ? `Cotización ${cot.folio} ACEPTADA — Nota de venta ${notaVentaFolio}`
       : `Cotización ${cot.folio} RECHAZADA`;
-    const linkNotasVenta = process.env.NEXT_PUBLIC_APP_URL
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/notas-venta`
-      : null;
+    const linkNotasVenta = `${APP_URL}/notas-venta`;
 
     await enviarCorreo({
       para: perfil.correo_aviso,
@@ -100,9 +106,12 @@ export async function POST(
   }
 
   const supabase = createAdminClient();
+  const esAceptar = parsed.data.accion === "aceptar";
   const { data, error } = await supabase.rpc("responder_cotizacion", {
     p_token: token,
-    p_aceptar: parsed.data.accion === "aceptar",
+    p_aceptar: esAceptar,
+    p_firma: esAceptar ? (parsed.data.firma ?? null) : null,
+    p_firmante: esAceptar ? (parsed.data.firmante ?? null) : null,
   });
 
   if (error) {

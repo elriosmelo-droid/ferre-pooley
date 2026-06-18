@@ -30,7 +30,12 @@ type NotaVentaDetalle = {
     rut: string | null;
     correo: string;
   } | null;
-  cotizaciones: { id: string; folio: string } | null;
+  cotizaciones: {
+    id: string;
+    folio: string;
+    firma: string | null;
+    firmante: string | null;
+  } | null;
   nota_venta_items: ItemRow[];
 };
 
@@ -53,7 +58,7 @@ export default async function DetalleNotaVentaPage({
     .select(
       `id, folio, estado, flete, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
-       cotizaciones(id, folio),
+       cotizaciones(id, folio, firma, firmante),
        nota_venta_items(id, sku, descripcion, cantidad, costo, precio, posicion)`
     )
     .eq("id", id)
@@ -206,6 +211,26 @@ export default async function DetalleNotaVentaPage({
           </div>
         </dl>
       </div>
+
+      {nota.cotizaciones?.firma && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Aceptación firmada por el cliente
+          </h2>
+          {nota.cotizaciones.firmante && (
+            <p className="mb-2 text-sm text-slate-700">
+              Firmado por:{" "}
+              <span className="font-medium">{nota.cotizaciones.firmante}</span>
+            </p>
+          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={nota.cotizaciones.firma}
+            alt="Firma del cliente"
+            className="max-h-40 rounded-md border border-slate-200 bg-white"
+          />
+        </div>
+      )}
     </div>
   );
 }

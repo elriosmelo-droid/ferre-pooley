@@ -113,7 +113,14 @@ create policy "own perfil" on perfiles for all to authenticated using (auth.uid(
 -- Crea la nota de venta con snapshot de ítems en la misma transacción.
 -- "transicion" indica si esta llamada cambió el estado: las repeticiones
 -- (replay del mismo token) devuelven false y no deben generar avisos.
-create or replace function responder_cotizacion(p_token uuid, p_aceptar boolean)
+-- p_firma: data URL (PNG) de la firma manuscrita del cliente; p_firmante: su
+-- nombre. Solo se guardan al aceptar.
+create or replace function responder_cotizacion(
+  p_token uuid,
+  p_aceptar boolean,
+  p_firma text default null,
+  p_firmante text default null
+)
 returns table (resultado text, nota_venta_folio text, transicion boolean)
 language plpgsql security definer set search_path = public as $$
 declare
@@ -132,7 +139,10 @@ begin
     return query select 'vencida'::text, null::text, true; return;
   end if;
   if p_aceptar then
-    update cotizaciones set estado = 'aceptada', respondida_at = now() where id = v_cot.id;
+    update cotizaciones
+      set estado = 'aceptada', respondida_at = now(),
+          firma = p_firma, firmante = p_firmante
+      where id = v_cot.id;
     insert into notas_venta (cotizacion_id, cliente_id, flete, subtotal_neto, iva, total)
       values (v_cot.id, v_cot.cliente_id, v_cot.flete, v_cot.subtotal_neto, v_cot.iva, v_cot.total)
       returning * into v_nv;
@@ -147,3 +157,4 @@ begin
 end $$;
 
 revoke execute on function responder_cotizacion(uuid, boolean) from public, anon, authenticated;
+revoke execute on function responder_cotizacion(uuid, boolean, text, text) from public, anon, authenticated;
