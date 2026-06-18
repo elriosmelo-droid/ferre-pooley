@@ -12,6 +12,7 @@ type ItemRow = {
   descripcion: string;
   cantidad: number;
   precio: number;
+  flete: number;
   posicion: number;
 };
 
@@ -19,7 +20,6 @@ type CotizacionPublica = {
   folio: string;
   estado: string;
   fecha_validez: string;
-  flete: number;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -137,9 +137,9 @@ export default async function CotizacionPublicaPage({
   const { data } = await supabase
     .from("cotizaciones")
     .select(
-      `folio, estado, fecha_validez, flete, subtotal_neto, iva, total, notas,
+      `folio, estado, fecha_validez, subtotal_neto, iva, total, notas,
        created_at, clientes(nombre),
-       cotizacion_items(sku, descripcion, cantidad, precio, posicion)`
+       cotizacion_items(sku, descripcion, cantidad, precio, flete, posicion)`
     )
     .eq("token_aceptacion", token)
     .maybeSingle();
@@ -236,10 +236,10 @@ export default async function CotizacionPublicaPage({
                     </td>
                     <td className="px-4 py-3 text-right">{item.cantidad}</td>
                     <td className="px-4 py-3 text-right">
-                      {formatCLP(item.precio)}
+                      {formatCLP(item.precio + item.flete)}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-900">
-                      {formatCLP(item.cantidad * item.precio)}
+                      {formatCLP(item.cantidad * (item.precio + item.flete))}
                     </td>
                   </tr>
                 ))}
@@ -251,10 +251,6 @@ export default async function CotizacionPublicaPage({
             <div className="flex justify-between text-slate-600">
               <dt>Subtotal neto</dt>
               <dd>{formatCLP(cotizacion.subtotal_neto)}</dd>
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <dt>Flete</dt>
-              <dd>{formatCLP(cotizacion.flete)}</dd>
             </div>
             <div className="flex justify-between text-slate-600">
               <dt>IVA (19%)</dt>

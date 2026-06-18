@@ -15,6 +15,7 @@ type ItemRow = {
   cantidad: number;
   costo: number;
   precio: number;
+  flete: number;
   posicion: number;
 };
 
@@ -69,7 +70,7 @@ export default async function DetalleCotizacionPage({
       `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
        token_aceptacion, notas, firma, firmante, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
-       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, posicion)`
+       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, posicion)`
     )
     .eq("id", id)
     .single();
@@ -179,6 +180,10 @@ export default async function DetalleCotizacionPage({
                 Costo (interno)
               </th>
               <th className="px-4 py-3 text-right">Precio</th>
+              <th className="px-4 py-3 text-right text-amber-600">
+                Flete unit. (interno)
+              </th>
+              <th className="px-4 py-3 text-right">Precio final</th>
               <th className="px-4 py-3 text-right">Total línea</th>
               <th className="px-4 py-3 text-right text-amber-600">
                 Margen (interno)
@@ -188,7 +193,7 @@ export default async function DetalleCotizacionPage({
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   Esta cotización no tiene ítems.
                 </td>
               </tr>
@@ -206,8 +211,14 @@ export default async function DetalleCotizacionPage({
                   <td className="px-4 py-3 text-right">
                     {formatCLP(item.precio)}
                   </td>
+                  <td className="px-4 py-3 text-right text-amber-600">
+                    {formatCLP(item.flete)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {formatCLP(item.precio + item.flete)}
+                  </td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">
-                    {formatCLP(item.cantidad * item.precio)}
+                    {formatCLP(item.cantidad * (item.precio + item.flete))}
                   </td>
                   <td className="px-4 py-3 text-right text-amber-600">
                     {formatCLP(item.cantidad * (item.precio - item.costo))}
@@ -224,10 +235,6 @@ export default async function DetalleCotizacionPage({
           <div className="flex justify-between text-slate-600">
             <dt>Subtotal neto</dt>
             <dd>{formatCLP(cotizacion.subtotal_neto)}</dd>
-          </div>
-          <div className="flex justify-between text-slate-600">
-            <dt>Flete</dt>
-            <dd>{formatCLP(cotizacion.flete)}</dd>
           </div>
           <div className="flex justify-between text-slate-600">
             <dt>IVA (19%)</dt>

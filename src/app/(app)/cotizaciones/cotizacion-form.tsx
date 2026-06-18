@@ -24,6 +24,8 @@ export type CotizacionItemInput = {
   cantidad: number;
   costo: number;
   precio: number;
+  // Flete unitario: interno, se suma al precio para el cliente.
+  flete: number;
 };
 
 type CotizacionFormProps = {
@@ -32,7 +34,6 @@ type CotizacionFormProps = {
   cotizacion?: {
     cliente_id: string;
     fecha_validez: string;
-    flete: number;
     notas: string | null;
     items: CotizacionItemInput[];
   };
@@ -66,6 +67,7 @@ type ItemRow = {
   cantidad: CampoNumerico;
   costo: CampoNumerico;
   precio: CampoNumerico;
+  flete: CampoNumerico;
 };
 
 const aNumero = (v: CampoNumerico) => (v === "" ? 0 : v);
@@ -88,14 +90,12 @@ export function CotizacionForm({
   const [items, setItems] = useState<ItemRow[]>(() =>
     (cotizacion?.items ?? []).map((item, i) => ({ ...item, uid: `init-${i}` }))
   );
-  const [flete, setFlete] = useState<CampoNumerico>(cotizacion?.flete ?? 0);
-
   const totales = calcularTotales(
     items.map((i) => ({
       cantidad: aNumero(i.cantidad),
       precio: aNumero(i.precio),
-    })),
-    aNumero(flete)
+      flete: aNumero(i.flete),
+    }))
   );
 
   function agregarProducto(producto: ProductoOption) {
@@ -109,6 +109,7 @@ export function CotizacionForm({
         cantidad: 1,
         costo: producto.costo,
         precio: producto.precio,
+        flete: 0,
       },
     ]);
   }
@@ -124,6 +125,7 @@ export function CotizacionForm({
         cantidad: 1,
         costo: "",
         precio: "",
+        flete: "",
       },
     ]);
   }
@@ -154,6 +156,7 @@ export function CotizacionForm({
             cantidad: aNumero(item.cantidad),
             costo: aNumero(item.costo),
             precio: aNumero(item.precio),
+            flete: aNumero(item.flete),
           }))
         )}
       />
@@ -234,8 +237,9 @@ export function CotizacionForm({
                 <th className="w-32 px-3 py-3">SKU</th>
                 <th className="min-w-56 px-3 py-3">Descripción</th>
                 <th className="w-24 px-3 py-3">Cantidad</th>
-                <th className="w-32 px-3 py-3">Costo</th>
-                <th className="w-32 px-3 py-3">Precio</th>
+                <th className="w-28 px-3 py-3">Costo</th>
+                <th className="w-28 px-3 py-3">Precio</th>
+                <th className="w-28 px-3 py-3">Flete unit.</th>
                 <th className="w-32 px-3 py-3 text-right">Total línea</th>
                 <th className="w-12 px-3 py-3"></th>
               </tr>
@@ -243,7 +247,7 @@ export function CotizacionForm({
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                     Agrega productos del catálogo o ítems libres.
                   </td>
                 </tr>
@@ -323,8 +327,26 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={item.flete}
+                          aria-label="Flete unitario"
+                          onChange={(e) =>
+                            actualizarItem(index, {
+                              flete: parseEntero(e.target.value),
+                            })
+                          }
+                          className={itemInputClass}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-right font-medium text-slate-900">
-                        {formatCLP(aNumero(item.cantidad) * aNumero(item.precio))}
+                        {formatCLP(
+                          aNumero(item.cantidad) *
+                            (aNumero(item.precio) + aNumero(item.flete))
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button
@@ -348,22 +370,10 @@ export function CotizacionForm({
       </div>
 
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="flete" className={labelClass}>
-            Flete (CLP)
-          </label>
-          <input
-            id="flete"
-            name="flete"
-            type="number"
-            min={0}
-            step={1}
-            value={flete}
-            onChange={(e) => setFlete(parseEntero(e.target.value))}
-            className={inputClass}
-          />
-          <FieldErrors errors={state.fieldErrors?.flete} />
-        </div>
+        <p className="text-xs text-slate-500">
+          El flete unitario se suma al precio de cada ítem. El cliente ve el
+          precio final sin una línea de flete separada.
+        </p>
       </div>
 
       <div className="max-w-2xl">
@@ -385,10 +395,6 @@ export function CotizacionForm({
           <div className="flex justify-between text-slate-600">
             <dt>Subtotal neto</dt>
             <dd>{formatCLP(totales.subtotalNeto)}</dd>
-          </div>
-          <div className="flex justify-between text-slate-600">
-            <dt>Flete</dt>
-            <dd>{formatCLP(totales.flete)}</dd>
           </div>
           <div className="flex justify-between text-slate-600">
             <dt>IVA (19%)</dt>

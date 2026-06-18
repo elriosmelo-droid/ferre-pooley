@@ -12,7 +12,6 @@ type CotizacionEditable = {
   estado: string;
   cliente_id: string;
   fecha_validez: string;
-  flete: number;
   notas: string | null;
   cotizacion_items: (CotizacionItemInput & { posicion: number })[];
 };
@@ -30,8 +29,8 @@ export default async function EditarCotizacionPage({
       supabase
         .from("cotizaciones")
         .select(
-          `id, folio, estado, cliente_id, fecha_validez, flete, notas,
-           cotizacion_items(producto_id, sku, descripcion, cantidad, costo, precio, posicion)`
+          `id, folio, estado, cliente_id, fecha_validez, notas,
+           cotizacion_items(producto_id, sku, descripcion, cantidad, costo, precio, flete, posicion)`
         )
         .eq("id", id)
         .single(),
@@ -55,13 +54,14 @@ export default async function EditarCotizacionPage({
 
   const items = [...cotizacion.cotizacion_items]
     .sort((a, b) => a.posicion - b.posicion)
-    .map(({ producto_id, sku, descripcion, cantidad, costo, precio }) => ({
+    .map(({ producto_id, sku, descripcion, cantidad, costo, precio, flete }) => ({
       producto_id,
       sku,
       descripcion,
       cantidad,
       costo,
       precio,
+      flete,
     }));
 
   const action = actualizarCotizacion.bind(null, id);
@@ -78,7 +78,6 @@ export default async function EditarCotizacionPage({
           cotizacion={{
             cliente_id: cotizacion.cliente_id,
             fecha_validez: cotizacion.fecha_validez,
-            flete: cotizacion.flete,
             notas: cotizacion.notas,
             items,
           }}

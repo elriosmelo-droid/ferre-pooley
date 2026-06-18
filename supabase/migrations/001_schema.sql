@@ -53,6 +53,7 @@ create table cotizacion_items (
   cantidad integer not null check (cantidad > 0),
   costo integer not null default 0,
   precio integer not null default 0,
+  flete integer not null default 0, -- flete unitario; se suma al precio para el cliente
   posicion integer not null default 0
 );
 
@@ -78,6 +79,7 @@ create table nota_venta_items (
   cantidad integer not null,
   costo integer not null default 0,
   precio integer not null default 0,
+  flete integer not null default 0,
   posicion integer not null default 0
 );
 
@@ -146,8 +148,8 @@ begin
     insert into notas_venta (cotizacion_id, cliente_id, flete, subtotal_neto, iva, total)
       values (v_cot.id, v_cot.cliente_id, v_cot.flete, v_cot.subtotal_neto, v_cot.iva, v_cot.total)
       returning * into v_nv;
-    insert into nota_venta_items (nota_venta_id, sku, descripcion, cantidad, costo, precio, posicion)
-      select v_nv.id, sku, descripcion, cantidad, costo, precio, posicion
+    insert into nota_venta_items (nota_venta_id, sku, descripcion, cantidad, costo, precio, flete, posicion)
+      select v_nv.id, sku, descripcion, cantidad, costo, precio, flete, posicion
       from cotizacion_items where cotizacion_id = v_cot.id;
     return query select 'aceptada'::text, v_nv.folio, true;
   else

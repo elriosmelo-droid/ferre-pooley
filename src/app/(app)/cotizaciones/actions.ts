@@ -38,15 +38,15 @@ const itemSchema = z.object({
     .number("Ingresa un precio válido")
     .int("El precio debe ser un número entero")
     .min(0, "El precio debe ser mayor o igual a 0"),
+  flete: z
+    .number("Ingresa un flete válido")
+    .int("El flete debe ser un número entero")
+    .min(0, "El flete debe ser mayor o igual a 0"),
 });
 
 const cotizacionSchema = z.object({
   cliente_id: z.uuid("Selecciona un cliente"),
   fecha_validez: z.iso.date("Ingresa una fecha de validez válida"),
-  flete: z.coerce
-    .number("Ingresa un flete válido")
-    .int("El flete debe ser un número entero")
-    .min(0, "El flete debe ser mayor o igual a 0"),
   notas: z.string().trim().optional(),
   items: z
     .array(itemSchema, "Los ítems no son válidos")
@@ -64,18 +64,17 @@ function parseCotizacionForm(formData: FormData) {
   return cotizacionSchema.safeParse({
     cliente_id: String(formData.get("cliente_id") ?? ""),
     fecha_validez: String(formData.get("fecha_validez") ?? ""),
-    flete: String(formData.get("flete") ?? "0"),
     notas: String(formData.get("notas") ?? ""),
     items,
   });
 }
 
 function toCotizacionRow(data: z.infer<typeof cotizacionSchema>) {
-  const totales = calcularTotales(data.items, data.flete);
+  const totales = calcularTotales(data.items);
   return {
     cliente_id: data.cliente_id,
     fecha_validez: data.fecha_validez,
-    flete: data.flete,
+    flete: 0, // el flete vive por ítem; este campo global queda en 0
     notas: data.notas || null,
     subtotal_neto: totales.subtotalNeto,
     iva: totales.iva,
@@ -95,6 +94,7 @@ function toItemRows(
     cantidad: item.cantidad,
     costo: item.costo,
     precio: item.precio,
+    flete: item.flete,
     posicion: index,
   }));
 }
@@ -227,7 +227,7 @@ export async function enviarCotizacion(
       `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
        token_aceptacion, notas, created_at,
        clientes(nombre, rut, correo, direccion),
-       cotizacion_items(sku, descripcion, cantidad, precio, posicion)`
+       cotizacion_items(sku, descripcion, cantidad, precio, flete, posicion)`
     )
     .eq("id", id)
     .single();
@@ -243,15 +243,25 @@ export async function enviarCotizacion(
     correo: string;
     direccion: string | null;
   } | null;
+  // El cliente ve el precio efectivo (precio + flete unitario), sin línea de flete.
   const items = [
     ...(cotizacion.cotizacion_items as unknown as {
       sku: string;
       descripcion: string;
       cantidad: number;
       precio: number;
+      flete: number;
       posicion: number;
     }[]),
-  ].sort((a, b) => a.posicion - b.posicion);
+  ]
+    .sort((a, b) => a.posicion - b.posicion)
+    .map((it) => ({
+      sku: it.sku,
+      descripcion: it.descripcion,
+      cantidad: it.cantidad,
+      precio: it.precio + it.flete,
+      posicion: it.posicion,
+    }));
 
   if (cotizacion.estado !== "borrador") {
     return { error: "Solo se pueden enviar borradores" };
@@ -279,7 +289,6 @@ export async function enviarCotizacion(
         folio: cotizacion.folio,
         created_at: cotizacion.created_at,
         fecha_validez: cotizacion.fecha_validez,
-        flete: cotizacion.flete,
         subtotal_neto: cotizacion.subtotal_neto,
         iva: cotizacion.iva,
         total: cotizacion.total,
@@ -359,7 +368,7 @@ export async function duplicarCotizacion(id: string): Promise<void> {
 
   const { data: items, error: itemsReadError } = await supabase
     .from("cotizacion_items")
-    .select("producto_id, sku, descripcion, cantidad, costo, precio")
+    .select("producto_id, sku, descripcion, cantidad, costo, precio, flete")
     .eq("cotizacion_id", id)
     .order("posicion");
 

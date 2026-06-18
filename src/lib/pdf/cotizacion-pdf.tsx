@@ -16,7 +16,6 @@ export type DatosPdfCotizacion = {
     folio: string;
     created_at: string;
     fecha_validez: string;
-    flete: number;
     subtotal_neto: number;
     iva: number;
     total: number;
@@ -234,10 +233,6 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
           <View style={styles.totalFila}>
             <Text style={styles.totalLabel}>Subtotal neto</Text>
             <Text>{clp(cotizacion.subtotal_neto)}</Text>
-          </View>
-          <View style={styles.totalFila}>
-            <Text style={styles.totalLabel}>Flete</Text>
-            <Text>{clp(cotizacion.flete)}</Text>
           </View>
           <View style={styles.totalFila}>
             <Text style={styles.totalLabel}>IVA (19%)</Text>
