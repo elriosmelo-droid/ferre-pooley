@@ -145,7 +145,7 @@ export default async function DashboardPage() {
             </h2>
             <Link
               href="/cotizaciones"
-              className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              className="text-sm font-medium text-brand-600 hover:text-brand-800"
             >
               Ver todas
             </Link>
@@ -190,7 +190,7 @@ export default async function DashboardPage() {
             </h2>
             <Link
               href="/notas-venta"
-              className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              className="text-sm font-medium text-brand-600 hover:text-brand-800"
             >
               Ver todas
             </Link>

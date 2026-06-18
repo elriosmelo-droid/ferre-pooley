@@ -9,8 +9,8 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-brand-50 px-4">
+      <div className="w-full max-w-sm rounded-xl border-t-4 border-brand-600 bg-white p-8 shadow-lg">
         <div className="mb-8 flex justify-center">
           <Image
             src="/logo-full.png"
@@ -35,7 +35,7 @@ export default async function LoginPage({
               type="email"
               required
               autoComplete="email"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
           <div>
@@ -51,7 +51,7 @@ export default async function LoginPage({
               type="password"
               required
               autoComplete="current-password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
           {error && (
@@ -59,7 +59,7 @@ export default async function LoginPage({
           )}
           <button
             type="submit"
-            className="mt-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+            className="mt-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
           >
             Ingresar
           </button>

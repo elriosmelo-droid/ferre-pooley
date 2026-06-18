@@ -26,7 +26,7 @@ export function EnviarButton({ cotizacionId }: { cotizacionId: string }) {
         type="button"
         onClick={enviar}
         disabled={isPending}
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
       >
         {isPending ? "Enviando…" : "Enviar al cliente"}
       </button>

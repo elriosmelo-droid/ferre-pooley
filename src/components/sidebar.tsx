@@ -16,7 +16,7 @@ const menuItems = [
 function linkClasses(active: boolean) {
   return `block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
     active
-      ? "bg-slate-700 text-white"
+      ? "bg-brand-600 text-white"
       : "text-slate-300 hover:bg-slate-800 hover:text-white"
   }`;
 }

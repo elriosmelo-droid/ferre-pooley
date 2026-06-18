@@ -10,13 +10,22 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Paleta de marca Tulbless — rojo del hexágono y dorado del texto */
+  --color-brand-50: #fef2f3;
+  --color-brand-100: #fde3e6;
+  --color-brand-200: #fbccd2;
+  --color-brand-300: #f7a3ae;
+  --color-brand-400: #f16d7f;
+  --color-brand-500: #e63a52;
+  --color-brand-600: #d80018;
+  --color-brand-700: #b30014;
+  --color-brand-800: #930417;
+  --color-brand-900: #7d0918;
+
+  --color-gold-400: #ffc000;
+  --color-gold-500: #f5b500;
+  --color-gold-600: #d99a00;
 }
 
 body {

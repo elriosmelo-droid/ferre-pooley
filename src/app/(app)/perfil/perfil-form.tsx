@@ -145,7 +145,7 @@ export function PerfilForm({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {isPending ? "Guardando…" : "Guardar"}
         </button>

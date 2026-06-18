@@ -39,7 +39,7 @@ export default async function ClientesPage({
         <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
         <Link
           href="/clientes/nuevo"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           Nuevo cliente
         </Link>
@@ -51,7 +51,7 @@ export default async function ClientesPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por nombre o RUT…"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
         <button
           type="submit"
@@ -99,7 +99,7 @@ export default async function ClientesPage({
                       <div className="flex justify-end gap-4">
                         <Link
                           href={`/clientes/${cliente.id}/editar`}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                          className="text-sm font-medium text-brand-600 hover:text-brand-800"
                         >
                           Editar
                         </Link>

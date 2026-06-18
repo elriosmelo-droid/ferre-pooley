@@ -118,7 +118,7 @@ export default async function DetalleNotaVentaPage({
                 {nota.cotizaciones ? (
                   <Link
                     href={`/cotizaciones/${nota.cotizaciones.id}`}
-                    className="font-medium text-blue-600 hover:text-blue-800"
+                    className="font-medium text-brand-600 hover:text-brand-800"
                   >
                     {nota.cotizaciones.folio}
                   </Link>

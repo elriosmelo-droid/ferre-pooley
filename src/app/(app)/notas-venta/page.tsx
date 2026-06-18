@@ -63,7 +63,7 @@ export default async function NotasVentaPage({
             }
             className={
               filtroActivo === filtro.value
-                ? "rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white"
+                ? "rounded-full bg-brand-600 px-3 py-1 text-sm font-medium text-white"
                 : "rounded-full border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
             }
           >
@@ -112,7 +112,7 @@ export default async function NotasVentaPage({
                       {nota.cotizaciones ? (
                         <Link
                           href={`/cotizaciones/${nota.cotizaciones.id}`}
-                          className="font-medium text-blue-600 hover:text-blue-800"
+                          className="font-medium text-brand-600 hover:text-brand-800"
                         >
                           {nota.cotizaciones.folio}
                         </Link>
@@ -134,7 +134,7 @@ export default async function NotasVentaPage({
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/notas-venta/${nota.id}`}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                        className="text-sm font-medium text-brand-600 hover:text-brand-800"
                       >
                         Ver
                       </Link>

@@ -101,7 +101,7 @@ export function ProductoForm({
           name="activo"
           type="checkbox"
           defaultChecked={producto?.activo ?? true}
-          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
         />
         <label htmlFor="activo" className="text-sm font-medium text-slate-700">
           Producto activo
@@ -114,7 +114,7 @@ export function ProductoForm({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {isPending ? "Guardando…" : submitLabel}
         </button>

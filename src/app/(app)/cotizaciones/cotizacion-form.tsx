@@ -52,7 +52,7 @@ function fechaValidezDefault() {
 }
 
 const itemInputClass =
-  "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 
 // uid: clave estable de React por fila; se descarta al serializar al servidor.
 // Los campos numéricos admiten "" para poder dejarse vacíos mientras se editan
@@ -212,7 +212,7 @@ export function CotizacionForm({
               const producto = productos.find((p) => p.id === e.target.value);
               if (producto) agregarProducto(producto);
             }}
-            className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Agregar producto del catálogo…</option>
             {productos.map((producto) => (
@@ -413,7 +413,7 @@ export function CotizacionForm({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {isPending ? "Guardando…" : "Guardar borrador"}
         </button>
