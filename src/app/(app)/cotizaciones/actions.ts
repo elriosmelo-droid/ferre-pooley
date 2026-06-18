@@ -277,7 +277,7 @@ export async function enviarCotizacion(
     .limit(1)
     .maybeSingle();
 
-  const empresa = perfil?.razon_social || "Ferre Pooley";
+  const empresa = perfil?.razon_social || "Tulbless";
   const linkAceptar = `${appUrl}/cotizacion/${cotizacion.token_aceptacion}`;
 
   try {

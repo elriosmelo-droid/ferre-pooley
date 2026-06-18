@@ -87,7 +87,7 @@ export function AvisoRespuestaEmail({
           )}
           <Hr style={{ borderColor: "#e2e8f0", margin: "24px 0 16px" }} />
           <Text style={{ color: "#94a3b8", fontSize: "12px", margin: 0 }}>
-            Aviso automático de Ferre Pooley
+            Aviso automático de Tulbless
           </Text>
         </Container>
       </Body>

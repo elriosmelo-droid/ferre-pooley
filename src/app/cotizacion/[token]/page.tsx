@@ -175,7 +175,7 @@ export default async function CotizacionPublicaPage({
     .limit(1)
     .maybeSingle();
 
-  const empresa = perfil?.razon_social || "Ferre Pooley";
+  const empresa = perfil?.razon_social || "Tulbless";
   const items = [...cotizacion.cotizacion_items].sort(
     (a, b) => a.posicion - b.posicion
   );

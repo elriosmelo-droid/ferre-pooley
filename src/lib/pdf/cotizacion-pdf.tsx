@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
 });
 
 function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacion) {
-  const empresa = perfil?.razon_social || "Ferre Pooley";
+  const empresa = perfil?.razon_social || "Tulbless";
 
   return (
     <Document>
@@ -252,7 +252,7 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
         ) : null}
 
         <Text style={styles.footer} fixed>
-          Documento generado por Ferre Pooley
+          Documento generado por Tulbless
         </Text>
       </Page>
     </Document>

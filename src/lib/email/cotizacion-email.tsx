@@ -82,7 +82,7 @@ export function CotizacionEmail({
           </Text>
           <Hr style={{ borderColor: "#e2e8f0", margin: "24px 0 16px" }} />
           <Text style={{ color: "#94a3b8", fontSize: "12px", margin: 0 }}>
-            {empresa} · Enviado con Ferre Pooley
+            {empresa} · Enviado con Tulbless
           </Text>
         </Container>
       </Body>

@@ -30,7 +30,7 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 flex w-[220px] flex-col bg-slate-900">
       <div className="px-4 py-5">
         <Link href="/dashboard" className="text-lg font-bold text-white">
-          🔩 Ferre Pooley
+          🔩 Tulbless
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3">

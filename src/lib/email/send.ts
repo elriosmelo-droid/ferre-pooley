@@ -27,7 +27,7 @@ export async function enviarCorreo({
   const from = process.env.RESEND_FROM;
   if (!from) {
     throw new Error(
-      'RESEND_FROM no está configurada. Define la variable de entorno (p. ej. "Ferre Pooley <onboarding@resend.dev>").'
+      'RESEND_FROM no está configurada. Define la variable de entorno (p. ej. "Tulbless <onboarding@resend.dev>").'
     );
   }
 
@@ -59,7 +59,7 @@ export async function enviarCorreoCotizacion({
   const from = process.env.RESEND_FROM;
   if (!from) {
     throw new Error(
-      'RESEND_FROM no está configurada. Define la variable de entorno (p. ej. "Ferre Pooley <onboarding@resend.dev>").'
+      'RESEND_FROM no está configurada. Define la variable de entorno (p. ej. "Tulbless <onboarding@resend.dev>").'
     );
   }
 

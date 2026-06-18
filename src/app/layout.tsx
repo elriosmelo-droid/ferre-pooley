@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ferre Pooley",
+  title: "Tulbless",
   description: "Sistema de cotizaciones y notas de venta",
 };
 
