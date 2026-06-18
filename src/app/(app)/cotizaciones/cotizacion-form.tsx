@@ -54,7 +54,29 @@ const itemInputClass =
   "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
 // uid: clave estable de React por fila; se descarta al serializar al servidor.
-type ItemRow = CotizacionItemInput & { uid: string };
+// Los campos numéricos admiten "" para poder dejarse vacíos mientras se editan
+// (si no, el 0 quedaría "pegado" e imposible de borrar). Se interpretan como 0
+// al calcular totales y al serializar.
+type CampoNumerico = number | "";
+type ItemRow = {
+  uid: string;
+  producto_id: string | null;
+  sku: string;
+  descripcion: string;
+  cantidad: CampoNumerico;
+  costo: CampoNumerico;
+  precio: CampoNumerico;
+};
+
+const aNumero = (v: CampoNumerico) => (v === "" ? 0 : v);
+
+// Parsea lo que el usuario escribe: vacío se mantiene vacío; texto inválido
+// también; números se truncan a entero ≥ 0.
+function parseEntero(valor: string): CampoNumerico {
+  if (valor === "") return "";
+  const n = Math.trunc(Number(valor));
+  return Number.isNaN(n) ? "" : Math.max(0, n);
+}
 
 export function CotizacionForm({
   clientes,
@@ -66,9 +88,15 @@ export function CotizacionForm({
   const [items, setItems] = useState<ItemRow[]>(() =>
     (cotizacion?.items ?? []).map((item, i) => ({ ...item, uid: `init-${i}` }))
   );
-  const [flete, setFlete] = useState(cotizacion?.flete ?? 0);
+  const [flete, setFlete] = useState<CampoNumerico>(cotizacion?.flete ?? 0);
 
-  const totales = calcularTotales(items, flete);
+  const totales = calcularTotales(
+    items.map((i) => ({
+      cantidad: aNumero(i.cantidad),
+      precio: aNumero(i.precio),
+    })),
+    aNumero(flete)
+  );
 
   function agregarProducto(producto: ProductoOption) {
     setItems((prev) => [
@@ -94,15 +122,15 @@ export function CotizacionForm({
         sku: "",
         descripcion: "",
         cantidad: 1,
-        costo: 0,
-        precio: 0,
+        costo: "",
+        precio: "",
       },
     ]);
   }
 
   function actualizarItem(
     index: number,
-    cambios: Partial<CotizacionItemInput>
+    cambios: Partial<Omit<ItemRow, "uid">>
   ) {
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, ...cambios } : item))
@@ -123,9 +151,9 @@ export function CotizacionForm({
             producto_id: item.producto_id,
             sku: item.sku,
             descripcion: item.descripcion,
-            cantidad: item.cantidad,
-            costo: item.costo,
-            precio: item.precio,
+            cantidad: aNumero(item.cantidad),
+            costo: aNumero(item.costo),
+            precio: aNumero(item.precio),
           }))
         )}
       />
@@ -259,7 +287,7 @@ export function CotizacionForm({
                           aria-label="Cantidad"
                           onChange={(e) =>
                             actualizarItem(index, {
-                              cantidad: Math.trunc(Number(e.target.value)) || 0,
+                              cantidad: parseEntero(e.target.value),
                             })
                           }
                           className={itemInputClass}
@@ -274,7 +302,7 @@ export function CotizacionForm({
                           aria-label="Costo"
                           onChange={(e) =>
                             actualizarItem(index, {
-                              costo: Math.trunc(Number(e.target.value)) || 0,
+                              costo: parseEntero(e.target.value),
                             })
                           }
                           className={itemInputClass}
@@ -289,14 +317,14 @@ export function CotizacionForm({
                           aria-label="Precio"
                           onChange={(e) =>
                             actualizarItem(index, {
-                              precio: Math.trunc(Number(e.target.value)) || 0,
+                              precio: parseEntero(e.target.value),
                             })
                           }
                           className={itemInputClass}
                         />
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-slate-900">
-                        {formatCLP(item.cantidad * item.precio)}
+                        {formatCLP(aNumero(item.cantidad) * aNumero(item.precio))}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button
@@ -331,7 +359,7 @@ export function CotizacionForm({
             min={0}
             step={1}
             value={flete}
-            onChange={(e) => setFlete(Math.trunc(Number(e.target.value)) || 0)}
+            onChange={(e) => setFlete(parseEntero(e.target.value))}
             className={inputClass}
           />
           <FieldErrors errors={state.fieldErrors?.flete} />
