@@ -1,5 +1,6 @@
 import {
   Document,
+  Image,
   Page,
   StyleSheet,
   Text,
@@ -7,6 +8,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { formatCLP } from "@/lib/money";
+import { LOGO_DATA_URI } from "./logo-data";
 
 // Datos mínimos para el PDF. NUNCA incluir costo ni margen: son internos.
 export type DatosPdfCotizacion = {
@@ -64,6 +66,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 24,
   },
+  logo: { width: 110, marginBottom: 8 },
   empresaNombre: {
     fontFamily: "Helvetica-Bold",
     fontSize: 14,
@@ -171,6 +174,8 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image style={styles.logo} src={LOGO_DATA_URI} />
             <Text style={styles.empresaNombre}>{empresa}</Text>
             {perfil?.rut_empresa ? (
               <Text style={styles.empresaLinea}>RUT: {perfil.rut_empresa}</Text>

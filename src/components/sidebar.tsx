@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
@@ -28,9 +29,16 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 flex w-[220px] flex-col bg-slate-900">
-      <div className="px-4 py-5">
-        <Link href="/dashboard" className="text-lg font-bold text-white">
-          🔩 Tulbless
+      <div className="flex justify-center px-4 py-5">
+        <Link href="/dashboard" className="rounded-lg bg-white px-3 py-2">
+          <Image
+            src="/logo.png"
+            alt="Tulbless"
+            width={160}
+            height={173}
+            priority
+            className="h-auto w-[140px]"
+          />
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3">
