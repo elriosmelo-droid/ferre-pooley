@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export type NotaVentaActionResult = {
@@ -35,6 +36,34 @@ export async function marcarPagada(
   revalidatePath("/notas-venta");
   revalidatePath(`/notas-venta/${id}`);
   return { success: true };
+}
+
+// Borrado definitivo: elimina la nota y, por FK on delete cascade, sus ítems.
+// La cotización de origen queda intacta (estado "aceptada"); como su vínculo es
+// único, no se podrá generar otra nota desde esa cotización.
+export async function eliminarNotaVenta(
+  id: string
+): Promise<NotaVentaActionResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("notas_venta")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    console.error("Error al eliminar nota de venta:", error.message);
+    return {
+      error: "No se pudo eliminar la nota de venta. Intenta nuevamente.",
+    };
+  }
+  if (!data?.length) {
+    return { error: "La nota de venta ya no existe" };
+  }
+
+  revalidatePath("/notas-venta");
+  redirect("/notas-venta");
 }
 
 export async function anularNotaVenta(

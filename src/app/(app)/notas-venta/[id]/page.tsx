@@ -91,9 +91,7 @@ export default async function DetalleNotaVentaPage({
           <h1 className="text-2xl font-bold text-slate-900">{nota.folio}</h1>
           <NotaEstadoBadge estado={nota.estado} />
         </div>
-        {nota.estado === "pendiente" && (
-          <AccionesNota notaVentaId={nota.id} />
-        )}
+        <AccionesNota notaVentaId={nota.id} estado={nota.estado} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
