@@ -8,6 +8,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { formatCLP } from "@/lib/money";
+import { etiquetaMedioPago } from "@/lib/medio-pago";
 import { LOGO_DATA_URI } from "./logo-data";
 
 // Datos mínimos para el PDF. NUNCA incluir costo ni margen: son internos.
@@ -16,6 +17,9 @@ export type DatosPdfCotizacion = {
     folio: string;
     created_at: string;
     fecha_validez: string;
+    medio_pago: string | null;
+    subtotal_bruto: number;
+    descuento: number;
     subtotal_neto: number;
     iva: number;
     total: number;
@@ -26,6 +30,8 @@ export type DatosPdfCotizacion = {
     descripcion: string;
     cantidad: number;
     precio: number;
+    descuento: number;
+    precioConDesc: number;
   }[];
   cliente: {
     nombre: string;
@@ -120,11 +126,13 @@ const styles = StyleSheet.create({
     color: "#64748b",
     textTransform: "uppercase",
   },
-  colSku: { width: "15%" },
-  colDescripcion: { width: "41%", paddingRight: 6 },
-  colCantidad: { width: "10%", textAlign: "right" },
-  colPrecio: { width: "17%", textAlign: "right" },
-  colTotal: { width: "17%", textAlign: "right" },
+  colSku: { width: "12%" },
+  colDescripcion: { width: "30%", paddingRight: 6 },
+  colCantidad: { width: "8%", textAlign: "right" },
+  colPrecio: { width: "16%", textAlign: "right" },
+  colDescuento: { width: "10%", textAlign: "right" },
+  colPrecioDesc: { width: "12%", textAlign: "right" },
+  colTotal: { width: "12%", textAlign: "right" },
   totales: {
     marginTop: 12,
     alignSelf: "flex-end",
@@ -145,6 +153,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   totalFinalTexto: { fontFamily: "Helvetica-Bold", fontSize: 11 },
+  medioPagoBox: { flexDirection: "row", marginTop: 16 },
+  medioPagoLabel: { fontFamily: "Helvetica-Bold" },
   notas: { marginTop: 20 },
   notasTitulo: {
     fontFamily: "Helvetica-Bold",
@@ -167,6 +177,7 @@ const styles = StyleSheet.create({
 
 function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacion) {
   const empresa = perfil?.razon_social || "Tulbless";
+  const hayDescuento = items.some((it) => it.descuento > 0);
 
   return (
     <Document>
@@ -214,7 +225,9 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
           <Text style={[styles.th, styles.colSku]}>SKU</Text>
           <Text style={[styles.th, styles.colDescripcion]}>Descripción</Text>
           <Text style={[styles.th, styles.colCantidad]}>Cant.</Text>
-          <Text style={[styles.th, styles.colPrecio]}>Precio unit.</Text>
+          <Text style={[styles.th, styles.colPrecio]}>P. unit.</Text>
+          <Text style={[styles.th, styles.colDescuento]}>Desc.</Text>
+          <Text style={[styles.th, styles.colPrecioDesc]}>P. c/desc</Text>
           <Text style={[styles.th, styles.colTotal]}>Total</Text>
         </View>
         {items.map((item, index) => (
@@ -223,13 +236,29 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
             <Text style={styles.colDescripcion}>{item.descripcion}</Text>
             <Text style={styles.colCantidad}>{item.cantidad}</Text>
             <Text style={styles.colPrecio}>{clp(item.precio)}</Text>
+            <Text style={styles.colDescuento}>
+              {item.descuento > 0 ? `${item.descuento}%` : "—"}
+            </Text>
+            <Text style={styles.colPrecioDesc}>{clp(item.precioConDesc)}</Text>
             <Text style={styles.colTotal}>
-              {clp(item.cantidad * item.precio)}
+              {clp(item.cantidad * item.precioConDesc)}
             </Text>
           </View>
         ))}
 
         <View style={styles.totales}>
+          {hayDescuento ? (
+            <>
+              <View style={styles.totalFila}>
+                <Text style={styles.totalLabel}>Subtotal bruto</Text>
+                <Text>{clp(cotizacion.subtotal_bruto)}</Text>
+              </View>
+              <View style={styles.totalFila}>
+                <Text style={styles.totalLabel}>Descuento</Text>
+                <Text>-{clp(cotizacion.descuento)}</Text>
+              </View>
+            </>
+          ) : null}
           <View style={styles.totalFila}>
             <Text style={styles.totalLabel}>Subtotal neto</Text>
             <Text>{clp(cotizacion.subtotal_neto)}</Text>
@@ -242,6 +271,11 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
             <Text style={styles.totalFinalTexto}>TOTAL</Text>
             <Text style={styles.totalFinalTexto}>{clp(cotizacion.total)}</Text>
           </View>
+        </View>
+
+        <View style={styles.medioPagoBox}>
+          <Text style={styles.medioPagoLabel}>Medio de pago: </Text>
+          <Text>{etiquetaMedioPago(cotizacion.medio_pago)}</Text>
         </View>
 
         {cotizacion.notas ? (

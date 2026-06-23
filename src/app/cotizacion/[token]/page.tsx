@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCLP } from "@/lib/money";
+import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import { etiquetaMedioPago } from "@/lib/medio-pago";
 import { ResponderBotones } from "./responder-botones";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,7 @@ type ItemRow = {
   cantidad: number;
   precio: number;
   flete: number;
+  descuento: number;
   posicion: number;
 };
 
@@ -21,6 +24,7 @@ type CotizacionPublica = {
   folio: string;
   estado: string;
   fecha_validez: string;
+  medio_pago: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -138,9 +142,9 @@ export default async function CotizacionPublicaPage({
   const { data } = await supabase
     .from("cotizaciones")
     .select(
-      `folio, estado, fecha_validez, subtotal_neto, iva, total, notas,
+      `folio, estado, fecha_validez, medio_pago, subtotal_neto, iva, total, notas,
        created_at, clientes(nombre),
-       cotizacion_items(sku, descripcion, cantidad, precio, flete, posicion)`
+       cotizacion_items(sku, descripcion, cantidad, precio, flete, descuento, posicion)`
     )
     .eq("token_aceptacion", token)
     .maybeSingle();
@@ -180,6 +184,7 @@ export default async function CotizacionPublicaPage({
   const items = [...cotizacion.cotizacion_items].sort(
     (a, b) => a.posicion - b.posicion
   );
+  const totales = calcularTotales(items);
 
   return (
     <Shell>
@@ -227,40 +232,74 @@ export default async function CotizacionPublicaPage({
                 {formatFecha(cotizacion.fecha_validez)}
               </p>
             </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Medio de pago
+              </p>
+              <p className="mt-1 font-medium text-slate-900">
+                {etiquetaMedioPago(cotizacion.medio_pago)}
+              </p>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[520px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">SKU</th>
                   <th className="px-4 py-3">Descripción</th>
-                  <th className="px-4 py-3 text-right">Cantidad</th>
-                  <th className="px-4 py-3 text-right">Precio unit.</th>
+                  <th className="px-4 py-3 text-right">Cant.</th>
+                  <th className="px-4 py-3 text-right">P. unit.</th>
+                  <th className="px-4 py-3 text-right">Desc.</th>
+                  <th className="px-4 py-3 text-right">P. c/desc</th>
                   <th className="px-4 py-3 text-right">Total línea</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {items.map((item, i) => (
-                  <tr key={i} className="text-slate-700">
-                    <td className="px-4 py-3">{item.sku || "—"}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {item.descripcion}
-                    </td>
-                    <td className="px-4 py-3 text-right">{item.cantidad}</td>
-                    <td className="px-4 py-3 text-right">
-                      {formatCLP(item.precio + item.flete)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900">
-                      {formatCLP(item.cantidad * (item.precio + item.flete))}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item, i) => {
+                  const precioConDesc =
+                    item.precio -
+                    descuentoUnitario(item.precio, item.descuento) +
+                    item.flete;
+                  return (
+                    <tr key={i} className="text-slate-700">
+                      <td className="px-4 py-3">{item.sku || "—"}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {item.descripcion}
+                      </td>
+                      <td className="px-4 py-3 text-right">{item.cantidad}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCLP(item.precio + item.flete)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {item.descuento > 0 ? `${item.descuento}%` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCLP(precioConDesc)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                        {formatCLP(item.cantidad * precioConDesc)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <dl className="ml-auto flex w-full max-w-xs flex-col gap-2 text-sm">
+            {totales.descuento > 0 && (
+              <>
+                <div className="flex justify-between text-slate-600">
+                  <dt>Subtotal bruto</dt>
+                  <dd>{formatCLP(totales.subtotalBruto)}</dd>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <dt>Descuento</dt>
+                  <dd>-{formatCLP(totales.descuento)}</dd>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-slate-600">
               <dt>Subtotal neto</dt>
               <dd>{formatCLP(cotizacion.subtotal_neto)}</dd>

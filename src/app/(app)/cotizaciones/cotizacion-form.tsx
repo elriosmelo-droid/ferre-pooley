@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { formatCLP } from "@/lib/money";
-import { calcularTotales } from "@/lib/totals";
+import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import { MEDIOS_PAGO } from "@/lib/medio-pago";
 import type { CotizacionFormState } from "./actions";
 
 type ClienteOption = { id: string; nombre: string; rut: string | null };
@@ -26,6 +27,8 @@ export type CotizacionItemInput = {
   precio: number;
   // Flete unitario: interno, se suma al precio para el cliente.
   flete: number;
+  // Descuento porcentual (0–100) sobre el precio.
+  descuento: number;
 };
 
 type CotizacionFormProps = {
@@ -34,6 +37,7 @@ type CotizacionFormProps = {
   cotizacion?: {
     cliente_id: string;
     fecha_validez: string;
+    medio_pago: string | null;
     notas: string | null;
     items: CotizacionItemInput[];
   };
@@ -68,6 +72,7 @@ type ItemRow = {
   costo: CampoNumerico;
   precio: CampoNumerico;
   flete: CampoNumerico;
+  descuento: CampoNumerico;
 };
 
 const aNumero = (v: CampoNumerico) => (v === "" ? 0 : v);
@@ -78,6 +83,13 @@ function parseEntero(valor: string): CampoNumerico {
   if (valor === "") return "";
   const n = Math.trunc(Number(valor));
   return Number.isNaN(n) ? "" : Math.max(0, n);
+}
+
+// Porcentaje de descuento: entero entre 0 y 100.
+function parsePorcentaje(valor: string): CampoNumerico {
+  if (valor === "") return "";
+  const n = Math.trunc(Number(valor));
+  return Number.isNaN(n) ? "" : Math.min(100, Math.max(0, n));
 }
 
 export function CotizacionForm({
@@ -95,6 +107,7 @@ export function CotizacionForm({
       cantidad: aNumero(i.cantidad),
       precio: aNumero(i.precio),
       flete: aNumero(i.flete),
+      descuento: aNumero(i.descuento),
     }))
   );
 
@@ -110,6 +123,7 @@ export function CotizacionForm({
         costo: producto.costo,
         precio: producto.precio,
         flete: 0,
+        descuento: 0,
       },
     ]);
   }
@@ -126,6 +140,7 @@ export function CotizacionForm({
         costo: "",
         precio: "",
         flete: "",
+        descuento: "",
       },
     ]);
   }
@@ -157,6 +172,7 @@ export function CotizacionForm({
             costo: aNumero(item.costo),
             precio: aNumero(item.precio),
             flete: aNumero(item.flete),
+            descuento: aNumero(item.descuento),
           }))
         )}
       />
@@ -200,6 +216,29 @@ export function CotizacionForm({
           />
           <FieldErrors errors={state.fieldErrors?.fecha_validez} />
         </div>
+
+        <div>
+          <label htmlFor="medio_pago" className={labelClass}>
+            Medio de pago *
+          </label>
+          <select
+            id="medio_pago"
+            name="medio_pago"
+            required
+            defaultValue={cotizacion?.medio_pago ?? ""}
+            className={inputClass}
+          >
+            <option value="" disabled>
+              Selecciona un medio de pago…
+            </option>
+            {MEDIOS_PAGO.map((m) => (
+              <option key={m.valor} value={m.valor}>
+                {m.etiqueta}
+              </option>
+            ))}
+          </select>
+          <FieldErrors errors={state.fieldErrors?.medio_pago} />
+        </div>
       </div>
 
       <div>
@@ -240,6 +279,7 @@ export function CotizacionForm({
                 <th className="w-28 px-3 py-3">Costo</th>
                 <th className="w-28 px-3 py-3">Precio</th>
                 <th className="w-28 px-3 py-3">Flete unit.</th>
+                <th className="w-24 px-3 py-3">Desc. %</th>
                 <th className="w-32 px-3 py-3 text-right">Total línea</th>
                 <th className="w-12 px-3 py-3"></th>
               </tr>
@@ -247,7 +287,7 @@ export function CotizacionForm({
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
                     Agrega productos del catálogo o ítems libres.
                   </td>
                 </tr>
@@ -342,10 +382,31 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={item.descuento}
+                          aria-label="Descuento porcentual"
+                          onChange={(e) =>
+                            actualizarItem(index, {
+                              descuento: parsePorcentaje(e.target.value),
+                            })
+                          }
+                          className={itemInputClass}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-right font-medium text-slate-900">
                         {formatCLP(
                           aNumero(item.cantidad) *
-                            (aNumero(item.precio) + aNumero(item.flete))
+                            (aNumero(item.precio) -
+                              descuentoUnitario(
+                                aNumero(item.precio),
+                                aNumero(item.descuento)
+                              ) +
+                              aNumero(item.flete))
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -392,6 +453,18 @@ export function CotizacionForm({
 
       <div className="max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
+          {totales.descuento > 0 && (
+            <>
+              <div className="flex justify-between text-slate-600">
+                <dt>Subtotal bruto</dt>
+                <dd>{formatCLP(totales.subtotalBruto)}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Descuento</dt>
+                <dd>-{formatCLP(totales.descuento)}</dd>
+              </div>
+            </>
+          )}
           <div className="flex justify-between text-slate-600">
             <dt>Subtotal neto</dt>
             <dd>{formatCLP(totales.subtotalNeto)}</dd>

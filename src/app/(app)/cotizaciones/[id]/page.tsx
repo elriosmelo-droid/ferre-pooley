@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
+import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import { etiquetaMedioPago } from "@/lib/medio-pago";
 import { APP_URL } from "@/lib/app-url";
 import { duplicarCotizacion } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
@@ -16,6 +18,7 @@ type ItemRow = {
   costo: number;
   precio: number;
   flete: number;
+  descuento: number;
   posicion: number;
 };
 
@@ -25,6 +28,7 @@ type CotizacionDetalle = {
   estado: CotizacionEstado;
   fecha_validez: string;
   flete: number;
+  medio_pago: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -68,10 +72,10 @@ export default async function DetalleCotizacionPage({
   const { data } = await supabase
     .from("cotizaciones")
     .select(
-      `id, folio, estado, fecha_validez, flete, subtotal_neto, iva, total,
+      `id, folio, estado, fecha_validez, flete, medio_pago, subtotal_neto, iva, total,
        token_aceptacion, notas, firma, firmante, motivo_rechazo, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
-       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, posicion)`
+       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
     )
     .eq("id", id)
     .single();
@@ -84,6 +88,7 @@ export default async function DetalleCotizacionPage({
   const items = [...cotizacion.cotizacion_items].sort(
     (a, b) => a.posicion - b.posicion
   );
+  const totales = calcularTotales(items);
   const cliente = cotizacion.clientes;
   const linkPublico = `${APP_URL}/cotizacion/${cotizacion.token_aceptacion}`;
   const mostrarLinkPublico = ["enviada", "aceptada", "rechazada"].includes(
@@ -184,6 +189,7 @@ export default async function DetalleCotizacionPage({
               <th className="px-4 py-3 text-right text-amber-600">
                 Flete unit. (interno)
               </th>
+              <th className="px-4 py-3 text-right">Desc. %</th>
               <th className="px-4 py-3 text-right">Precio final</th>
               <th className="px-4 py-3 text-right">Total línea</th>
               <th className="px-4 py-3 text-right text-amber-600">
@@ -194,7 +200,7 @@ export default async function DetalleCotizacionPage({
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   Esta cotización no tiene ítems.
                 </td>
               </tr>
@@ -216,13 +222,30 @@ export default async function DetalleCotizacionPage({
                     {formatCLP(item.flete)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {formatCLP(item.precio + item.flete)}
+                    {item.descuento > 0 ? `${item.descuento}%` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {formatCLP(
+                      item.precio -
+                        descuentoUnitario(item.precio, item.descuento) +
+                        item.flete
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">
-                    {formatCLP(item.cantidad * (item.precio + item.flete))}
+                    {formatCLP(
+                      item.cantidad *
+                        (item.precio -
+                          descuentoUnitario(item.precio, item.descuento) +
+                          item.flete)
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right text-amber-600">
-                    {formatCLP(item.cantidad * (item.precio - item.costo))}
+                    {formatCLP(
+                      item.cantidad *
+                        (item.precio -
+                          descuentoUnitario(item.precio, item.descuento) -
+                          item.costo)
+                    )}
                   </td>
                 </tr>
               ))
@@ -233,6 +256,24 @@ export default async function DetalleCotizacionPage({
 
       <div className="ml-auto w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
+          <div className="flex justify-between text-slate-600">
+            <dt>Medio de pago</dt>
+            <dd className="font-medium text-slate-900">
+              {etiquetaMedioPago(cotizacion.medio_pago)}
+            </dd>
+          </div>
+          {totales.descuento > 0 && (
+            <>
+              <div className="flex justify-between border-t border-slate-200 pt-2 text-slate-600">
+                <dt>Subtotal bruto</dt>
+                <dd>{formatCLP(totales.subtotalBruto)}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Descuento</dt>
+                <dd>-{formatCLP(totales.descuento)}</dd>
+              </div>
+            </>
+          )}
           <div className="flex justify-between text-slate-600">
             <dt>Subtotal neto</dt>
             <dd>{formatCLP(cotizacion.subtotal_neto)}</dd>

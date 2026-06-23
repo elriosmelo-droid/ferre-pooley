@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
+import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import { etiquetaMedioPago } from "@/lib/medio-pago";
 import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
 
@@ -13,6 +15,7 @@ type ItemRow = {
   costo: number;
   precio: number;
   flete: number;
+  descuento: number;
   posicion: number;
 };
 
@@ -21,6 +24,7 @@ type NotaVentaDetalle = {
   folio: string;
   estado: NotaVentaEstado;
   flete: number;
+  medio_pago: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -57,10 +61,10 @@ export default async function DetalleNotaVentaPage({
   const { data, error } = await supabase
     .from("notas_venta")
     .select(
-      `id, folio, estado, flete, subtotal_neto, iva, total, pagada_at, created_at,
+      `id, folio, estado, flete, medio_pago, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
-       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, posicion)`
+       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
     )
     .eq("id", id)
     .single();
@@ -77,6 +81,7 @@ export default async function DetalleNotaVentaPage({
   const items = [...nota.nota_venta_items].sort(
     (a, b) => a.posicion - b.posicion
   );
+  const totales = calcularTotales(items);
   const cliente = nota.clientes;
 
   return (
@@ -155,6 +160,7 @@ export default async function DetalleNotaVentaPage({
               <th className="px-4 py-3 text-right text-amber-600">
                 Flete unit. (interno)
               </th>
+              <th className="px-4 py-3 text-right">Desc. %</th>
               <th className="px-4 py-3 text-right">Precio final</th>
               <th className="px-4 py-3 text-right">Total línea</th>
               <th className="px-4 py-3 text-right text-amber-600">
@@ -165,7 +171,7 @@ export default async function DetalleNotaVentaPage({
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   Esta nota de venta no tiene ítems.
                 </td>
               </tr>
@@ -187,13 +193,30 @@ export default async function DetalleNotaVentaPage({
                     {formatCLP(item.flete)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {formatCLP(item.precio + item.flete)}
+                    {item.descuento > 0 ? `${item.descuento}%` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {formatCLP(
+                      item.precio -
+                        descuentoUnitario(item.precio, item.descuento) +
+                        item.flete
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">
-                    {formatCLP(item.cantidad * (item.precio + item.flete))}
+                    {formatCLP(
+                      item.cantidad *
+                        (item.precio -
+                          descuentoUnitario(item.precio, item.descuento) +
+                          item.flete)
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right text-amber-600">
-                    {formatCLP(item.cantidad * (item.precio - item.costo))}
+                    {formatCLP(
+                      item.cantidad *
+                        (item.precio -
+                          descuentoUnitario(item.precio, item.descuento) -
+                          item.costo)
+                    )}
                   </td>
                 </tr>
               ))
@@ -205,12 +228,26 @@ export default async function DetalleNotaVentaPage({
       <div className="ml-auto w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
           <div className="flex justify-between text-slate-600">
+            <dt>Medio de pago</dt>
+            <dd className="font-medium text-slate-900">
+              {etiquetaMedioPago(nota.medio_pago)}
+            </dd>
+          </div>
+          {totales.descuento > 0 && (
+            <>
+              <div className="flex justify-between border-t border-slate-200 pt-2 text-slate-600">
+                <dt>Subtotal bruto</dt>
+                <dd>{formatCLP(totales.subtotalBruto)}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Descuento</dt>
+                <dd>-{formatCLP(totales.descuento)}</dd>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between text-slate-600">
             <dt>Subtotal neto</dt>
             <dd>{formatCLP(nota.subtotal_neto)}</dd>
-          </div>
-          <div className="flex justify-between text-slate-600">
-            <dt>Flete</dt>
-            <dd>{formatCLP(nota.flete)}</dd>
           </div>
           <div className="flex justify-between text-slate-600">
             <dt>IVA (19%)</dt>
