@@ -1,5 +1,6 @@
 import "server-only";
 import https from "node:https";
+import type { IncomingHttpHeaders } from "node:http";
 import { randomUUID } from "node:crypto";
 
 // Cliente del Registro de Compra y Venta (RCV) del SII para bajar las facturas
@@ -94,7 +95,7 @@ type ReqOpts = {
 function request(
   opts: ReqOpts,
   body?: string
-): Promise<{ status: number; headers: https.IncomingMessage["headers"]; body: string }> {
+): Promise<{ status: number; headers: IncomingHttpHeaders; body: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(
       {

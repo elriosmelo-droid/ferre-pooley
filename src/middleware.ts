@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/cotizacion"];
+// /api/sii: el cron del SII se autentica con SII_SYNC_SECRET en la propia ruta,
+// no con sesión de usuario, así que se exime del middleware de auth.
+const PUBLIC_PATHS = ["/login", "/cotizacion", "/api/sii"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
