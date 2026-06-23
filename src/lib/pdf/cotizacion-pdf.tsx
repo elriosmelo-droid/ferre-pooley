@@ -39,6 +39,7 @@ export type DatosPdfCotizacion = {
     nombre: string;
     rut: string | null;
     correo: string;
+    telefono: string | null;
     direccion: string | null;
   };
 };
@@ -68,7 +69,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: { width: 130, marginBottom: 6 },
-  tagline: { fontSize: 8, color: "#64748b", marginBottom: 6, maxWidth: 180 },
+  tagline: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
+    color: "#000000",
+    marginBottom: 6,
+    maxWidth: 200,
+  },
   empresaLinea: { marginBottom: 2, color: "#475569" },
   vendedorLinea: {
     marginTop: 4,
@@ -102,8 +109,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 4,
   },
-  clienteNombre: { fontFamily: "Helvetica-Bold", marginBottom: 2 },
   clienteLinea: { marginBottom: 2, color: "#475569" },
+  clienteLabel: { fontFamily: "Helvetica-Bold", color: "#1e293b" },
   tablaHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -205,13 +212,35 @@ function CotizacionPdf({ cotizacion, items, cliente }: DatosPdfCotizacion) {
 
         <View style={styles.clienteBox}>
           <Text style={styles.clienteTitulo}>Cliente</Text>
-          <Text style={styles.clienteNombre}>{cliente.nombre}</Text>
-          {cliente.rut ? (
-            <Text style={styles.clienteLinea}>RUT: {cliente.rut}</Text>
+          {cliente.nombre ? (
+            <Text style={styles.clienteLinea}>
+              <Text style={styles.clienteLabel}>Nombre: </Text>
+              {cliente.nombre}
+            </Text>
           ) : null}
-          <Text style={styles.clienteLinea}>{cliente.correo}</Text>
+          {cliente.rut ? (
+            <Text style={styles.clienteLinea}>
+              <Text style={styles.clienteLabel}>RUT: </Text>
+              {cliente.rut}
+            </Text>
+          ) : null}
+          {cliente.correo ? (
+            <Text style={styles.clienteLinea}>
+              <Text style={styles.clienteLabel}>Correo: </Text>
+              {cliente.correo}
+            </Text>
+          ) : null}
+          {cliente.telefono ? (
+            <Text style={styles.clienteLinea}>
+              <Text style={styles.clienteLabel}>Teléfono: </Text>
+              {cliente.telefono}
+            </Text>
+          ) : null}
           {cliente.direccion ? (
-            <Text style={styles.clienteLinea}>{cliente.direccion}</Text>
+            <Text style={styles.clienteLinea}>
+              <Text style={styles.clienteLabel}>Dirección: </Text>
+              {cliente.direccion}
+            </Text>
           ) : null}
         </View>
 

@@ -256,7 +256,7 @@ export async function enviarCotizacion(
     .select(
       `id, folio, estado, fecha_validez, flete, medio_pago, vendedor, subtotal_neto, iva, total,
        token_aceptacion, notas, created_at,
-       clientes(nombre, rut, correo, direccion),
+       clientes(nombre, rut, correo, telefono, direccion),
        cotizacion_items(sku, descripcion, cantidad, precio, flete, descuento, posicion)`
     )
     .eq("id", id)
@@ -271,6 +271,7 @@ export async function enviarCotizacion(
     nombre: string;
     rut: string | null;
     correo: string;
+    telefono: string | null;
     direccion: string | null;
   } | null;
   const itemsRaw = [
