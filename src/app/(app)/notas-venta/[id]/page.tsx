@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
-import { etiquetaMedioPago } from "@/lib/medio-pago";
+import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
 
@@ -24,7 +24,7 @@ type NotaVentaDetalle = {
   folio: string;
   estado: NotaVentaEstado;
   flete: number;
-  medio_pago: string | null;
+  medio_pago: string[] | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -227,10 +227,10 @@ export default async function DetalleNotaVentaPage({
 
       <div className="ml-auto w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
-          <div className="flex justify-between text-slate-600">
-            <dt>Medio de pago</dt>
-            <dd className="font-medium text-slate-900">
-              {etiquetaMedioPago(nota.medio_pago)}
+          <div className="flex justify-between gap-4 text-slate-600">
+            <dt>Medios de pago</dt>
+            <dd className="text-right font-medium text-slate-900">
+              {etiquetasMedioPago(nota.medio_pago)}
             </dd>
           </div>
           {totales.descuento > 0 && (

@@ -8,7 +8,8 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { formatCLP } from "@/lib/money";
-import { etiquetaMedioPago } from "@/lib/medio-pago";
+import { etiquetasMedioPago } from "@/lib/medio-pago";
+import { EMPRESA } from "@/lib/empresa";
 import { LOGO_DATA_URI } from "./logo-data";
 
 // Datos mínimos para el PDF. NUNCA incluir costo ni margen: son internos.
@@ -17,7 +18,8 @@ export type DatosPdfCotizacion = {
     folio: string;
     created_at: string;
     fecha_validez: string;
-    medio_pago: string | null;
+    medio_pago: string[];
+    vendedor: string | null;
     subtotal_bruto: number;
     descuento: number;
     subtotal_neto: number;
@@ -39,12 +41,6 @@ export type DatosPdfCotizacion = {
     correo: string;
     direccion: string | null;
   };
-  perfil: {
-    razon_social: string | null;
-    rut_empresa: string | null;
-    direccion_empresa: string | null;
-    telefono_empresa: string | null;
-  } | null;
 };
 
 // Helvetica estándar no soporta algunos espacios Unicode que emite Intl.
@@ -71,13 +67,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 24,
   },
-  logo: { width: 110, marginBottom: 8 },
-  empresaNombre: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 14,
-    marginBottom: 4,
-  },
+  logo: { width: 130, marginBottom: 6 },
+  tagline: { fontSize: 8, color: "#64748b", marginBottom: 6, maxWidth: 180 },
   empresaLinea: { marginBottom: 2, color: "#475569" },
+  vendedorLinea: {
+    marginTop: 4,
+    fontFamily: "Helvetica-Bold",
+    color: "#1e293b",
+  },
   docTitulo: {
     fontFamily: "Helvetica-Bold",
     fontSize: 16,
@@ -175,8 +172,7 @@ const styles = StyleSheet.create({
   },
 });
 
-function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacion) {
-  const empresa = perfil?.razon_social || "Tulbless";
+function CotizacionPdf({ cotizacion, items, cliente }: DatosPdfCotizacion) {
   const hayDescuento = items.some((it) => it.descuento > 0);
 
   return (
@@ -186,15 +182,13 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
           <View>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
             <Image style={styles.logo} src={LOGO_DATA_URI} />
-            <Text style={styles.empresaNombre}>{empresa}</Text>
-            {perfil?.rut_empresa ? (
-              <Text style={styles.empresaLinea}>RUT: {perfil.rut_empresa}</Text>
-            ) : null}
-            {perfil?.direccion_empresa ? (
-              <Text style={styles.empresaLinea}>{perfil.direccion_empresa}</Text>
-            ) : null}
-            {perfil?.telefono_empresa ? (
-              <Text style={styles.empresaLinea}>{perfil.telefono_empresa}</Text>
+            <Text style={styles.tagline}>{EMPRESA.tagline}</Text>
+            <Text style={styles.empresaLinea}>RUT: {EMPRESA.rut}</Text>
+            <Text style={styles.empresaLinea}>{EMPRESA.direccion}</Text>
+            {cotizacion.vendedor ? (
+              <Text style={styles.vendedorLinea}>
+                Vendedor: {cotizacion.vendedor}
+              </Text>
             ) : null}
           </View>
           <View>
@@ -274,8 +268,8 @@ function CotizacionPdf({ cotizacion, items, cliente, perfil }: DatosPdfCotizacio
         </View>
 
         <View style={styles.medioPagoBox}>
-          <Text style={styles.medioPagoLabel}>Medio de pago: </Text>
-          <Text>{etiquetaMedioPago(cotizacion.medio_pago)}</Text>
+          <Text style={styles.medioPagoLabel}>Medios de pago: </Text>
+          <Text>{etiquetasMedioPago(cotizacion.medio_pago)}</Text>
         </View>
 
         {cotizacion.notas ? (

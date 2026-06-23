@@ -53,7 +53,9 @@ const itemSchema = z.object({
 const cotizacionSchema = z.object({
   cliente_id: z.uuid("Selecciona un cliente"),
   fecha_validez: z.iso.date("Ingresa una fecha de validez válida"),
-  medio_pago: z.enum(MEDIOS_PAGO_VALORES, "Selecciona un medio de pago"),
+  medio_pago: z
+    .array(z.enum(MEDIOS_PAGO_VALORES))
+    .min(1, "Selecciona al menos un medio de pago"),
   notas: z.string().trim().optional(),
   items: z
     .array(itemSchema, "Los ítems no son válidos")
@@ -71,7 +73,7 @@ function parseCotizacionForm(formData: FormData) {
   return cotizacionSchema.safeParse({
     cliente_id: String(formData.get("cliente_id") ?? ""),
     fecha_validez: String(formData.get("fecha_validez") ?? ""),
-    medio_pago: String(formData.get("medio_pago") ?? ""),
+    medio_pago: formData.getAll("medio_pago").map(String),
     notas: String(formData.get("notas") ?? ""),
     items,
   });
@@ -109,6 +111,23 @@ function toItemRows(
   }));
 }
 
+// Nombre del vendedor que crea la cotización: nombre de su perfil, o su correo
+// como respaldo si todavía no lo cargó.
+async function resolverVendedor(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("nombre")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return perfil?.nombre?.trim() || user.email || null;
+}
+
 export async function crearCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
@@ -119,9 +138,10 @@ export async function crearCotizacion(
   }
 
   const supabase = await createClient();
+  const vendedor = await resolverVendedor(supabase);
   const { data: cotizacion, error } = await supabase
     .from("cotizaciones")
-    .insert(toCotizacionRow(parsed.data))
+    .insert({ ...toCotizacionRow(parsed.data), vendedor })
     .select("id")
     .single();
 
@@ -234,7 +254,7 @@ export async function enviarCotizacion(
   const { data: cotizacion, error: readError } = await supabase
     .from("cotizaciones")
     .select(
-      `id, folio, estado, fecha_validez, flete, medio_pago, subtotal_neto, iva, total,
+      `id, folio, estado, fecha_validez, flete, medio_pago, vendedor, subtotal_neto, iva, total,
        token_aceptacion, notas, created_at,
        clientes(nombre, rut, correo, direccion),
        cotizacion_items(sku, descripcion, cantidad, precio, flete, descuento, posicion)`
@@ -307,7 +327,8 @@ export async function enviarCotizacion(
         folio: cotizacion.folio,
         created_at: cotizacion.created_at,
         fecha_validez: cotizacion.fecha_validez,
-        medio_pago: cotizacion.medio_pago,
+        medio_pago: (cotizacion.medio_pago as string[] | null) ?? [],
+        vendedor: cotizacion.vendedor as string | null,
         subtotal_bruto: totales.subtotalBruto,
         descuento: totales.descuento,
         subtotal_neto: cotizacion.subtotal_neto,
@@ -317,7 +338,6 @@ export async function enviarCotizacion(
       },
       items,
       cliente,
-      perfil,
     });
 
     await enviarCorreoCotizacion({
@@ -378,7 +398,7 @@ export async function duplicarCotizacion(id: string): Promise<void> {
 
   const { data: original, error: readError } = await supabase
     .from("cotizaciones")
-    .select("cliente_id, flete, medio_pago, subtotal_neto, iva, total, notas")
+    .select("cliente_id, flete, medio_pago, vendedor, subtotal_neto, iva, total, notas")
     .eq("id", id)
     .single();
 

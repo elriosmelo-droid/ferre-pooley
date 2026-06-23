@@ -18,3 +18,13 @@ export const MEDIOS_PAGO_VALORES = MEDIOS_PAGO.map((m) => m.valor) as [
 export function etiquetaMedioPago(valor: string | null | undefined): string {
   return MEDIOS_PAGO.find((m) => m.valor === valor)?.etiqueta ?? "—";
 }
+
+// Une las etiquetas de una lista de medios de pago, en el orden canónico.
+export function etiquetasMedioPago(
+  valores: readonly string[] | null | undefined
+): string {
+  if (!valores || valores.length === 0) return "—";
+  return MEDIOS_PAGO.filter((m) => valores.includes(m.valor))
+    .map((m) => m.etiqueta)
+    .join(" · ");
+}

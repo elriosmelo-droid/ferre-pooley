@@ -2,7 +2,8 @@ import Image from "next/image";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatCLP } from "@/lib/money";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
-import { etiquetaMedioPago } from "@/lib/medio-pago";
+import { etiquetasMedioPago } from "@/lib/medio-pago";
+import { EMPRESA } from "@/lib/empresa";
 import { ResponderBotones } from "./responder-botones";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,8 @@ type CotizacionPublica = {
   folio: string;
   estado: string;
   fecha_validez: string;
-  medio_pago: string | null;
+  medio_pago: string[] | null;
+  vendedor: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -142,7 +144,7 @@ export default async function CotizacionPublicaPage({
   const { data } = await supabase
     .from("cotizaciones")
     .select(
-      `folio, estado, fecha_validez, medio_pago, subtotal_neto, iva, total, notas,
+      `folio, estado, fecha_validez, medio_pago, vendedor, subtotal_neto, iva, total, notas,
        created_at, clientes(nombre),
        cotizacion_items(sku, descripcion, cantidad, precio, flete, descuento, posicion)`
     )
@@ -200,7 +202,11 @@ export default async function CotizacionPublicaPage({
           />
           <div>
             <p className="text-lg font-bold text-white">{empresa}</p>
-            <p className="text-sm text-slate-300">
+            <p className="text-xs text-slate-300">{EMPRESA.tagline}</p>
+            <p className="text-xs text-slate-400">
+              RUT {EMPRESA.rut} · {EMPRESA.direccion}
+            </p>
+            <p className="mt-1 text-sm font-medium text-slate-200">
               Cotización {cotizacion.folio}
             </p>
           </div>
@@ -234,12 +240,22 @@ export default async function CotizacionPublicaPage({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Medio de pago
+                Medios de pago
               </p>
               <p className="mt-1 font-medium text-slate-900">
-                {etiquetaMedioPago(cotizacion.medio_pago)}
+                {etiquetasMedioPago(cotizacion.medio_pago)}
               </p>
             </div>
+            {cotizacion.vendedor && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Vendedor
+                </p>
+                <p className="mt-1 font-medium text-slate-900">
+                  {cotizacion.vendedor}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">

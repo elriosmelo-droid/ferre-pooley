@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
-import { etiquetaMedioPago } from "@/lib/medio-pago";
+import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { APP_URL } from "@/lib/app-url";
 import { duplicarCotizacion } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
@@ -28,7 +28,8 @@ type CotizacionDetalle = {
   estado: CotizacionEstado;
   fecha_validez: string;
   flete: number;
-  medio_pago: string | null;
+  medio_pago: string[] | null;
+  vendedor: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -72,7 +73,7 @@ export default async function DetalleCotizacionPage({
   const { data } = await supabase
     .from("cotizaciones")
     .select(
-      `id, folio, estado, fecha_validez, flete, medio_pago, subtotal_neto, iva, total,
+      `id, folio, estado, fecha_validez, flete, medio_pago, vendedor, subtotal_neto, iva, total,
        token_aceptacion, notas, firma, firmante, motivo_rechazo, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
        cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
@@ -151,6 +152,14 @@ export default async function DetalleCotizacionPage({
             Fechas
           </h2>
           <dl className="flex flex-col gap-1 text-sm text-slate-700">
+            {cotizacion.vendedor && (
+              <div className="flex justify-between">
+                <dt>Vendedor</dt>
+                <dd className="font-medium text-slate-900">
+                  {cotizacion.vendedor}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt>Creada</dt>
               <dd>{formatFechaHora(cotizacion.created_at)}</dd>
@@ -256,10 +265,10 @@ export default async function DetalleCotizacionPage({
 
       <div className="ml-auto w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
-          <div className="flex justify-between text-slate-600">
-            <dt>Medio de pago</dt>
-            <dd className="font-medium text-slate-900">
-              {etiquetaMedioPago(cotizacion.medio_pago)}
+          <div className="flex justify-between gap-4 text-slate-600">
+            <dt>Medios de pago</dt>
+            <dd className="text-right font-medium text-slate-900">
+              {etiquetasMedioPago(cotizacion.medio_pago)}
             </dd>
           </div>
           {totales.descuento > 0 && (

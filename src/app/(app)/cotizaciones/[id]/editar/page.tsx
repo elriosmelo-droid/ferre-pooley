@@ -12,7 +12,7 @@ type CotizacionEditable = {
   estado: string;
   cliente_id: string;
   fecha_validez: string;
-  medio_pago: string | null;
+  medio_pago: string[] | null;
   notas: string | null;
   cotizacion_items: (CotizacionItemInput & { posicion: number })[];
 };

@@ -37,7 +37,7 @@ type CotizacionFormProps = {
   cotizacion?: {
     cliente_id: string;
     fecha_validez: string;
-    medio_pago: string | null;
+    medio_pago: string[] | null;
     notas: string | null;
     items: CotizacionItemInput[];
   };
@@ -217,26 +217,25 @@ export function CotizacionForm({
           <FieldErrors errors={state.fieldErrors?.fecha_validez} />
         </div>
 
-        <div>
-          <label htmlFor="medio_pago" className={labelClass}>
-            Medio de pago *
-          </label>
-          <select
-            id="medio_pago"
-            name="medio_pago"
-            required
-            defaultValue={cotizacion?.medio_pago ?? ""}
-            className={inputClass}
-          >
-            <option value="" disabled>
-              Selecciona un medio de pago…
-            </option>
+        <div className="sm:col-span-2">
+          <span className={labelClass}>Medios de pago *</span>
+          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-2">
             {MEDIOS_PAGO.map((m) => (
-              <option key={m.valor} value={m.valor}>
+              <label
+                key={m.valor}
+                className="flex items-center gap-2 text-sm text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  name="medio_pago"
+                  value={m.valor}
+                  defaultChecked={cotizacion?.medio_pago?.includes(m.valor) ?? false}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
                 {m.etiqueta}
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
           <FieldErrors errors={state.fieldErrors?.medio_pago} />
         </div>
       </div>
