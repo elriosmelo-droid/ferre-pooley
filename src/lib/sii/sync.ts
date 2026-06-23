@@ -56,5 +56,28 @@ export async function sincronizarCompras(): Promise<SyncResult> {
     throw new Error("No se pudieron guardar las compras.");
   }
 
+  // Auto-sync de proveedores: un registro por RUT. No se incluye `tipo` en el
+  // payload para no pisar la clasificación manual del usuario en los que ya
+  // existen; los nuevos quedan sin clasificar.
+  const proveedores = [
+    ...new Map(
+      compras.map((c) => [
+        c.rutProveedor,
+        {
+          rut: c.rutProveedor,
+          razon_social: c.razonSocial,
+          updated_at: ahora,
+        },
+      ])
+    ).values(),
+  ];
+  const { error: provError } = await supabase
+    .from("proveedores")
+    .upsert(proveedores, { onConflict: "rut" });
+  if (provError) {
+    // No es fatal para el sync de compras; se registra y sigue.
+    console.error("Error al sincronizar proveedores:", provError.message);
+  }
+
   return { periodos, encontradas: compras.length, guardadas: filas.length };
 }
