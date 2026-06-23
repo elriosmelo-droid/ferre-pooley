@@ -1,5 +1,6 @@
 import {
   Document,
+  Font,
   Image,
   Page,
   StyleSheet,
@@ -44,6 +45,9 @@ export type DatosPdfCotizacion = {
   };
 };
 
+// Evita que @react-pdf parta palabras con guion (ej. "Construc-ción").
+Font.registerHyphenationCallback((word) => [word]);
+
 // Helvetica estándar no soporta algunos espacios Unicode que emite Intl.
 function clp(n: number) {
   return formatCLP(n).replace(/[  ]/g, " ");
@@ -74,7 +78,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#000000",
     marginBottom: 6,
-    maxWidth: 200,
+    maxWidth: 260,
   },
   empresaLinea: { marginBottom: 2, color: "#475569" },
   vendedorLinea: {
