@@ -11,6 +11,7 @@ const menuItems = [
   { href: "/cotizaciones", label: "Cotizaciones" },
   { href: "/notas-venta", label: "Notas de Venta" },
   { href: "/ventas", label: "Ventas" },
+  { href: "/conciliacion", label: "Conciliación" },
   { href: "/compras", label: "Compras" },
   { href: "/proveedores", label: "Proveedores" },
   { href: "/productos", label: "Productos" },

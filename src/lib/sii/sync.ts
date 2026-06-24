@@ -155,25 +155,15 @@ const VENTANA_DIAS_DESPUES = 60;
 export async function autoVincularVentas(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Notas sin factura asociada (las anuladas no se cruzan).
+  // Notas no anuladas (las anuladas no se cruzan).
   const { data: notasData } = await supabase
     .from("notas_venta")
-    .select("id, total, created_at, clientes(rut)")
-    .is("venta_sii_id", null)
+    .select("id, total, created_at, estado, clientes(rut)")
     .neq("estado", "anulada");
-
-  // Facturas del SII todavía no vinculadas a ninguna nota.
-  const { data: notasLinkeadas } = await supabase
-    .from("notas_venta")
-    .select("venta_sii_id")
-    .not("venta_sii_id", "is", null);
-  const tomadas = new Set(
-    (notasLinkeadas ?? []).map((n) => n.venta_sii_id as string)
-  );
 
   const { data: ventasData } = await supabase
     .from("ventas_sii")
-    .select("id, rut_cliente, monto_total, fecha_emision");
+    .select("id, rut_cliente, monto_total, fecha_emision, nota_venta_id");
 
   const notas = (notasData ?? []) as unknown as {
     id: string;
@@ -186,18 +176,26 @@ export async function autoVincularVentas(
     rut_cliente: string;
     monto_total: number;
     fecha_emision: string | null;
+    nota_venta_id: string | null;
   }[];
 
-  const disponibles = ventas.filter((v) => !tomadas.has(v.id));
+  // Notas que ya tienen al menos una factura: el auto-cruce no las toca (los
+  // casos de varias facturas por nota, p.ej. flete suelto, se arman a mano en
+  // la conciliación). Solo resuelve el caso limpio nota=1 factura.
+  const notasConFactura = new Set(
+    ventas.filter((v) => v.nota_venta_id).map((v) => v.nota_venta_id as string)
+  );
+  const disponibles = ventas.filter((v) => !v.nota_venta_id);
   let vinculadas = 0;
 
   for (const nota of notas) {
+    if (notasConFactura.has(nota.id)) continue;
     const rutNota = normalizarRut(nota.clientes?.rut);
     if (!rutNota) continue;
     const diaNota = diaEpoch(nota.created_at);
 
     const candidatas = disponibles.filter((v) => {
-      if (tomadas.has(v.id)) return false;
+      if (v.nota_venta_id) return false;
       if (normalizarRut(v.rut_cliente) !== rutNota) return false;
       if (v.monto_total !== nota.total) return false;
       if (!v.fecha_emision) return false;
@@ -212,12 +210,13 @@ export async function autoVincularVentas(
     const factura = candidatas[0];
 
     const { error } = await supabase
-      .from("notas_venta")
-      .update({ venta_sii_id: factura.id })
-      .eq("id", nota.id)
-      .is("venta_sii_id", null);
+      .from("ventas_sii")
+      .update({ nota_venta_id: nota.id })
+      .eq("id", factura.id)
+      .is("nota_venta_id", null);
     if (!error) {
-      tomadas.add(factura.id);
+      factura.nota_venta_id = nota.id;
+      notasConFactura.add(nota.id);
       vinculadas += 1;
     }
   }

@@ -66,50 +66,56 @@ export async function eliminarNotaVenta(
   redirect("/notas-venta");
 }
 
-// Vincula manualmente una nota de venta con una factura del SII. El índice
-// único parcial sobre venta_sii_id impide que dos notas tomen la misma factura
-// (el update falla con 23505 y se devuelve un mensaje claro).
+// Adjunta una factura del SII a una nota de venta. El vínculo vive en
+// ventas_sii.nota_venta_id (una nota agrupa varias facturas). El `is null`
+// evita robar una factura ya asignada a otra nota.
 export async function vincularFacturaVenta(
   notaId: string,
   ventaSiiId: string
 ): Promise<NotaVentaActionResult> {
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("notas_venta")
-    .update({ venta_sii_id: ventaSiiId })
-    .eq("id", notaId);
+  const { data, error } = await supabase
+    .from("ventas_sii")
+    .update({ nota_venta_id: notaId })
+    .eq("id", ventaSiiId)
+    .is("nota_venta_id", null)
+    .select("id");
 
   if (error) {
-    if (error.code === "23505") {
-      return { error: "Esa factura ya está vinculada a otra nota de venta." };
-    }
     console.error("Error al vincular factura del SII:", error.message);
     return { error: "No se pudo vincular la factura. Intenta nuevamente." };
+  }
+  if (!data?.length) {
+    return { error: "Esa factura ya está vinculada a otra nota de venta." };
   }
 
   revalidatePath(`/notas-venta/${notaId}`);
   revalidatePath("/ventas");
+  revalidatePath("/conciliacion");
   return { success: true };
 }
 
+// Quita una factura de su nota (se identifica por la factura, no por la nota,
+// porque una nota puede tener varias).
 export async function desvincularFacturaVenta(
-  notaId: string
+  ventaSiiId: string
 ): Promise<NotaVentaActionResult> {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("notas_venta")
-    .update({ venta_sii_id: null })
-    .eq("id", notaId);
+    .from("ventas_sii")
+    .update({ nota_venta_id: null })
+    .eq("id", ventaSiiId);
 
   if (error) {
     console.error("Error al desvincular factura del SII:", error.message);
     return { error: "No se pudo desvincular la factura. Intenta nuevamente." };
   }
 
-  revalidatePath(`/notas-venta/${notaId}`);
+  revalidatePath("/notas-venta");
   revalidatePath("/ventas");
+  revalidatePath("/conciliacion");
   return { success: true };
 }
 

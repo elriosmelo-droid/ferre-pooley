@@ -35,30 +35,18 @@ function formatFecha(iso: string | null): string {
 export default async function VentasPage() {
   const supabase = await createClient();
 
-  const [{ data, error }, { data: notasData }] = await Promise.all([
-    supabase
-      .from("ventas_sii")
-      .select(
-        "id, tipo_doc, rut_cliente, razon_social, folio, fecha_emision, monto_neto, monto_iva, monto_total"
-      )
-      .order("fecha_emision", { ascending: false, nullsFirst: false })
-      .order("folio", { ascending: false }),
-    supabase
-      .from("notas_venta")
-      .select("id, folio, venta_sii_id")
-      .not("venta_sii_id", "is", null),
-  ]);
+  // Cada factura trae su nota vinculada embebida vía nota_venta_id.
+  const { data, error } = await supabase
+    .from("ventas_sii")
+    .select(
+      "id, tipo_doc, rut_cliente, razon_social, folio, fecha_emision, monto_neto, monto_iva, monto_total, notas_venta(id, folio)"
+    )
+    .order("fecha_emision", { ascending: false, nullsFirst: false })
+    .order("folio", { ascending: false });
 
-  const ventas = (data ?? []) as VentaRow[];
-
-  // Mapa factura SII -> nota de venta vinculada.
-  const notaPorVenta = new Map<string, { id: string; folio: string }>();
-  for (const n of notasData ?? []) {
-    notaPorVenta.set(n.venta_sii_id as string, {
-      id: n.id as string,
-      folio: n.folio as string,
-    });
-  }
+  const ventas = (data ?? []) as unknown as (VentaRow & {
+    notas_venta: { id: string; folio: string } | null;
+  })[];
 
   const totalTotal = ventas.reduce((s, v) => s + v.monto_total, 0);
 
@@ -102,7 +90,7 @@ export default async function VentasPage() {
                 </tr>
               ) : (
                 ventas.map((v) => {
-                  const nota = notaPorVenta.get(v.id);
+                  const nota = v.notas_venta;
                   return (
                     <tr key={v.id} className="text-slate-700">
                       <td className="px-4 py-3 whitespace-nowrap">
