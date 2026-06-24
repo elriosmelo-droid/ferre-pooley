@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { descargarCompras } from "./rcv";
+import { descargarCompras, descargarVentas } from "./rcv";
+import { normalizarRut } from "@/lib/rut";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SyncResult = {
   periodos: string[];
@@ -80,4 +82,145 @@ export async function sincronizarCompras(): Promise<SyncResult> {
   }
 
   return { periodos, encontradas: compras.length, guardadas: filas.length };
+}
+
+export type SyncVentasResult = SyncResult & { vinculadas: number };
+
+// Baja las ventas (facturas emitidas) del SII y las upserta en ventas_sii.
+// Luego intenta vincularlas automáticamente con notas de venta. Va en un
+// endpoint/cron aparte del de compras porque cada descarga tarda ~4min y no
+// caben las dos en el límite de 300s de una función serverless.
+export async function sincronizarVentas(): Promise<SyncVentasResult> {
+  const periodos = [periodoConOffset(0), periodoConOffset(-1)];
+  const ventas = await descargarVentas(periodos);
+  const supabase = createAdminClient();
+
+  if (ventas.length === 0) {
+    const vinculadas = await autoVincularVentas(supabase);
+    return { periodos, encontradas: 0, guardadas: 0, vinculadas };
+  }
+
+  const ahora = new Date().toISOString();
+  // En ventas `rutProveedor`/`razonSocial` del mapeo del RCV son, en realidad,
+  // el RUT y la razón social del cliente (contraparte del documento).
+  const filas = ventas.map((v) => ({
+    periodo: v.periodo,
+    tipo_doc: v.tipoDoc,
+    rut_cliente: v.rutProveedor,
+    razon_social: v.razonSocial,
+    folio: v.folio,
+    fecha_emision: v.fechaEmision,
+    fecha_recepcion: v.fechaRecepcion,
+    monto_exento: v.montoExento,
+    monto_neto: v.montoNeto,
+    monto_iva: v.montoIva,
+    monto_total: v.montoTotal,
+    estado_contab: v.estadoContab,
+    raw: v.raw,
+    updated_at: ahora,
+  }));
+
+  const { error } = await supabase
+    .from("ventas_sii")
+    .upsert(filas, { onConflict: "tipo_doc,rut_cliente,folio" });
+
+  if (error) {
+    console.error("Error al guardar ventas del SII:", error.message);
+    throw new Error("No se pudieron guardar las ventas.");
+  }
+
+  const vinculadas = await autoVincularVentas(supabase);
+  return {
+    periodos,
+    encontradas: ventas.length,
+    guardadas: filas.length,
+    vinculadas,
+  };
+}
+
+// Día calendario de un timestamptz, en horario de Chile, como número de días
+// epoch para comparar ventanas sin líos de zona.
+function diaEpoch(iso: string): number {
+  return Math.floor(new Date(iso).getTime() / 86_400_000);
+}
+
+// Vincula notas de venta con facturas del SII que aún no estén asociadas. Regla
+// conservadora: mismo RUT de cliente + mismo total, y la factura emitida en una
+// ventana razonable respecto a la nota. Solo vincula cuando hay exactamente UNA
+// factura candidata para esa nota (y no se reusa una factura ya tomada en esta
+// pasada), para no enlazar a ciegas. Lo dudoso queda para vínculo manual.
+const VENTANA_DIAS_ANTES = 5;
+const VENTANA_DIAS_DESPUES = 60;
+
+export async function autoVincularVentas(
+  supabase: SupabaseClient
+): Promise<number> {
+  // Notas sin factura asociada (las anuladas no se cruzan).
+  const { data: notasData } = await supabase
+    .from("notas_venta")
+    .select("id, total, created_at, clientes(rut)")
+    .is("venta_sii_id", null)
+    .neq("estado", "anulada");
+
+  // Facturas del SII todavía no vinculadas a ninguna nota.
+  const { data: notasLinkeadas } = await supabase
+    .from("notas_venta")
+    .select("venta_sii_id")
+    .not("venta_sii_id", "is", null);
+  const tomadas = new Set(
+    (notasLinkeadas ?? []).map((n) => n.venta_sii_id as string)
+  );
+
+  const { data: ventasData } = await supabase
+    .from("ventas_sii")
+    .select("id, rut_cliente, monto_total, fecha_emision");
+
+  const notas = (notasData ?? []) as unknown as {
+    id: string;
+    total: number;
+    created_at: string;
+    clientes: { rut: string | null } | null;
+  }[];
+  const ventas = (ventasData ?? []) as {
+    id: string;
+    rut_cliente: string;
+    monto_total: number;
+    fecha_emision: string | null;
+  }[];
+
+  const disponibles = ventas.filter((v) => !tomadas.has(v.id));
+  let vinculadas = 0;
+
+  for (const nota of notas) {
+    const rutNota = normalizarRut(nota.clientes?.rut);
+    if (!rutNota) continue;
+    const diaNota = diaEpoch(nota.created_at);
+
+    const candidatas = disponibles.filter((v) => {
+      if (tomadas.has(v.id)) return false;
+      if (normalizarRut(v.rut_cliente) !== rutNota) return false;
+      if (v.monto_total !== nota.total) return false;
+      if (!v.fecha_emision) return false;
+      const diaFactura = diaEpoch(v.fecha_emision);
+      return (
+        diaFactura >= diaNota - VENTANA_DIAS_ANTES &&
+        diaFactura <= diaNota + VENTANA_DIAS_DESPUES
+      );
+    });
+
+    if (candidatas.length !== 1) continue; // 0 o ambiguo -> manual
+    const factura = candidatas[0];
+
+    const { error } = await supabase
+      .from("notas_venta")
+      .update({ venta_sii_id: factura.id })
+      .eq("id", nota.id)
+      .is("venta_sii_id", null);
+    if (!error) {
+      tomadas.add(factura.id);
+      vinculadas += 1;
+    }
+  }
+
+  return vinculadas;
 }

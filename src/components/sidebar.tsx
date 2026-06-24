@@ -10,6 +10,7 @@ const menuItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/cotizaciones", label: "Cotizaciones" },
   { href: "/notas-venta", label: "Notas de Venta" },
+  { href: "/ventas", label: "Ventas" },
   { href: "/compras", label: "Compras" },
   { href: "/proveedores", label: "Proveedores" },
   { href: "/productos", label: "Productos" },

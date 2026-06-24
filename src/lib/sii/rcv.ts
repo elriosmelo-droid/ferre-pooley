@@ -24,13 +24,33 @@ const AUTH_REFERENCIA =
 const RCV_HOST = "www4.sii.cl";
 const RESUMEN_PATH =
   "/consdcvinternetui/services/data/facadeService/getResumen";
-const DETALLE_PATH =
-  "/consdcvinternetui/services/data/facadeService/getDetalleCompra";
 const NS = "cl.sii.sdi.lob.diii.consdcv.data.api.interfaces.FacadeService";
 
-// Tipos de documento de compra a descargar (factura afecta, exenta, NC, ND,
-// factura de compra, liquidación factura).
+// Tipos de documento a descargar (factura afecta, exenta, NC, ND). Aplica igual
+// a compras y ventas (facturas electrónicas + notas de crédito/débito).
 const TIPOS_DOC = [33, 34, 56, 61];
+
+export type Operacion = "COMPRA" | "VENTA";
+
+// Cada operación cambia el endpoint de detalle, la acción de recaptcha y si se
+// envía estadoContab (solo compras lo usan).
+const CONFIG: Record<
+  Operacion,
+  { detallePath: string; accionRecaptcha: string; usaEstadoContab: boolean }
+> = {
+  COMPRA: {
+    detallePath:
+      "/consdcvinternetui/services/data/facadeService/getDetalleCompra",
+    accionRecaptcha: "RCV_DETC",
+    usaEstadoContab: true,
+  },
+  VENTA: {
+    detallePath:
+      "/consdcvinternetui/services/data/facadeService/getDetalleVenta",
+    accionRecaptcha: "RCV_DETV",
+    usaEstadoContab: false,
+  },
+};
 
 // Polling acotado para caber en el maxDuration de la función serverless. Como
 // el cron corre cada hora y el upsert es idempotente, no hace falta agotar la
@@ -225,7 +245,8 @@ async function gatillarResumen(
   s: Sesion,
   rutEmisor: string,
   dvEmisor: string,
-  periodo: string
+  periodo: string,
+  operacion: Operacion
 ) {
   const payload = JSON.stringify({
     metaData: {
@@ -238,8 +259,10 @@ async function gatillarResumen(
       rutEmisor,
       dvEmisor,
       ptributario: periodo,
-      estadoContab: "REGISTRO",
-      operacion: "COMPRA",
+      ...(CONFIG[operacion].usaEstadoContab
+        ? { estadoContab: "REGISTRO" }
+        : {}),
+      operacion,
       busquedaInicial: true,
     },
   });
@@ -265,11 +288,13 @@ async function pedirDetalle(
   rutEmisor: string,
   dvEmisor: string,
   periodo: string,
-  codTipoDoc: number
+  codTipoDoc: number,
+  operacion: Operacion
 ): Promise<CompraRaw[] | null> {
+  const cfg = CONFIG[operacion];
   const payload = JSON.stringify({
     metaData: {
-      namespace: `${NS}/getDetalleCompra`,
+      namespace: `${NS}/getDetalle${operacion === "COMPRA" ? "Compra" : "Venta"}`,
       conversationId: s.convId,
       transactionId: randomUUID(),
       page: null,
@@ -279,9 +304,9 @@ async function pedirDetalle(
       dvEmisor,
       ptributario: periodo,
       codTipoDoc: String(codTipoDoc),
-      operacion: "COMPRA",
-      estadoContab: "REGISTRO",
-      accionRecaptcha: "RCV_DETC",
+      operacion,
+      ...(cfg.usaEstadoContab ? { estadoContab: "REGISTRO" } : {}),
+      accionRecaptcha: cfg.accionRecaptcha,
       tokenRecaptcha: "t-o-k-e-n-web",
     },
   });
@@ -289,7 +314,7 @@ async function pedirDetalle(
     const res = await request(
       {
         host: RCV_HOST,
-        path: DETALLE_PATH,
+        path: cfg.detallePath,
         method: "POST",
         headers: jsonHeaders(s.jar, Buffer.byteLength(payload)),
         cert: s.cert,
@@ -313,14 +338,22 @@ async function detalleEstable(
   rutEmisor: string,
   dvEmisor: string,
   periodo: string,
-  codTipoDoc: number
+  codTipoDoc: number,
+  operacion: Operacion
 ): Promise<CompraRaw[]> {
   let best: CompraRaw[] = [];
   let stable = 0;
   for (let i = 0; i < POLL_MAX_TRIES; i++) {
-    await gatillarResumen(s, rutEmisor, dvEmisor, periodo);
+    await gatillarResumen(s, rutEmisor, dvEmisor, periodo, operacion);
     await sleep(POLL_BASE_MS + i * POLL_STEP_MS);
-    const data = await pedirDetalle(s, rutEmisor, dvEmisor, periodo, codTipoDoc);
+    const data = await pedirDetalle(
+      s,
+      rutEmisor,
+      dvEmisor,
+      periodo,
+      codTipoDoc,
+      operacion
+    );
     if (data == null) continue;
     if (data.length > best.length) {
       best = data;
@@ -333,9 +366,13 @@ async function detalleEstable(
   return best;
 }
 
-// Descarga todas las compras de los periodos dados. Devuelve la lista mapeada
-// y deduplicada por (tipoDoc, rutProveedor, folio).
-export async function descargarCompras(periodos: string[]): Promise<Compra[]> {
+// Descarga los documentos (compra o venta) de los periodos dados. Devuelve la
+// lista mapeada y deduplicada por (tipoDoc, rut contraparte, folio). En compras
+// `rutProveedor` es el RUT del proveedor; en ventas es el del cliente.
+async function descargar(
+  operacion: Operacion,
+  periodos: string[]
+): Promise<Compra[]> {
   const rutEmpresa = (process.env.SII_RUT_EMPRESA ?? "").trim(); // '78400766-9'
   if (!rutEmpresa.includes("-"))
     throw new Error("SII_RUT_EMPRESA debe ser 'RUT-DV' (ej. 78400766-9)");
@@ -346,17 +383,29 @@ export async function descargarCompras(periodos: string[]): Promise<Compra[]> {
 
   for (const periodo of periodos) {
     for (const tipoDoc of TIPOS_DOC) {
-      const filas = await detalleEstable(s, rutEmisor, dvEmisor, periodo, tipoDoc);
+      const filas = await detalleEstable(
+        s,
+        rutEmisor,
+        dvEmisor,
+        periodo,
+        tipoDoc,
+        operacion
+      );
       for (const row of filas) {
-        const compra = mapFila(row, periodo, tipoDoc);
-        if (!compra) continue;
-        porClave.set(
-          `${compra.tipoDoc}|${compra.rutProveedor}|${compra.folio}`,
-          compra
-        );
+        const doc = mapFila(row, periodo, tipoDoc);
+        if (!doc) continue;
+        porClave.set(`${doc.tipoDoc}|${doc.rutProveedor}|${doc.folio}`, doc);
       }
     }
   }
 
   return [...porClave.values()];
+}
+
+export function descargarCompras(periodos: string[]): Promise<Compra[]> {
+  return descargar("COMPRA", periodos);
+}
+
+export function descargarVentas(periodos: string[]): Promise<Compra[]> {
+  return descargar("VENTA", periodos);
 }

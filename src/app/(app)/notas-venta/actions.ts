@@ -66,6 +66,53 @@ export async function eliminarNotaVenta(
   redirect("/notas-venta");
 }
 
+// Vincula manualmente una nota de venta con una factura del SII. El índice
+// único parcial sobre venta_sii_id impide que dos notas tomen la misma factura
+// (el update falla con 23505 y se devuelve un mensaje claro).
+export async function vincularFacturaVenta(
+  notaId: string,
+  ventaSiiId: string
+): Promise<NotaVentaActionResult> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("notas_venta")
+    .update({ venta_sii_id: ventaSiiId })
+    .eq("id", notaId);
+
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "Esa factura ya está vinculada a otra nota de venta." };
+    }
+    console.error("Error al vincular factura del SII:", error.message);
+    return { error: "No se pudo vincular la factura. Intenta nuevamente." };
+  }
+
+  revalidatePath(`/notas-venta/${notaId}`);
+  revalidatePath("/ventas");
+  return { success: true };
+}
+
+export async function desvincularFacturaVenta(
+  notaId: string
+): Promise<NotaVentaActionResult> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("notas_venta")
+    .update({ venta_sii_id: null })
+    .eq("id", notaId);
+
+  if (error) {
+    console.error("Error al desvincular factura del SII:", error.message);
+    return { error: "No se pudo desvincular la factura. Intenta nuevamente." };
+  }
+
+  revalidatePath(`/notas-venta/${notaId}`);
+  revalidatePath("/ventas");
+  return { success: true };
+}
+
 export async function anularNotaVenta(
   id: string
 ): Promise<NotaVentaActionResult> {

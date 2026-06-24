@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
+import { normalizarRut } from "@/lib/rut";
 import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
+import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
 
 type ItemRow = {
   id: string;
@@ -30,6 +32,7 @@ type NotaVentaDetalle = {
   total: number;
   pagada_at: string | null;
   created_at: string;
+  venta_sii_id: string | null;
   clientes: {
     nombre: string;
     rut: string | null;
@@ -61,7 +64,7 @@ export default async function DetalleNotaVentaPage({
   const { data, error } = await supabase
     .from("notas_venta")
     .select(
-      `id, folio, estado, flete, medio_pago, subtotal_neto, iva, total, pagada_at, created_at,
+      `id, folio, estado, flete, medio_pago, subtotal_neto, iva, total, pagada_at, created_at, venta_sii_id,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
        nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
@@ -83,6 +86,39 @@ export default async function DetalleNotaVentaPage({
   );
   const totales = calcularTotales(items);
   const cliente = nota.clientes;
+
+  // Factura del SII vinculada + candidatas para vínculo manual: facturas del
+  // mismo cliente (RUT) que no estén ya tomadas por otra nota de venta.
+  const [{ data: ventasData }, { data: tomadasData }] = await Promise.all([
+    supabase
+      .from("ventas_sii")
+      .select("id, folio, fecha_emision, monto_total, rut_cliente")
+      .order("fecha_emision", { ascending: false, nullsFirst: false }),
+    supabase
+      .from("notas_venta")
+      .select("id, venta_sii_id")
+      .not("venta_sii_id", "is", null),
+  ]);
+
+  const tomadasPorOtras = new Set(
+    (tomadasData ?? [])
+      .filter((n) => n.id !== nota.id)
+      .map((n) => n.venta_sii_id as string)
+  );
+  const rutCliente = normalizarRut(cliente?.rut);
+  const ventas = (ventasData ?? []) as (FacturaOpcion & {
+    rut_cliente: string;
+  })[];
+  const facturaVinculada =
+    ventas.find((v) => v.id === nota.venta_sii_id) ?? null;
+  const candidatas: FacturaOpcion[] = rutCliente
+    ? ventas.filter(
+        (v) =>
+          v.id !== nota.venta_sii_id &&
+          !tomadasPorOtras.has(v.id) &&
+          normalizarRut(v.rut_cliente) === rutCliente
+      )
+    : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,6 +177,17 @@ export default async function DetalleNotaVentaPage({
               </div>
             )}
           </dl>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 lg:col-span-2">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Factura de venta (SII)
+          </h2>
+          <FacturaVinculo
+            notaId={nota.id}
+            vinculada={facturaVinculada}
+            candidatas={candidatas}
+          />
         </div>
       </div>
 
