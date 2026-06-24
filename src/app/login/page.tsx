@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { login } from "./actions";
+import { EMPRESA } from "@/lib/empresa";
 
 export default async function LoginPage({
   searchParams,
@@ -11,7 +12,7 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-brand-50 px-4">
       <div className="w-full max-w-sm rounded-xl border-t-4 border-brand-600 bg-white p-8 shadow-lg">
-        <div className="mb-8 flex justify-center">
+        <div className="mb-8 flex flex-col items-center">
           <Image
             src="/logo-full.png"
             alt="Tulbless"
@@ -20,6 +21,9 @@ export default async function LoginPage({
             priority
             className="h-auto w-[210px]"
           />
+          <p className="mt-3 text-center text-sm font-medium text-slate-600">
+            {EMPRESA.tagline}
+          </p>
         </div>
         <form action={login} className="flex flex-col gap-4">
           <div>
