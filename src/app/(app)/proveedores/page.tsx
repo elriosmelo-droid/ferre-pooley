@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
 import { TIPOS_PROVEEDOR, ETIQUETAS_TIPO, type TipoProveedor } from "./tipos";
 import { TipoSelect } from "./tipo-select";
+import { CorreoInput } from "./correo-input";
 
 const filtros: { value: string; label: string }[] = [
   { value: "todos", label: "Todos" },
@@ -15,6 +16,7 @@ type ProveedorRow = {
   rut: string;
   razon_social: string | null;
   tipo: TipoProveedor | null;
+  correo: string | null;
 };
 
 export default async function ProveedoresPage({
@@ -31,7 +33,7 @@ export default async function ProveedoresPage({
 
   let query = supabase
     .from("proveedores")
-    .select("id, rut, razon_social, tipo")
+    .select("id, rut, razon_social, tipo, correo")
     .order("razon_social", { ascending: true, nullsFirst: false });
 
   if (filtroActivo === "sin-clasificar") {
@@ -102,12 +104,13 @@ export default async function ProveedoresPage({
                 <th className="px-4 py-3 text-right">Facturas</th>
                 <th className="px-4 py-3 text-right">Total comprado</th>
                 <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Correo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {proveedores.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                     {filtroActivo !== "todos"
                       ? "No hay proveedores con este tipo."
                       : "Aún no hay proveedores. Se generan al actualizar las compras."}
@@ -128,6 +131,9 @@ export default async function ProveedoresPage({
                       </td>
                       <td className="px-4 py-3">
                         <TipoSelect proveedorId={p.id} tipo={p.tipo} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <CorreoInput proveedorId={p.id} correo={p.correo} />
                       </td>
                     </tr>
                   );

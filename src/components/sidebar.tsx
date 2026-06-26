@@ -13,6 +13,7 @@ const menuItems = [
   { href: "/ventas", label: "Ventas" },
   { href: "/conciliacion", label: "Conciliación" },
   { href: "/compras", label: "Compras" },
+  { href: "/ordenes-compra", label: "Órdenes de Compra" },
   { href: "/proveedores", label: "Proveedores" },
   { href: "/productos", label: "Productos" },
   { href: "/clientes", label: "Clientes" },
