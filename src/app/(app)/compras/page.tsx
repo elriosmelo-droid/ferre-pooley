@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ActualizarComprasButton } from "./actualizar-button";
+import { GenerarPdfsButton } from "./generar-pdfs-button";
 import { ComprasTabla, type CompraRow } from "./compras-tabla";
 
 // El sync del SII puede tardar (polling al RCV); el server action de actualizar
@@ -29,7 +30,10 @@ export default async function ComprasPage() {
             actualizan cada hora; también puedes refrescarlas a mano.
           </p>
         </div>
-        <ActualizarComprasButton />
+        <div className="flex items-start gap-2">
+          <GenerarPdfsButton />
+          <ActualizarComprasButton />
+        </div>
       </div>
 
       {error ? (

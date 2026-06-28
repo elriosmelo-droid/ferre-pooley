@@ -21,7 +21,7 @@ function pemFromEnv(name: string): string {
 
 type Resp = { status: number; buf: Buffer };
 
-class Sesion {
+export class Sesion {
   private jar: Record<string, string> = {};
   private agent: https.Agent;
   constructor() {
@@ -140,11 +140,11 @@ function filtrarDtePorFolio(
 // un POST de inicialización a mipeAdminDocsRcp.cgi que arma el token del módulo
 // antes de poder descargar. Flujo validado en el script de producción
 // `proceso_semanal/descargar_facturas_pfx.py`. Es cert puro, sin clave.
-export async function descargarDteRecibidoXml(args: {
-  fecha: string;
-  folio: string;
-  tipoDoc: number;
-}): Promise<string | null> {
+// Abre una sesión MIPE en el módulo de documentos RECIBIDOS (auth cert +
+// selección de empresa + launch). Reutilizable para bajar varios días con una
+// sola autenticación (el SII rate-limitea por IP, así que conviene minimizar
+// sesiones). Lanza si el certificado es rechazado.
+export async function abrirSesionRecibidos(): Promise<Sesion> {
   const titular = process.env.SII_RUT_TITULAR;
   const empresa = process.env.SII_RUT_EMPRESA;
   if (!titular || !empresa) throw new Error("Falta SII_RUT_TITULAR o SII_RUT_EMPRESA");
@@ -168,20 +168,49 @@ export async function descargarDteRecibidoXml(args: {
     `DESDE_DONDE_URL=OPCION%3D1%26TIPO%3D4&RUT_EMP=${encodeURIComponent(empresa)}`
   );
   await s.req("GET", `${PORTAL}/mipeLaunchPage.cgi?OPCION=1&TIPO=4`);
+  return s;
+}
 
-  // POST de inicialización del módulo de recibidos: sin esto mipeDownLoad
-  // responde "Error 501 ptr NULL (ptrTkn)".
+// Baja el XML compilado (SetDTE, 0..N DTE) de los documentos recibidos de un
+// día, sobre una sesión ya abierta. El POST de init arma el token del módulo
+// (sin él mipeDownLoad responde "Error 501 ptr NULL (ptrTkn)").
+export async function descargarReciDiaXml(s: Sesion, fecha: string): Promise<string> {
   await s.req(
     "POST",
     `${PORTAL}/mipeAdminDocsRcp.cgi`,
-    `RUT_EMI=&ORIGEN=RCP&TPO_DOC=&FEC_DESDE=${args.fecha}&FEC_HASTA=${args.fecha}` +
+    `RUT_EMI=&ORIGEN=RCP&TPO_DOC=&FEC_DESDE=${fecha}&FEC_HASTA=${fecha}` +
       `&FOLIO=&FOLIOHASTA=&RUT_RECP=&RZN_SOC=&ESTADO=&ORDEN=&NUM_PAG=1&TPO_ARCHIVO=dte`
   );
-
   const r = await s.req(
     "GET",
-    `${PORTAL}/mipeDownLoad.cgi?ORIGEN=RCP&RUT_EMI=&FOLIO=&FOLIOHASTA=&RZN_SOC=&FEC_DESDE=${args.fecha}&FEC_HASTA=${args.fecha}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
+    `${PORTAL}/mipeDownLoad.cgi?ORIGEN=RCP&RUT_EMI=&FOLIO=&FOLIOHASTA=&RZN_SOC=&FEC_DESDE=${fecha}&FEC_HASTA=${fecha}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
   );
   if (r.status === 429) throw new Error("SII rate limit (429)");
-  return filtrarDtePorFolio(r.buf.toString("latin1"), args.folio, args.tipoDoc);
+  return r.buf.toString("latin1");
+}
+
+// Devuelve los bloques <DTE>...</DTE> de un XML compilado, con su folio y tipo.
+export function separarDtes(xml: string): { folio: string; tipoDoc: number; xml: string }[] {
+  if (!xml.includes("</DTE>")) return [];
+  const out: { folio: string; tipoDoc: number; xml: string }[] = [];
+  for (const part of xml.split("</DTE>")) {
+    const folio = part.match(/<Folio>(\d+)/)?.[1];
+    const tipo = part.match(/<TipoDTE>(\d+)/)?.[1];
+    if (!folio || !tipo) continue;
+    const start = part.indexOf("<DTE");
+    out.push({ folio, tipoDoc: Number(tipo), xml: (start >= 0 ? part.slice(start) : part) + "</DTE>" });
+  }
+  return out;
+}
+
+// Baja el DTE recibido de un folio puntual (abre su propia sesión). Para varios
+// usar abrirSesionRecibidos + descargarReciDiaXml.
+export async function descargarDteRecibidoXml(args: {
+  fecha: string;
+  folio: string;
+  tipoDoc: number;
+}): Promise<string | null> {
+  const s = await abrirSesionRecibidos();
+  const xml = await descargarReciDiaXml(s, args.fecha);
+  return filtrarDtePorFolio(xml, args.folio, args.tipoDoc);
 }

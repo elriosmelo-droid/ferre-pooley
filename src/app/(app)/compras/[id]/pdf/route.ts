@@ -59,9 +59,12 @@ export async function GET(
     return new Response(`No se pudo obtener el DTE del SII: ${msg}`, { status });
   }
   if (!xml) {
-    return new Response("No se pudo obtener el detalle: el DTE no está en el SII", {
-      status: 404,
-    });
+    // El SII throttlea las sesiones por click. Si el caché aún no tiene este
+    // PDF, lo mejor es generarlos en lote con el botón "Generar PDFs".
+    return new Response(
+      "No se pudo obtener el detalle ahora (límite del SII). Usa “Generar PDFs” en /compras o reintenta en unos minutos.",
+      { status: 404 }
+    );
   }
 
   const buf = await generarPdfFacturaRecibida(parseDte(xml));
