@@ -27,7 +27,7 @@ export type PrecacheResult = {
 // agrupando por día (cada descarga trae todos los documentos del día), genera
 // el PDF y lo sube a Storage `compras-pdf/{id}.pdf`. Así "Ver" sirve del caché
 // sin abrir una sesión al SII por click (que el SII throttlea).
-export async function precachearComprasPdf(): Promise<PrecacheResult> {
+export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<PrecacheResult> {
   const db = createAdminClient();
 
   const { data: compras } = await db
@@ -60,7 +60,7 @@ export async function precachearComprasPdf(): Promise<PrecacheResult> {
   let rateLimited = false;
 
   for (const dia of dias) {
-    if (generados >= MAX_POR_CORRIDA) break;
+    if (generados >= max) break;
     const pendientesDia = porDia.get(dia)!;
     const idx = new Map(pendientesDia.map((c) => [`${c.tipo_doc}-${c.folio}`, c]));
 
@@ -97,7 +97,7 @@ export async function precachearComprasPdf(): Promise<PrecacheResult> {
       } catch {
         // un documento que falla no corta la corrida
       }
-      if (generados >= MAX_POR_CORRIDA) break;
+      if (generados >= max) break;
     }
   }
 

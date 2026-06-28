@@ -8,6 +8,7 @@ export type ActualizarComprasResult = {
   error?: string;
   encontradas?: number;
   guardadas?: number;
+  pdfsGenerados?: number;
 };
 
 // Dispara el sync del SII a demanda desde el botón "Actualizar compras". La
@@ -16,8 +17,18 @@ export type ActualizarComprasResult = {
 export async function actualizarCompras(): Promise<ActualizarComprasResult> {
   try {
     const { encontradas, guardadas } = await sincronizarCompras();
+    // Tras bajar las compras, trae también los detalles (PDF de cada DTE
+    // recibido) en la misma sesión. Acotado porque el sync ya consumió tiempo;
+    // lo que falte lo completa el botón "Generar PDFs" o la próxima corrida.
+    let pdfsGenerados = 0;
+    try {
+      const pre = await precachearComprasPdf(15);
+      pdfsGenerados = pre.generados;
+    } catch (e) {
+      console.error("Precache de PDFs tras actualizar compras falló:", e);
+    }
     revalidatePath("/compras");
-    return { encontradas, guardadas };
+    return { encontradas, guardadas, pdfsGenerados };
   } catch (err) {
     console.error("Error al actualizar compras del SII:", err);
     const msg =

@@ -17,10 +17,13 @@ export function ActualizarComprasButton() {
         setError(result.error);
         return;
       }
+      const pdfs = result.pdfsGenerados
+        ? ` · ${result.pdfsGenerados} PDF generados`
+        : "";
       setMensaje(
         result.encontradas
-          ? `Listo: ${result.guardadas} compras actualizadas.`
-          : "No se encontraron compras nuevas en el SII."
+          ? `Listo: ${result.guardadas} compras actualizadas${pdfs}.`
+          : `No se encontraron compras nuevas en el SII${pdfs}.`
       );
     });
   }
