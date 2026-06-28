@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sincronizarCompras } from "@/lib/sii/sync";
+import { precachearComprasPdf } from "@/lib/sii/precache-compras";
 
 // Sync horario del RCV: baja las facturas de compra del SII y las upserta en
 // `compras_sii`. Lo invoca el cron de Vercel (ver vercel.json) o manualmente
@@ -24,7 +25,17 @@ export async function GET(request: Request) {
 
   try {
     const { periodos, encontradas, guardadas } = await sincronizarCompras();
-    return NextResponse.json({ ok: true, periodos, encontradas, guardadas });
+    // Mantener el caché de PDFs de detalle al día sin intervención: tras bajar
+    // las compras, pre-genera los PDF que falten (en una sola sesión al SII).
+    // Idempotente y acotado; lo que no alcance lo toma la corrida siguiente.
+    let pdfsGenerados = 0;
+    try {
+      const pre = await precachearComprasPdf(30);
+      pdfsGenerados = pre.generados;
+    } catch (e) {
+      console.error("Precache de PDFs en el cron de compras falló:", e);
+    }
+    return NextResponse.json({ ok: true, periodos, encontradas, guardadas, pdfsGenerados });
   } catch (err) {
     console.error("Error en el sync del SII:", err);
     const msg = err instanceof Error ? err.message : "Error desconocido";
