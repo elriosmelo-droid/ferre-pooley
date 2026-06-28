@@ -16,13 +16,30 @@ export type DteParsed = {
   tipoDte: number;
   folio: string;
   fchEmis: string;
-  emisor: { rut: string; rznSoc: string; giro: string | null; dir: string | null };
-  receptor: { rut: string; rznSoc: string; giro: string | null; dir: string | null };
+  emisor: {
+    rut: string;
+    rznSoc: string;
+    giro: string | null;
+    dir: string | null;
+    comuna: string | null;
+    ciudad: string | null;
+    correo: string | null;
+  };
+  receptor: {
+    rut: string;
+    rznSoc: string;
+    giro: string | null;
+    dir: string | null;
+    comuna: string | null;
+    ciudad: string | null;
+  };
   items: DteItem[];
   montoNeto: number;
   iva: number;
   exento: number;
   total: number;
+  // Bloque <TED>…</TED> crudo (timbre electrónico) para renderizar el PDF417.
+  ted: string | null;
 };
 
 function tag(src: string, name: string): string | null {
@@ -77,17 +94,23 @@ export function parseDte(xml: string): DteParsed {
       rznSoc: tag(emisorB, "RznSoc") ?? "",
       giro: tag(emisorB, "GiroEmis"),
       dir: tag(emisorB, "DirOrigen"),
+      comuna: tag(emisorB, "CmnaOrigen"),
+      ciudad: tag(emisorB, "CiudadOrigen"),
+      correo: tag(emisorB, "CorreoEmisor"),
     },
     receptor: {
       rut: tag(recepB, "RUTRecep") ?? "",
       rznSoc: tag(recepB, "RznSocRecep") ?? "",
       giro: tag(recepB, "GiroRecep"),
       dir: tag(recepB, "DirRecep"),
+      comuna: tag(recepB, "CmnaRecep"),
+      ciudad: tag(recepB, "CiudadRecep"),
     },
     items,
     montoNeto: intTag(totB, "MntNeto"),
     iva: intTag(totB, "IVA"),
     exento: intTag(totB, "MntExe"),
     total: intTag(totB, "MntTotal"),
+    ted: xml.match(/<TED[\s\S]*?<\/TED>/)?.[0] ?? null,
   };
 }

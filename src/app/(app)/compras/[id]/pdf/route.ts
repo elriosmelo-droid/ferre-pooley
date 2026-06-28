@@ -35,7 +35,7 @@ export async function GET(
 
   // Versión del PDF: subir al renderizar (p.ej. agregar descuento de línea)
   // invalida el caché viejo sin tener que borrarlo.
-  const key = `${id}-v2.pdf`;
+  const key = `${id}-v3.pdf`;
 
   // 1. Caché
   const cached = await db.storage.from(BUCKET).download(key);
