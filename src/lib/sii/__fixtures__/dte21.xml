@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<SetDTE>
+<DTE version="1.0" >
+  <!-- O Win32 Chrome 149 central VERSION: v20190409 -->
+<Documento ID="MiPE78400766-20270">
+    <Encabezado>
+      <IdDoc>
+        <TipoDTE>33</TipoDTE>
+        <Folio>21</Folio>
+        <FchEmis>2026-06-25</FchEmis>
+        <TpoTranCompra>1</TpoTranCompra>
+        <TpoTranVenta>1</TpoTranVenta>
+        <FmaPago>1</FmaPago>
+      </IdDoc>
+      <Emisor>
+        <RUTEmisor>78400766-9</RUTEmisor>
+        <RznSoc>TULBLESS SPA</RznSoc>
+        <GiroEmis>COMERCIALIZADORA DE MATERIALES DE CONSTRUCCION</GiroEmis>
+        <CorreoEmisor>tulbless.spa@gmail.com</CorreoEmisor>
+        <Acteco>466302</Acteco>
+        <CdgSIISucur>92775812</CdgSIISucur>
+        <DirOrigen>THIERS 566 DP 303 EDIF DON SIMON VI</DirOrigen>
+        <CmnaOrigen>TEMUCO</CmnaOrigen>
+        <CiudadOrigen>TEMUCO</CiudadOrigen>
+      </Emisor>
+      <Receptor>
+        <RUTRecep>77264557-0</RUTRecep>
+        <RznSocRecep>PRO LOGÍSTICA LOS RIOS LIMITADA</RznSocRecep>
+        <GiroRecep>VENTA AL POR MAYOR DE OTROS ENSERES DOME</GiroRecep>
+        <DirRecep>LAS BANDURRIAS 1063</DirRecep>
+        <CmnaRecep>VALDIVIA</CmnaRecep>
+        <CiudadRecep>VALDIVIA</CiudadRecep>
+      </Receptor>
+    <Transporte>
+  </Transporte>
+      <Totales>
+        <MntNeto>14695200</MntNeto>
+        <TasaIVA>19.00</TasaIVA>
+        <IVA>2792088</IVA>
+        <MntTotal>17487288</MntTotal>
+      </Totales>
+    </Encabezado>
+    <Detalle>
+      <NroLinDet>1</NroLinDet>
+      <NmbItem>TERCIADO ESTRUCTURAL</NmbItem>
+      <DscItem>18X244X122</DscItem>
+      <QtyItem>936.00</QtyItem>
+      <UnmdItem>UND</UnmdItem>
+      <PrcItem>15700.00</PrcItem>
+      <MontoItem>14695200</MontoItem>
+    </Detalle>
+    <Referencia>
+      <NroLinRef>1</NroLinRef>
+      <TpoDocRef>801</TpoDocRef>
+      <FolioRef>772</FolioRef>
+      <FchRef>2026-06-25</FchRef>
+    </Referencia>
+<TED version="1.0"><DD><RE>78400766-9</RE><TD>33</TD><F>21</F><FE>2026-06-25</FE><RR>77264557-0</RR><RSR>PRO LOGÍSTICA LOS RIOS LIMITADA</RSR><MNT>17487288</MNT><IT1>TERCIADO ESTRUCTURAL</IT1><CAF version="1.0"><DA><RE>78400766-9</RE><RS>TULBLESS SPA</RS><TD>33</TD><RNG><D>21</D><H>21</H></RNG><FA>2026-06-25</FA><RSAPK><M>olWxOtkoUfrSB79IcG1trb5eLNPOnxep1q5WyEYGzY9xzIeM0kuPCA5/7E29rNtroTbbxZPKqceY55GF7uDPdQ==</M><E>Aw==</E></RSAPK><IDK>300</IDK></DA><FRMA algoritmo="SHA1withRSA">eMs+nv7cpOLdHTMtXY+p8VHyg6auitbTNc8S8qMB7q4GPItD8oT44klL793xUfRYAW4LH/Ol3QRBPaRjP3LkLA==</FRMA></CAF><TSTED>2026-06-25T15:16:15</TSTED></DD><FRMT algoritmo="SHA1withRSA">fWKqUx3weQW92FXz1M1sNnhVknhhd/zZzPZsr0M8VXZM5NI8BrEQb3vPWcNpqXbZUpgnrHg/vFp108H9wmZxVA==</FRMT></TED>
+    <TmstFirma>2026-06-25T15:16:15</TmstFirma>
+
+  </Documento>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<SignedInfo>
+<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+<Reference URI="#MiPE78400766-20270">
+<Transforms>
+<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+</Transforms>
+<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+<DigestValue>D+dyZ/lwBKWqkvh8IFK1fOtUMZw=</DigestValue>
+</Reference>
+</SignedInfo>
+<SignatureValue>
+bw9zSnd4JQqSo6xREuYrt+RppzYunS1dmMlbRy24XqP39epsUWVaIduBJaJDkFStwY0vPOJvsdcd
+GOaX4uqAaSGiMrAs4vTJmd3QMrC3jucz+CDZpMU2YOBjD6JrvWLRH5p72+3L9aBptQwAxFzLb82H
+PqbQnU4wCVP2I0n6iYYP3UCKfJJSTi0thufQNl33xyN2e3JrNTX7Y9lTi1Akf0Zw++rD5O23bRS2
+sTs8RC4huhaNVqt+5N1XMdTHqpVxLWXIhUF/BXPimIT+b8mpVwbM4C4z/8Q2RzIjdSiiWzbE0ej/
+zfM4CWSuGJatzjijgDSkvQ/o7ydODlAsOXEL/g==
+</SignatureValue>
+<KeyInfo>
+<KeyValue>
+<RSAKeyValue>
+<Modulus>
+t9ltDBxaoYpWQ6/GswwUdX3/OA/mcSlvjmnmO1XgT5MRCUdh1pYkSrllwSApsrkh9wJ+b048NwPs
+m7Mxe/sTpzSxWHKssHw/yJ1vnLnewdL0WPYrB0aAzptnKSKu3Kgl6nFOXHj4ZD9QTtrW5b8ZN3P3
+FDRx+Xxn4DZOTzUobUUKAQzLTdObfl9j1u6CEs/m+MmWaVZ3S307fIb9wvkactneG3jC3GA5xSLI
+WHxc6OfX2JxndsATUspnpidNrWUisgG/8ozlwU7GgoYdSU9iiWbX4JV9g/pHoHaxicZ2fxdtXkdE
+lprBbfJCac2PZFWVAOc3ikl1hx5XwqCZRo0udw==
+</Modulus>
+<Exponent>AQAB</Exponent>
+</RSAKeyValue>
+</KeyValue>
+<X509Data>
+<X509Certificate>
+MIIHqjCCBZKgAwIBAgIKZsy8dgABABKGYzANBgkqhkiG9w0BAQsFADCBvzELMAkGA1UEBhMCQ0wx
+HTAbBgNVBAgTFFJlZ2lvbiBNZXRyb3BvbGl0YW5hMREwDwYDVQQHEwhTYW50aWFnbzEUMBIGA1UE
+ChMLRS1DRVJUQ0hJTEUxIDAeBgNVBAsTF0F1dG9yaWRhZCBDZXJ0aWZpY2Fkb3JhMR4wHAYDVQQD
+ExVFLUNFUlRDSElMRSBDQSBGRVMgMDIxJjAkBgkqhkiG9w0BCQEWF3NjbGllbnRlQGUtY2VydGNo
+aWxlLmNsMB4XDTI2MDQyOTIxNTM0OVoXDTI3MDQyOTIxNTM0OVowgaYxCzAJBgNVBAYTAkNMMRYw
+FAYDVQQIDA1MQSBBUkFVQ0FOw41BMRAwDgYDVQQHDAdDQVVUw41OMRUwEwYDVQQKEwxUVUxCTEVT
+UyBTUEExCjAIBgNVBAsMASoxJTAjBgNVBAMTHEVEVUFSRE8gQUxFSkFORFJPIEJFQ0FTIE1PUkEx
+IzAhBgkqhkiG9w0BCQEWFEVNRVpBTVBPTklAR01BSUwuQ09NMIIBIjANBgkqhkiG9w0BAQEFAAOC
+AQ8AMIIBCgKCAQEAt9ltDBxaoYpWQ6/GswwUdX3/OA/mcSlvjmnmO1XgT5MRCUdh1pYkSrllwSAp
+srkh9wJ+b048NwPsm7Mxe/sTpzSxWHKssHw/yJ1vnLnewdL0WPYrB0aAzptnKSKu3Kgl6nFOXHj4
+ZD9QTtrW5b8ZN3P3FDRx+Xxn4DZOTzUobUUKAQzLTdObfl9j1u6CEs/m+MmWaVZ3S307fIb9wvka
+ctneG3jC3GA5xSLIWHxc6OfX2JxndsATUspnpidNrWUisgG/8ozlwU7GgoYdSU9iiWbX4JV9g/pH
+oHaxicZ2fxdtXkdElprBbfJCac2PZFWVAOc3ikl1hx5XwqCZRo0udwIDAQABo4ICvTCCArkwggFf
+BgNVHSAEggFWMIIBUjCCAU4GCCsGAQQBw1IFMIIBQDA9BggrBgEFBQcCARYxaHR0cHM6Ly93d3cu
+ZS1jZXJ0Y2hpbGUuY2wvcG9saXRpY2FzLXktcHJhY3RpY2FzLzCB/gYIKwYBBQUHAgIwgfEege4A
+RQBsACAAcgBlAHMAcABvAG4AZABlAHIAIABlAHMAdABlACAAZgBvAHIAbQB1AGwAYQByAGkAbwAg
+AGUAcwAgAHUAbgAgAHIAZQBxAHUAaQBzAGkAdABvACAAaQBuAGQAaQBzAHAAZQBuAHMAYQBiAGwA
+ZQAgAHAAYQByAGEAIABkAGEAcgAgAGkAbgBpAGMAaQBvACAAYQBsACAAcAByAG8AYwBlAHMAbwAg
+AGQAZQAgAGMAZQByAHQAaQBmAGkAYwBhAGMAaQDzAG4ALgAgAFAAbwBzAHQAZQByAGkAbwByAG0A
+ZQBuAHQAZQAsMB0GA1UdDgQWBBQptdTp6RaNTnHK8HQ0i0qCw2PyNDALBgNVHQ8EBAMCBPAwIwYD
+VR0RBBwwGqAYBggrBgEEAcEBAaAMFgoxNDIxODI5NC03MB8GA1UdIwQYMBaAFHTWIbP0WugtfLtZ
+BmND72m0OpMEMEAGA1UdHwQ5MDcwNaAzoDGGL2h0dHA6Ly9jcmwuZWNlcnRjaGlsZS5jbC9FLUNF
+UlRDSElMRUNBRkVTMDIuY3JsMD0GCCsGAQUFBwEBBDEwLzAtBggrBgEFBQcwAYYhaHR0cDovL29j
+c3BmZXMuZWNlcnRjaGlsZS5jbC9vY3NwMDwGCSsGAQQBgjcVBwQvMC0GJSsGAQQBgjcVCIHd0k2X
+1DqGiZ0Gh4jOb4OvzGBFhaS+OIKen20CAWQCAQIwIwYDVR0SBBwwGqAYBggrBgEEAcEBAqAMFgo5
+NjkyODE4MC01MA0GCSqGSIb3DQEBCwUAA4ICAQAxhP2SGRR2zcE9aZdAfh8KbKr5pU7H6QllVf0s
+5VbnRE8aNUBQNCjOVQmXC53b+1OLub9JIf17NRrDBHi1b50fETTGb19vZYDIjk4pcTvHTXHQqYlI
+Pgs266zvlNFIwNcOqsF2b4pC+a+TCKFMVjntaP+OWmhNX0ujUiRoRe9rNwJvRGX1NzhIrtmOF6Lq
+aZG57o+eoCIoXP92NLrtKGJdpgVBCazsvzRlHo/fOfkunqVL4iUuNUTaefLSPhwgtsw3baNVzkw0
+OpKmPYPR3bdoBkrwtv2fa0NdvrTLmMo8TeMAKfgrZTK/OqzAPVfDDZTpUObx8DrL/QoHaXwa5N5X
+oq1gmxPsTGMhJ9OkbHptl8tzM40JqWDlDo2fsZQq6Q28nGdC4kphb495C/OVSVNjWnZDhzIpWZ9D
+MlzrdKPHCk+aY9fU22AEZSZ+RhgZxod/b4N0QC/+tiroa845YwI65kox58+XdciEjlbNr3mYzMAB
+zsNSAdbfhK5753LW68RSAhQr38EvG1JrP+KgM4xeUTcdYyAI3a8Yh1cl1jhfxpIoYR9TNxU4Uc9x
+m2sWPdnPOToX+j3oT+j/Has1IBID/czTqDnv6DZECLAzbPf2kzOSJNfzCSFHRk17X8t61hibiPqt
+NJK/50DvvFhHBH6WDXoou3KiVJxVJIyGkFdl0A==
+</X509Certificate>
+</X509Data>
+</KeyInfo>
+</Signature></DTE>
+</SetDTE>
