@@ -113,17 +113,75 @@ export async function descargarDteEmitidoXml(args: {
     `${PORTAL}/mipeDownLoad.cgi?ORIGEN=ENV&RUT_RECP=&FOLIO=&RZN_SOC=&FEC_DESDE=${args.fecha}&FEC_HASTA=${args.fecha}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
   );
   if (r.status === 429) throw new Error("SII rate limit (429)");
-  const xml = r.buf.toString("latin1");
-  if (!xml.includes("</DTE>")) return null;
+  return filtrarDtePorFolio(r.buf.toString("latin1"), args.folio, args.tipoDoc);
+}
 
-  // El día puede traer varios DTE; quedarse con el del folio+tipo pedido.
+// De un XML compilado (SetDTE con 0..N DTE) devuelve el bloque <DTE>...</DTE>
+// cuyo folio + tipo calzan, o null si no aparece.
+function filtrarDtePorFolio(
+  xml: string,
+  folio: string,
+  tipoDoc: number
+): string | null {
+  if (!xml.includes("</DTE>")) return null;
   for (const part of xml.split("</DTE>")) {
-    const folio = part.match(/<Folio>(\d+)/)?.[1];
-    const tipo = part.match(/<TipoDTE>(\d+)/)?.[1];
-    if (folio === args.folio && tipo === String(args.tipoDoc)) {
+    const f = part.match(/<Folio>(\d+)/)?.[1];
+    const t = part.match(/<TipoDTE>(\d+)/)?.[1];
+    if (f === folio && t === String(tipoDoc)) {
       const start = part.indexOf("<DTE");
       return (start >= 0 ? part.slice(start) : part) + "</DTE>";
     }
   }
   return null;
+}
+
+// Descarga el DTE RECIBIDO (compra) del SII y devuelve su XML, o null si no
+// aparece. A diferencia de los emitidos, los recibidos (ORIGEN=RCP) requieren
+// un POST de inicialización a mipeAdminDocsRcp.cgi que arma el token del módulo
+// antes de poder descargar. Flujo validado en el script de producción
+// `proceso_semanal/descargar_facturas_pfx.py`. Es cert puro, sin clave.
+export async function descargarDteRecibidoXml(args: {
+  fecha: string;
+  folio: string;
+  tipoDoc: number;
+}): Promise<string | null> {
+  const titular = process.env.SII_RUT_TITULAR;
+  const empresa = process.env.SII_RUT_EMPRESA;
+  if (!titular || !empresa) throw new Error("Falta SII_RUT_TITULAR o SII_RUT_EMPRESA");
+  const [rutNum, dv] = titular.split("-");
+
+  const s = new Sesion();
+  const ref = `${PORTAL}/mipeAdminDocsRcp.cgi`;
+  const auth = await s.req(
+    "GET",
+    `${AUTH}?rutcntr=${titular}&rut=${rutNum}&referencia=${encodeURIComponent(ref)}&dv=${dv}`
+  );
+  if (auth.status !== 200 || auth.buf.toString("latin1").includes("01.01.215.500.440.33")) {
+    throw new Error("Autenticación SII falló (certificado rechazado)");
+  }
+
+  // El DESDE_DONDE_URL va url-encoded como un solo valor.
+  await s.req("GET", `${PORTAL}/mipeSelEmpresa.cgi?DESDE_DONDE_URL=OPCION=1&TIPO=4`);
+  await s.req(
+    "POST",
+    `${PORTAL}/mipeSelEmpresa.cgi`,
+    `DESDE_DONDE_URL=OPCION%3D1%26TIPO%3D4&RUT_EMP=${encodeURIComponent(empresa)}`
+  );
+  await s.req("GET", `${PORTAL}/mipeLaunchPage.cgi?OPCION=1&TIPO=4`);
+
+  // POST de inicialización del módulo de recibidos: sin esto mipeDownLoad
+  // responde "Error 501 ptr NULL (ptrTkn)".
+  await s.req(
+    "POST",
+    `${PORTAL}/mipeAdminDocsRcp.cgi`,
+    `RUT_EMI=&ORIGEN=RCP&TPO_DOC=&FEC_DESDE=${args.fecha}&FEC_HASTA=${args.fecha}` +
+      `&FOLIO=&FOLIOHASTA=&RUT_RECP=&RZN_SOC=&ESTADO=&ORDEN=&NUM_PAG=1&TPO_ARCHIVO=dte`
+  );
+
+  const r = await s.req(
+    "GET",
+    `${PORTAL}/mipeDownLoad.cgi?ORIGEN=RCP&RUT_EMI=&FOLIO=&FOLIOHASTA=&RZN_SOC=&FEC_DESDE=${args.fecha}&FEC_HASTA=${args.fecha}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
+  );
+  if (r.status === 429) throw new Error("SII rate limit (429)");
+  return filtrarDtePorFolio(r.buf.toString("latin1"), args.folio, args.tipoDoc);
 }

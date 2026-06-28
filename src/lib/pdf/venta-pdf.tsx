@@ -38,14 +38,18 @@ const s = StyleSheet.create({
   totals: { marginTop: 12, alignSelf: "flex-end", width: 200 },
   totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
   totFinal: { fontFamily: "Helvetica-Bold", fontSize: 11, marginTop: 4, borderTopWidth: 1, borderTopColor: "#0f172a", paddingTop: 4 },
+  copiaBanner: { backgroundColor: "#fef3c7", color: "#92400e", fontFamily: "Helvetica-Bold", fontSize: 10, textAlign: "center", padding: 5, borderRadius: 4, marginBottom: 12 },
 });
 
-function VentaPdf({ dte }: { dte: DteParsed }) {
+function VentaPdf({ dte, copia }: { dte: DteParsed; copia?: boolean }) {
   const [y, m, d] = dte.fchEmis.split("-");
   const fecha = y ? `${d}/${m}/${y}` : dte.fchEmis;
   return (
     <Document>
       <Page size="A4" style={s.page}>
+        {copia ? (
+          <Text style={s.copiaBanner}>COPIA DE FACTURA RECIBIDA</Text>
+        ) : null}
         <View style={s.row}>
           <View>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
@@ -95,7 +99,9 @@ function VentaPdf({ dte }: { dte: DteParsed }) {
         </View>
 
         <Text style={[s.label, { marginTop: 24 }]}>
-          {EMPRESA.nombre} · {EMPRESA.direccion} · Documento generado desde el SII.
+          {copia
+            ? `Documento recibido — copia generada desde el SII, sin valor tributario.`
+            : `${EMPRESA.nombre} · ${EMPRESA.direccion} · Documento generado desde el SII.`}
         </Text>
       </Page>
     </Document>
@@ -104,4 +110,10 @@ function VentaPdf({ dte }: { dte: DteParsed }) {
 
 export function generarPdfVenta(dte: DteParsed): Promise<Buffer> {
   return renderToBuffer(<VentaPdf dte={dte} />);
+}
+
+// Misma plantilla, rotulada como copia del DTE recibido de un proveedor. El
+// emisor del DTE es el proveedor y el receptor es la empresa.
+export function generarPdfFacturaRecibida(dte: DteParsed): Promise<Buffer> {
+  return renderToBuffer(<VentaPdf dte={dte} copia />);
 }
