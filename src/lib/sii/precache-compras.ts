@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { abrirSesionRecibidos, descargarReciDiaXml, separarDtes } from "./mipe";
+import { abrirSesionRecibidos, descargarReciRangoXml, separarDtes } from "./mipe";
 import { parseDte } from "./dte-xml";
 import { generarPdfFacturaRecibida } from "@/lib/pdf/venta-pdf";
 
@@ -45,44 +45,40 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
     return { generados: 0, yaCacheados: cacheados.size, pendientes: 0, rateLimited: false };
   }
 
-  // Agrupar faltantes por día.
-  const porDia = new Map<string, CompraMin[]>();
+  // Agrupar faltantes por MES (AAAA-MM). Un rango mensual trae todos los
+  // documentos del mes en una sola request → mucho menos tráfico que día por
+  // día, que el SII throttlea.
+  const porMes = new Map<string, CompraMin[]>();
   for (const c of faltantes) {
-    const arr = porDia.get(c.fecha_emision) ?? [];
+    const mes = c.fecha_emision.slice(0, 7); // AAAA-MM
+    const arr = porMes.get(mes) ?? [];
     arr.push(c);
-    porDia.set(c.fecha_emision, arr);
+    porMes.set(mes, arr);
   }
-  const dias = [...porDia.keys()].sort().reverse();
+  const meses = [...porMes.keys()].sort().reverse();
+
+  // Índice global folio+tipo → compra (los DTE del rango pueden venir en
+  // cualquier orden; se matchea por folio+tipo, no por día).
+  const idx = new Map(faltantes.map((c) => [`${c.tipo_doc}-${c.folio}`, c]));
 
   const sesion = await abrirSesionRecibidos();
   let generados = 0;
-  let emptyStreak = 0;
   let rateLimited = false;
 
-  for (const dia of dias) {
+  for (const mes of meses) {
     if (generados >= max) break;
-    const pendientesDia = porDia.get(dia)!;
-    const idx = new Map(pendientesDia.map((c) => [`${c.tipo_doc}-${c.folio}`, c]));
+    const [y, m] = mes.split("-").map(Number);
+    const desde = `${mes}-01`;
+    const hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
 
     let xml: string;
     try {
-      xml = await descargarReciDiaXml(sesion, dia);
+      xml = await descargarReciRangoXml(sesion, desde, hasta);
     } catch {
       rateLimited = true;
       break;
     }
-    const dtes = separarDtes(xml);
-    if (dtes.length === 0) {
-      // Día con compras esperadas pero sin DTE: probable throttle del SII.
-      if (++emptyStreak >= 3) {
-        rateLimited = true;
-        break;
-      }
-      continue;
-    }
-    emptyStreak = 0;
-
-    for (const dte of dtes) {
+    for (const dte of separarDtes(xml)) {
       const compra = idx.get(`${dte.tipoDoc}-${dte.folio}`);
       if (!compra) continue;
       try {

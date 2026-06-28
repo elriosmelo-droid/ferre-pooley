@@ -171,19 +171,25 @@ export async function abrirSesionRecibidos(): Promise<Sesion> {
   return s;
 }
 
-// Baja el XML compilado (SetDTE, 0..N DTE) de los documentos recibidos de un
-// día, sobre una sesión ya abierta. El POST de init arma el token del módulo
-// (sin él mipeDownLoad responde "Error 501 ptr NULL (ptrTkn)").
-export async function descargarReciDiaXml(s: Sesion, fecha: string): Promise<string> {
+// Baja el XML compilado (SetDTE, 0..N DTE) de los documentos recibidos en un
+// RANGO de fechas, sobre una sesión ya abierta. Un solo rango (p.ej. todo un
+// mes) trae todos los documentos del período en una request → evita abrir
+// decenas de requests día por día (que el SII throttlea). El POST de init arma
+// el token del módulo (sin él mipeDownLoad responde "Error 501 ptr NULL").
+export async function descargarReciRangoXml(
+  s: Sesion,
+  desde: string,
+  hasta: string
+): Promise<string> {
   await s.req(
     "POST",
     `${PORTAL}/mipeAdminDocsRcp.cgi`,
-    `RUT_EMI=&ORIGEN=RCP&TPO_DOC=&FEC_DESDE=${fecha}&FEC_HASTA=${fecha}` +
+    `RUT_EMI=&ORIGEN=RCP&TPO_DOC=&FEC_DESDE=${desde}&FEC_HASTA=${hasta}` +
       `&FOLIO=&FOLIOHASTA=&RUT_RECP=&RZN_SOC=&ESTADO=&ORDEN=&NUM_PAG=1&TPO_ARCHIVO=dte`
   );
   const r = await s.req(
     "GET",
-    `${PORTAL}/mipeDownLoad.cgi?ORIGEN=RCP&RUT_EMI=&FOLIO=&FOLIOHASTA=&RZN_SOC=&FEC_DESDE=${fecha}&FEC_HASTA=${fecha}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
+    `${PORTAL}/mipeDownLoad.cgi?ORIGEN=RCP&RUT_EMI=&FOLIO=&FOLIOHASTA=&RZN_SOC=&FEC_DESDE=${desde}&FEC_HASTA=${hasta}&TPO_DOC=&ESTADO=&ORDEN=&DOWNLOAD=XML`
   );
   if (r.status === 429) throw new Error("SII rate limit (429)");
   return r.buf.toString("latin1");
@@ -211,6 +217,6 @@ export async function descargarDteRecibidoXml(args: {
   tipoDoc: number;
 }): Promise<string | null> {
   const s = await abrirSesionRecibidos();
-  const xml = await descargarReciDiaXml(s, args.fecha);
+  const xml = await descargarReciRangoXml(s, args.fecha, args.fecha);
   return filtrarDtePorFolio(xml, args.folio, args.tipoDoc);
 }
