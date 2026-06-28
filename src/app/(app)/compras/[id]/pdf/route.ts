@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { descargarDteRecibidoXml } from "@/lib/sii/mipe";
+import { descargarDteRecibido } from "@/lib/sii/mipe";
 import { parseDte } from "@/lib/sii/dte-xml";
 import { generarPdfFacturaRecibida } from "@/lib/pdf/venta-pdf";
 
@@ -46,9 +46,9 @@ export async function GET(
   if (!compra.fecha_emision) {
     return new Response("La compra no tiene fecha de emisión", { status: 422 });
   }
-  let xml: string | null;
+  let resultado;
   try {
-    xml = await descargarDteRecibidoXml({
+    resultado = await descargarDteRecibido({
       fecha: compra.fecha_emision,
       folio: compra.folio,
       tipoDoc: compra.tipo_doc,
@@ -58,16 +58,23 @@ export async function GET(
     const status = msg.includes("429") ? 503 : 502;
     return new Response(`No se pudo obtener el DTE del SII: ${msg}`, { status });
   }
-  if (!xml) {
-    // El SII throttlea las sesiones por click. Si el caché aún no tiene este
-    // PDF, lo mejor es generarlos en lote con el botón "Generar PDFs".
+  if ("motivo" in resultado) {
+    if (resultado.motivo === "no_en_mipe") {
+      // El proveedor no entrega este documento por el sistema gratuito del SII:
+      // el SII no tiene copia que darnos, no se puede descargar el detalle.
+      return new Response(
+        "Este documento no se puede descargar: el proveedor no lo entrega por el sistema gratuito del SII, así que el SII no tiene el detalle. Pídele el XML al proveedor si lo necesitas.",
+        { status: 404 }
+      );
+    }
+    // "vacio": probable límite del SII; reintentar o usar "Generar PDFs".
     return new Response(
-      "No se pudo obtener el detalle ahora (límite del SII). Usa “Generar PDFs” en /compras o reintenta en unos minutos.",
-      { status: 404 }
+      "No se pudo obtener el detalle ahora (el SII no respondió documentos, probable límite por consultas). Reintenta en unos minutos o usa “Generar PDFs”.",
+      { status: 503 }
     );
   }
 
-  const buf = await generarPdfFacturaRecibida(parseDte(xml));
+  const buf = await generarPdfFacturaRecibida(parseDte(resultado.xml));
 
   // 3. Cachear (best-effort)
   const up = await db.storage

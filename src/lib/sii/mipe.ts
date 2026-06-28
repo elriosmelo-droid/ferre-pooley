@@ -209,14 +209,30 @@ export function separarDtes(xml: string): { folio: string; tipoDoc: number; xml:
   return out;
 }
 
-// Baja el DTE recibido de un folio puntual (abre su propia sesión). Para varios
-// usar abrirSesionRecibidos + descargarReciDiaXml.
-export async function descargarDteRecibidoXml(args: {
+// Baja el DTE recibido de un folio puntual (abre su propia sesión). Consulta el
+// mes completo del documento para distinguir tres casos:
+//   { xml }            → encontrado.
+//   "no_en_mipe"       → el mes trajo documentos pero NO este folio: el
+//                        proveedor no entrega por el sistema gratuito del SII,
+//                        no hay forma de obtener el detalle.
+//   "vacio"            → el mes no trajo ningún DTE: probable throttle del SII
+//                        (o sin recibidos ese mes); reintentar más tarde.
+export type ResultadoRecibido =
+  | { xml: string }
+  | { motivo: "no_en_mipe" | "vacio" };
+
+export async function descargarDteRecibido(args: {
   fecha: string;
   folio: string;
   tipoDoc: number;
-}): Promise<string | null> {
+}): Promise<ResultadoRecibido> {
   const s = await abrirSesionRecibidos();
-  const xml = await descargarReciRangoXml(s, args.fecha, args.fecha);
-  return filtrarDtePorFolio(xml, args.folio, args.tipoDoc);
+  const mes = args.fecha.slice(0, 7);
+  const [y, m] = mes.split("-").map(Number);
+  const hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const xml = await descargarReciRangoXml(s, `${mes}-01`, hasta);
+  const dtes = separarDtes(xml);
+  if (dtes.length === 0) return { motivo: "vacio" };
+  const hit = dtes.find((d) => d.folio === args.folio && d.tipoDoc === args.tipoDoc);
+  return hit ? { xml: hit.xml } : { motivo: "no_en_mipe" };
 }
