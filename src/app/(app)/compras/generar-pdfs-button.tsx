@@ -19,6 +19,8 @@ export function GenerarPdfsButton() {
       }
       const partes = [`${result.generados ?? 0} PDF generados`];
       if (result.pendientes) partes.push(`${result.pendientes} pendientes`);
+      if (result.noDisponibles)
+        partes.push(`${result.noDisponibles} sin detalle en el SII (proveedor no usa el sistema gratuito)`);
       if (result.rateLimited) partes.push("SII cortó por límite, reintenta en un rato");
       setMensaje(`Listo: ${partes.join(" · ")}.`);
     });

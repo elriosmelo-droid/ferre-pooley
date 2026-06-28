@@ -41,6 +41,7 @@ export type GenerarPdfsResult = {
   error?: string;
   generados?: number;
   pendientes?: number;
+  noDisponibles?: number;
   rateLimited?: boolean;
 };
 
@@ -49,9 +50,10 @@ export type GenerarPdfsResult = {
 // sirve del caché en Storage. Idempotente: lo que falte lo toma otra corrida.
 export async function generarPdfsCompras(): Promise<GenerarPdfsResult> {
   try {
-    const { generados, pendientes, rateLimited } = await precachearComprasPdf();
+    const { generados, pendientes, noDisponibles, rateLimited } =
+      await precachearComprasPdf();
     revalidatePath("/compras");
-    return { generados, pendientes, rateLimited };
+    return { generados, pendientes, noDisponibles, rateLimited };
   } catch (err) {
     console.error("Error al generar PDFs de compras:", err);
     const msg =

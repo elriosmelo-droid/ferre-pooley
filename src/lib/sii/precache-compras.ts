@@ -20,6 +20,9 @@ export type PrecacheResult = {
   generados: number;
   yaCacheados: number;
   pendientes: number;
+  // Faltantes cuyo mes SÍ se consultó pero el DTE no está en MIPE (proveedor que
+  // no entrega por el sistema gratuito del SII): sin fuente, no recuperables.
+  noDisponibles: number;
   rateLimited: boolean;
 };
 
@@ -42,7 +45,7 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
 
   const faltantes = todas.filter((c) => !cacheados.has(c.id));
   if (faltantes.length === 0) {
-    return { generados: 0, yaCacheados: cacheados.size, pendientes: 0, rateLimited: false };
+    return { generados: 0, yaCacheados: cacheados.size, pendientes: 0, noDisponibles: 0, rateLimited: false };
   }
 
   // Agrupar faltantes por MES (AAAA-MM). Un rango mensual trae todos los
@@ -64,6 +67,11 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
   const sesion = await abrirSesionRecibidos();
   let generados = 0;
   let rateLimited = false;
+  // Meses cuyo rango se descargó OK + folios+tipo vistos en MIPE. Sirve para
+  // distinguir "no disponible en el SII" (mes consultado, DTE ausente) de
+  // "pendiente" (mes no alcanzado por tope/throttle).
+  const mesesConsultados = new Set<string>();
+  const vistosEnMipe = new Set<string>();
 
   for (const mes of meses) {
     if (generados >= max) break;
@@ -78,7 +86,9 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
       rateLimited = true;
       break;
     }
+    mesesConsultados.add(mes);
     for (const dte of separarDtes(xml)) {
+      vistosEnMipe.add(`${dte.tipoDoc}-${dte.folio}`);
       const compra = idx.get(`${dte.tipoDoc}-${dte.folio}`);
       if (!compra) continue;
       try {
@@ -97,10 +107,18 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
     }
   }
 
+  // Faltante cuyo mes se consultó pero no estaba en MIPE → sin fuente.
+  const noDisponibles = faltantes.filter(
+    (c) =>
+      mesesConsultados.has(c.fecha_emision.slice(0, 7)) &&
+      !vistosEnMipe.has(`${c.tipo_doc}-${c.folio}`)
+  ).length;
+
   return {
     generados,
     yaCacheados: cacheados.size,
-    pendientes: faltantes.length - generados,
+    pendientes: faltantes.length - generados - noDisponibles,
+    noDisponibles,
     rateLimited,
   };
 }
