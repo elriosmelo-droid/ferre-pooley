@@ -33,7 +33,9 @@ export async function GET(
     return new Response("Compra no encontrada", { status: 404 });
   }
 
-  const key = `${id}.pdf`;
+  // Versión del PDF: subir al renderizar (p.ej. agregar descuento de línea)
+  // invalida el caché viejo sin tener que borrarlo.
+  const key = `${id}-v2.pdf`;
 
   // 1. Caché
   const cached = await db.storage.from(BUCKET).download(key);

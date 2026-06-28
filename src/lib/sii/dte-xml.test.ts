@@ -26,5 +26,32 @@ describe("parseDte", () => {
     expect(d.items[0].cantidad).toBe(936);
     expect(d.items[0].precio).toBe(15700);
     expect(d.items[0].monto).toBe(14695200);
+    expect(d.items[0].descuento).toBe(0);
+  });
+
+  it("extrae el descuento de línea (DescuentoMonto) y reconcilia cant*precio - desc = monto", () => {
+    // DTE con descuento por línea (caso MELON: PrcItem bruto, MontoItem neto).
+    const conDesc = `<?xml version="1.0" encoding="ISO-8859-1"?>
+<SetDTE><DTE version="1.0"><Documento ID="x">
+  <Encabezado>
+    <IdDoc><TipoDTE>33</TipoDTE><Folio>1080115</Folio><FchEmis>2026-06-18</FchEmis></IdDoc>
+    <Emisor><RUTEmisor>90209000-3</RUTEmisor><RznSoc>MELON S.A.</RznSoc></Emisor>
+    <Receptor><RUTRecep>78400766-9</RUTRecep><RznSocRecep>TULBLESS SPA</RznSocRecep></Receptor>
+    <Totales><MntNeto>1134000</MntNeto><IVA>215460</IVA><MntTotal>1349460</MntTotal></Totales>
+  </Encabezado>
+  <Detalle>
+    <NroLinDet>1</NroLinDet><NmbItem>EXTRA SACO 25 SOLUBLE FILM</NmbItem>
+    <QtyItem>360</QtyItem><PrcItem>4725</PrcItem>
+    <DescuentoPct>33.33</DescuentoPct><DescuentoMonto>567000</DescuentoMonto>
+    <MontoItem>1134000</MontoItem>
+  </Detalle>
+</Documento></DTE></SetDTE>`;
+    const d = parseDte(conDesc);
+    const it = d.items[0];
+    expect(it.precio).toBe(4725);
+    expect(it.descuento).toBe(567000);
+    expect(it.monto).toBe(1134000);
+    // El bruto menos el descuento debe dar el monto neto de la línea.
+    expect(it.cantidad * it.precio - it.descuento).toBe(it.monto);
   });
 });

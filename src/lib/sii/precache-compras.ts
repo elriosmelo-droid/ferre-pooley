@@ -39,9 +39,13 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
     .not("fecha_emision", "is", null);
   const todas = (compras ?? []) as CompraMin[];
 
-  // PDFs ya en Storage.
+  // PDFs ya en Storage (versión actual del render).
   const { data: objetos } = await db.storage.from(BUCKET).list("", { limit: 1000 });
-  const cacheados = new Set((objetos ?? []).map((o) => o.name.replace(/\.pdf$/, "")));
+  const cacheados = new Set(
+    (objetos ?? [])
+      .filter((o) => o.name.endsWith("-v2.pdf"))
+      .map((o) => o.name.replace(/-v2\.pdf$/, ""))
+  );
 
   const faltantes = todas.filter((c) => !cacheados.has(c.id));
   if (faltantes.length === 0) {
@@ -95,7 +99,7 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
         const buf = await generarPdfFacturaRecibida(parseDte(dte.xml));
         const up = await db.storage
           .from(BUCKET)
-          .upload(`${compra.id}.pdf`, new Uint8Array(buf), {
+          .upload(`${compra.id}-v2.pdf`, new Uint8Array(buf), {
             contentType: "application/pdf",
             upsert: true,
           });

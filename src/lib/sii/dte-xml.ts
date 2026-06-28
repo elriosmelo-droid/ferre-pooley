@@ -6,6 +6,9 @@ export type DteItem = {
   cantidad: number;
   unidad: string | null;
   precio: number;
+  // Descuento de línea (DescuentoMonto). El precio es BRUTO y el monto es NETO
+  // tras descuento, así que: cantidad*precio - descuento = monto.
+  descuento: number;
   monto: number;
 };
 
@@ -60,6 +63,7 @@ export function parseDte(xml: string): DteParsed {
       cantidad: numTag(d, "QtyItem"),
       unidad: tag(d, "UnmdItem"),
       precio: numTag(d, "PrcItem"),
+      descuento: intTag(d, "DescuentoMonto"),
       monto: intTag(d, "MontoItem"),
     });
   }

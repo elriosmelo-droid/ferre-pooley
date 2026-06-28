@@ -31,9 +31,10 @@ const s = StyleSheet.create({
   bold: { fontFamily: "Helvetica-Bold" },
   th: { flexDirection: "row", backgroundColor: "#f1f5f9", paddingVertical: 5, paddingHorizontal: 6, marginTop: 12 },
   td: { flexDirection: "row", paddingVertical: 5, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
-  cDesc: { flex: 4 },
+  cDesc: { flex: 3.5 },
   cQty: { flex: 1, textAlign: "right" },
   cPrc: { flex: 1.5, textAlign: "right" },
+  cDsc: { flex: 1.3, textAlign: "right" },
   cTot: { flex: 1.5, textAlign: "right" },
   totals: { marginTop: 12, alignSelf: "flex-end", width: 200 },
   totRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
@@ -78,6 +79,7 @@ function VentaPdf({ dte, copia }: { dte: DteParsed; copia?: boolean }) {
           <Text style={[s.cDesc, s.bold]}>Detalle</Text>
           <Text style={[s.cQty, s.bold]}>Cant.</Text>
           <Text style={[s.cPrc, s.bold]}>Precio</Text>
+          <Text style={[s.cDsc, s.bold]}>Desc.</Text>
           <Text style={[s.cTot, s.bold]}>Monto</Text>
         </View>
         {dte.items.map((it, i) => (
@@ -85,6 +87,7 @@ function VentaPdf({ dte, copia }: { dte: DteParsed; copia?: boolean }) {
             <Text style={s.cDesc}>{it.nombre}{it.unidad ? ` (${it.unidad})` : ""}</Text>
             <Text style={s.cQty}>{it.cantidad}</Text>
             <Text style={s.cPrc}>{formatCLP(it.precio)}</Text>
+            <Text style={s.cDsc}>{it.descuento > 0 ? `-${formatCLP(it.descuento)}` : "—"}</Text>
             <Text style={s.cTot}>{formatCLP(it.monto)}</Text>
           </View>
         ))}
