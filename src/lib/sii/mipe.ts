@@ -229,9 +229,18 @@ export async function descargarDteRecibido(args: {
   const s = await abrirSesionRecibidos();
   const mes = args.fecha.slice(0, 7);
   const [y, m] = mes.split("-").map(Number);
-  const hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
-  const xml = await descargarReciRangoXml(s, `${mes}-01`, hasta);
-  const dtes = separarDtes(xml);
+  let hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  // El SII devuelve vacío si el rango se extiende al futuro (mes en curso).
+  const hoy = new Date();
+  const hoyStr = `${hoy.getUTCFullYear()}-${String(hoy.getUTCMonth() + 1).padStart(2, "0")}-${String(hoy.getUTCDate()).padStart(2, "0")}`;
+  if (hasta > hoyStr) hasta = hoyStr;
+  let xml = await descargarReciRangoXml(s, `${mes}-01`, hasta);
+  let dtes = separarDtes(xml);
+  // Fallback: si el rango vino vacío, intentar el día puntual del documento.
+  if (dtes.length === 0) {
+    xml = await descargarReciRangoXml(s, args.fecha, args.fecha);
+    dtes = separarDtes(xml);
+  }
   if (dtes.length === 0) return { motivo: "vacio" };
   const hit = dtes.find((d) => d.folio === args.folio && d.tipoDoc === args.tipoDoc);
   return hit ? { xml: hit.xml } : { motivo: "no_en_mipe" };

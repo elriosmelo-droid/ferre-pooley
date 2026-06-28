@@ -68,6 +68,11 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
   // cualquier orden; se matchea por folio+tipo, no por día).
   const idx = new Map(faltantes.map((c) => [`${c.tipo_doc}-${c.folio}`, c]));
 
+  // Fecha de hoy (UTC): el SII devuelve vacío si el rango se extiende al futuro,
+  // así que no se pide más allá de hoy para el mes en curso.
+  const hoy = new Date();
+  const hoyStr = `${hoy.getUTCFullYear()}-${String(hoy.getUTCMonth() + 1).padStart(2, "0")}-${String(hoy.getUTCDate()).padStart(2, "0")}`;
+
   const sesion = await abrirSesionRecibidos();
   let generados = 0;
   let rateLimited = false;
@@ -81,7 +86,8 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
     if (generados >= max) break;
     const [y, m] = mes.split("-").map(Number);
     const desde = `${mes}-01`;
-    const hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    let hasta = `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    if (hasta > hoyStr) hasta = hoyStr; // no pedir rango al futuro
 
     let xml: string;
     try {
@@ -91,7 +97,21 @@ export async function precachearComprasPdf(max = MAX_POR_CORRIDA): Promise<Preca
       break;
     }
     mesesConsultados.add(mes);
-    for (const dte of separarDtes(xml)) {
+    let dtes = separarDtes(xml);
+    // Si el rango mensual vino vacío, reintentar día por día los días con
+    // documentos esperados (el día puntual sí responde aunque el rango falle).
+    if (dtes.length === 0) {
+      const dias = [...new Set((porMes.get(mes) ?? []).map((c) => c.fecha_emision))];
+      for (const dia of dias) {
+        try {
+          dtes = dtes.concat(separarDtes(await descargarReciRangoXml(sesion, dia, dia)));
+        } catch {
+          rateLimited = true;
+          break;
+        }
+      }
+    }
+    for (const dte of dtes) {
       vistosEnMipe.add(`${dte.tipoDoc}-${dte.folio}`);
       const compra = idx.get(`${dte.tipoDoc}-${dte.folio}`);
       if (!compra) continue;
