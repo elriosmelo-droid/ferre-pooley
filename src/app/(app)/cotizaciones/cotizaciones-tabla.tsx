@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { EstadoBadge, type CotizacionEstado } from "./estado-badge";
+import { pasarANotaVenta } from "./actions";
 
 const ESTADO_LABEL: Record<CotizacionEstado, string> = {
   borrador: "Borrador",
@@ -13,6 +14,8 @@ const ESTADO_LABEL: Record<CotizacionEstado, string> = {
   vencida: "Vencida",
 };
 
+type NotaRef = { id: string; folio: string };
+
 export type CotizacionRow = {
   id: string;
   folio: string;
@@ -21,7 +24,16 @@ export type CotizacionRow = {
   total: number;
   estado: CotizacionEstado;
   clientes: { nombre: string } | null;
+  // El unique de notas_venta.cotizacion_id hace el embed to-one, pero se
+  // normaliza por si PostgREST lo entrega como arreglo.
+  notas_venta: NotaRef | NotaRef[] | null;
 };
+
+function notaDe(c: CotizacionRow): NotaRef | null {
+  return Array.isArray(c.notas_venta)
+    ? (c.notas_venta[0] ?? null)
+    : c.notas_venta;
+}
 
 function formatFecha(value: string) {
   const [anio, mes, dia] = value.slice(0, 10).split("-");
@@ -37,6 +49,19 @@ export function CotizacionesTabla({
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("");
+  const [isPending, startTransition] = useTransition();
+  // Fila cuya conversión a nota está en curso (deshabilita solo ese botón).
+  const [pasandoId, setPasandoId] = useState<string | null>(null);
+
+  function pasarANota(id: string) {
+    setPasandoId(id);
+    startTransition(async () => {
+      // En éxito el servidor redirige a la nota creada; si falla, se libera
+      // el botón para reintentar.
+      await pasarANotaVenta(id);
+      setPasandoId(null);
+    });
+  }
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -168,12 +193,38 @@ export function CotizacionesTabla({
                     <EstadoBadge estado={cotizacion.estado} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/cotizaciones/${cotizacion.id}`}
-                      className="text-sm font-medium text-brand-600 hover:text-brand-800"
-                    >
-                      Ver
-                    </Link>
+                    <div className="flex items-center justify-end gap-3 whitespace-nowrap">
+                      <Link
+                        href={`/cotizaciones/${cotizacion.id}`}
+                        className="text-sm font-medium text-brand-600 hover:text-brand-800"
+                      >
+                        Ver
+                      </Link>
+                      {(() => {
+                        const nota = notaDe(cotizacion);
+                        return nota ? (
+                          <Link
+                            href={`/notas-venta/${nota.id}`}
+                            title={`Ya tiene nota de venta ${nota.folio}`}
+                            className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                          >
+                            {nota.folio}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => pasarANota(cotizacion.id)}
+                            disabled={isPending && pasandoId === cotizacion.id}
+                            title="Crear nota de venta con los ítems de esta cotización"
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            {isPending && pasandoId === cotizacion.id
+                              ? "Creando…"
+                              : "A nota de venta"}
+                          </button>
+                        );
+                      })()}
+                    </div>
                   </td>
                 </tr>
               ))
