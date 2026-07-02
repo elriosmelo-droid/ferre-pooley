@@ -429,3 +429,81 @@ export async function duplicarCotizacion(id: string): Promise<void> {
   revalidatePath("/cotizaciones");
   redirect(`/cotizaciones/${copia.id}`);
 }
+
+// Crea una nota de venta a partir de la cotización (cualquier estado), con
+// cliente, ítems, medios de pago y vendedor copiados. Máximo una nota por
+// cotización (unique en notas_venta.cotizacion_id).
+export async function pasarANotaVenta(id: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: cotizacion, error: readError } = await supabase
+    .from("cotizaciones")
+    .select("cliente_id, flete, medio_pago, vendedor, subtotal_neto, iva, total")
+    .eq("id", id)
+    .single();
+
+  if (readError || !cotizacion) {
+    console.error("Error al leer cotización a pasar:", readError?.message);
+    return;
+  }
+
+  const { data: items, error: itemsReadError } = await supabase
+    .from("cotizacion_items")
+    .select("sku, descripcion, cantidad, costo, precio, flete, descuento")
+    .eq("cotizacion_id", id)
+    .order("posicion");
+
+  if (itemsReadError || !items?.length) {
+    console.error(
+      "Error al leer ítems a pasar (o cotización sin ítems):",
+      itemsReadError?.message
+    );
+    return;
+  }
+
+  const vendedor = cotizacion.vendedor ?? (await resolverVendedor(supabase));
+  const { data: nota, error: insertError } = await supabase
+    .from("notas_venta")
+    .insert({
+      cotizacion_id: id,
+      cliente_id: cotizacion.cliente_id,
+      flete: cotizacion.flete,
+      medio_pago: cotizacion.medio_pago,
+      vendedor,
+      subtotal_neto: cotizacion.subtotal_neto,
+      iva: cotizacion.iva,
+      total: cotizacion.total,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !nota) {
+    // 23505 = ya existe nota para esta cotización (carrera con otra pestaña).
+    console.error("Error al crear nota desde cotización:", insertError?.message);
+    return;
+  }
+
+  const { error: itemsError } = await supabase.from("nota_venta_items").insert(
+    items.map((item, index) => ({
+      nota_venta_id: nota.id,
+      sku: item.sku,
+      descripcion: item.descripcion,
+      cantidad: item.cantidad,
+      costo: item.costo,
+      precio: item.precio,
+      flete: item.flete,
+      descuento: item.descuento,
+      posicion: index,
+    }))
+  );
+
+  if (itemsError) {
+    console.error("Error al copiar ítems a la nota:", itemsError.message);
+    await supabase.from("notas_venta").delete().eq("id", nota.id);
+    return;
+  }
+
+  revalidatePath("/notas-venta");
+  revalidatePath(`/cotizaciones/${id}`);
+  redirect(`/notas-venta/${nota.id}`);
+}

@@ -5,7 +5,7 @@ import { formatCLP } from "@/lib/money";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { APP_URL } from "@/lib/app-url";
-import { duplicarCotizacion } from "../actions";
+import { duplicarCotizacion, pasarANotaVenta } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
 import { EnviarButton } from "./enviar-button";
@@ -49,6 +49,12 @@ type CotizacionDetalle = {
     direccion: string | null;
   } | null;
   cotizacion_items: ItemRow[];
+  // El unique de notas_venta.cotizacion_id hace el embed to-one, pero se
+  // normaliza por si PostgREST lo entrega como arreglo.
+  notas_venta:
+    | { id: string; folio: string }
+    | { id: string; folio: string }[]
+    | null;
 };
 
 function formatFecha(value: string) {
@@ -76,7 +82,8 @@ export default async function DetalleCotizacionPage({
       `id, folio, estado, fecha_validez, flete, medio_pago, vendedor, subtotal_neto, iva, total,
        token_aceptacion, notas, firma, firmante, motivo_rechazo, enviada_at, respondida_at, created_at,
        clientes(nombre, rut, correo, telefono, direccion),
-       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
+       cotizacion_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion),
+       notas_venta(id, folio)`
     )
     .eq("id", id)
     .single();
@@ -96,6 +103,10 @@ export default async function DetalleCotizacionPage({
     cotizacion.estado
   );
   const duplicar = duplicarCotizacion.bind(null, cotizacion.id);
+  const pasar = pasarANotaVenta.bind(null, cotizacion.id);
+  const notaExistente = Array.isArray(cotizacion.notas_venta)
+    ? (cotizacion.notas_venta[0] ?? null)
+    : cotizacion.notas_venta;
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,6 +137,23 @@ export default async function DetalleCotizacionPage({
               Duplicar
             </button>
           </form>
+          {notaExistente ? (
+            <Link
+              href={`/notas-venta/${notaExistente.id}`}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-slate-50"
+            >
+              Nota {notaExistente.folio}
+            </Link>
+          ) : (
+            <form action={pasar}>
+              <button
+                type="submit"
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+              >
+                Pasar a nota de venta
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
