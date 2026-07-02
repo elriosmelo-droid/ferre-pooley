@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
+import { resolverVendedor } from "@/lib/vendedor";
 import { formatCLP } from "@/lib/money";
 import { APP_URL } from "@/lib/app-url";
 import { generarPdfCotizacion } from "@/lib/pdf/cotizacion-pdf";
@@ -109,23 +110,6 @@ function toItemRows(
     descuento: item.descuento,
     posicion: index,
   }));
-}
-
-// Nombre del vendedor que crea la cotización: nombre de su perfil, o su correo
-// como respaldo si todavía no lo cargó.
-async function resolverVendedor(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("nombre")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  return perfil?.nombre?.trim() || user.email || null;
 }
 
 export async function crearCotizacion(
