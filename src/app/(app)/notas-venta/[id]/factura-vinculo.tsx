@@ -42,7 +42,13 @@ export function FacturaVinculo({
   const [verTodas, setVerTodas] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const opciones = verTodas ? [...candidatas, ...otras] : candidatas;
+  // Las de mismo monto que la nota van primero: son la sugerencia natural.
+  const ordenar = (lista: FacturaOpcion[]) =>
+    [...lista].sort(
+      (a, b) =>
+        Number(b.monto_total === total) - Number(a.monto_total === total)
+    );
+  const opciones = ordenar(verTodas ? [...candidatas, ...otras] : candidatas);
 
   const facturado = vinculadas.reduce((s, f) => s + f.monto_total, 0);
   const diferencia = total - facturado;
@@ -153,8 +159,10 @@ export function FacturaVinculo({
               <option value="">Agregar factura del SII…</option>
               {opciones.map((f) => (
                 <option key={f.id} value={f.id}>
+                  {f.monto_total === total ? "★ " : ""}
                   {f.folio} · {fmt(f.fecha_emision)} ·{" "}
                   {formatCLP(f.monto_total)}
+                  {f.monto_total === total ? " · mismo monto" : ""}
                   {f.razon_social ? ` · ${f.razon_social}` : ""}
                   {f.rut_cliente ? ` (${f.rut_cliente})` : ""}
                 </option>

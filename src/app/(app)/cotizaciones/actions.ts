@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
+import { autoVincularNota } from "@/lib/vinculo-nota";
 import { formatCLP } from "@/lib/money";
 import { APP_URL } from "@/lib/app-url";
 import { generarPdfCotizacion } from "@/lib/pdf/cotizacion-pdf";
@@ -502,6 +503,10 @@ export async function pasarANotaVenta(id: string): Promise<void> {
     await supabase.from("notas_venta").delete().eq("id", nota.id);
     return;
   }
+
+  // Si hay una factura del SII que calza sin ambigüedad (mismo RUT + mismo
+  // total), queda vinculada de inmediato.
+  await autoVincularNota(supabase, nota.id);
 
   revalidatePath("/notas-venta");
   revalidatePath(`/cotizaciones/${id}`);

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularTotales } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
+import { autoVincularNota } from "@/lib/vinculo-nota";
 
 export type NotaVentaActionResult = {
   error?: string;
@@ -160,6 +161,10 @@ export async function crearNotaVenta(
     return { error: "No se pudo guardar la nota de venta. Intenta nuevamente." };
   }
 
+  // Si hay una factura del SII que calza sin ambigüedad (mismo RUT + mismo
+  // total), queda vinculada de inmediato.
+  await autoVincularNota(supabase, nota.id);
+
   revalidatePath("/notas-venta");
   redirect(`/notas-venta/${nota.id}`);
 }
@@ -213,6 +218,10 @@ export async function actualizarNotaVenta(
     console.error("Error al guardar ítems:", itemsError.message);
     return { error: "No se pudieron actualizar los ítems. Intenta nuevamente." };
   }
+
+  // El total pudo cambiar: reintenta el calce automático (autoVincularNota
+  // no toca notas que ya tienen factura vinculada).
+  await autoVincularNota(supabase, id);
 
   revalidatePath("/notas-venta");
   revalidatePath(`/notas-venta/${id}`);
