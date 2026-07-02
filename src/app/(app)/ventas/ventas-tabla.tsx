@@ -3,13 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
-
-const TIPO_DOC: Record<number, string> = {
-  33: "Factura electrónica",
-  34: "Factura exenta",
-  56: "Nota de débito",
-  61: "Nota de crédito",
-};
+import { TIPO_DOC } from "@/lib/dte-doc";
 
 export type VentaRow = {
   id: string;

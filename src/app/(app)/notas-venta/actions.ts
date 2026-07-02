@@ -8,6 +8,7 @@ import { calcularTotales } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
 import { autoVincularNota } from "@/lib/vinculo-nota";
+import { esNotaCredito } from "@/lib/dte-doc";
 
 export type NotaVentaActionResult = {
   error?: string;
@@ -270,7 +271,7 @@ export async function vincularFacturaVenta(
     .update({ nota_venta_id: notaId })
     .eq("id", ventaSiiId)
     .is("nota_venta_id", null)
-    .select("id");
+    .select("id, tipo_doc, observacion");
 
   if (error) {
     console.error("Error al vincular factura del SII:", error.message);
@@ -280,9 +281,55 @@ export async function vincularFacturaVenta(
     return { error: "Esa factura ya está vinculada a otra nota de venta." };
   }
 
+  // Nota de crédito: deja constancia de qué factura de la nota descuenta
+  // (observación editable después). Best-effort, no bloquea el vínculo.
+  const vinculada = data[0] as {
+    id: string;
+    tipo_doc: number;
+    observacion: string | null;
+  };
+  if (esNotaCredito(vinculada.tipo_doc) && !vinculada.observacion) {
+    const { data: facturas } = await supabase
+      .from("ventas_sii")
+      .select("folio, tipo_doc")
+      .eq("nota_venta_id", notaId)
+      .neq("id", ventaSiiId)
+      .neq("tipo_doc", 61)
+      .order("fecha_emision", { ascending: false, nullsFirst: false });
+    if (facturas?.length) {
+      await supabase
+        .from("ventas_sii")
+        .update({ observacion: `Descuenta factura ${facturas[0].folio}` })
+        .eq("id", ventaSiiId);
+    }
+  }
+
   revalidatePath(`/notas-venta/${notaId}`);
   revalidatePath("/ventas");
   revalidatePath("/conciliacion");
+  return { success: true };
+}
+
+// Observación libre sobre un documento vinculado (típico: a qué factura
+// hace referencia una nota de crédito).
+export async function setObservacionVenta(
+  ventaSiiId: string,
+  notaId: string,
+  observacion: string
+): Promise<NotaVentaActionResult> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ventas_sii")
+    .update({ observacion: observacion.trim() || null })
+    .eq("id", ventaSiiId);
+
+  if (error) {
+    console.error("Error al guardar observación:", error.message);
+    return { error: "No se pudo guardar la observación. Intenta nuevamente." };
+  }
+
+  revalidatePath(`/notas-venta/${notaId}`);
   return { success: true };
 }
 

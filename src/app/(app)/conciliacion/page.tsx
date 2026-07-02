@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { signoDte } from "@/lib/dte-doc";
 import { ConciliacionTabla, type ConciliacionRow } from "./conciliacion-tabla";
 
 type NotaRow = {
@@ -24,7 +25,7 @@ export default async function ConciliacionPage() {
       .select("id, folio, total, estado, created_at, clientes(nombre)")
       .neq("estado", "anulada")
       .order("created_at", { ascending: false }),
-    supabase.from("ventas_sii").select("nota_venta_id, monto_total"),
+    supabase.from("ventas_sii").select("nota_venta_id, monto_total, tipo_doc"),
   ]);
 
   const notas = (notasData ?? []) as unknown as NotaRow[];
@@ -33,7 +34,8 @@ export default async function ConciliacionPage() {
   for (const v of ventasData ?? []) {
     if (!v.nota_venta_id) continue;
     const a = agg.get(v.nota_venta_id) ?? { facturado: 0, n: 0 };
-    a.facturado += v.monto_total ?? 0;
+    // Facturas suman, notas de crédito restan.
+    a.facturado += signoDte(v.tipo_doc) * (v.monto_total ?? 0);
     a.n += 1;
     agg.set(v.nota_venta_id, a);
   }

@@ -92,7 +92,7 @@ export default async function DetalleNotaVentaPage({
   const { data: ventasData } = await supabase
     .from("ventas_sii")
     .select(
-      "id, folio, fecha_emision, monto_total, rut_cliente, razon_social, nota_venta_id"
+      "id, folio, tipo_doc, fecha_emision, monto_total, rut_cliente, razon_social, observacion, nota_venta_id"
     )
     .order("fecha_emision", { ascending: false, nullsFirst: false });
 

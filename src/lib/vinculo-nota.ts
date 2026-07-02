@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizarRut } from "@/lib/rut";
+import { TIPOS_AUTO_VINCULO } from "@/lib/dte-doc";
 
 // Al crear una nota la factura del SII suele existir de antes: se mira hacia
 // atrás. El margen hacia adelante cubre facturas emitidas el mismo día con
@@ -41,11 +42,13 @@ export async function autoVincularNota(
       .eq("nota_venta_id", notaId);
     if (count && count > 0) return null;
 
+    // Solo facturas: una nota de crédito jamás se engancha sola.
     const { data: ventasData } = await supabase
       .from("ventas_sii")
       .select("id, folio, rut_cliente, monto_total, fecha_emision")
       .is("nota_venta_id", null)
-      .eq("monto_total", nota.total);
+      .eq("monto_total", nota.total)
+      .in("tipo_doc", TIPOS_AUTO_VINCULO);
 
     const diaNota = Math.floor(new Date(nota.created_at).getTime() / 86_400_000);
     const candidatas = (ventasData ?? []).filter((v) => {

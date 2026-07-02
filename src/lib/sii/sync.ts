@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { descargarCompras, descargarVentas } from "./rcv";
 import { normalizarRut } from "@/lib/rut";
+import { TIPOS_AUTO_VINCULO } from "@/lib/dte-doc";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SyncResult = {
@@ -161,9 +162,11 @@ export async function autoVincularVentas(
     .select("id, total, created_at, estado, clientes(rut)")
     .neq("estado", "anulada");
 
+  // Solo facturas: las notas de crédito/débito se asocian a mano.
   const { data: ventasData } = await supabase
     .from("ventas_sii")
-    .select("id, rut_cliente, monto_total, fecha_emision, nota_venta_id");
+    .select("id, rut_cliente, monto_total, fecha_emision, nota_venta_id")
+    .in("tipo_doc", TIPOS_AUTO_VINCULO);
 
   const notas = (notasData ?? []) as unknown as {
     id: string;

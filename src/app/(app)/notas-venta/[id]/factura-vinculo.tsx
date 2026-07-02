@@ -2,18 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { formatCLP } from "@/lib/money";
+import { TIPO_DOC_CORTO, esNotaCredito, signoDte } from "@/lib/dte-doc";
 import {
   vincularFacturaVenta,
   desvincularFacturaVenta,
+  setObservacionVenta,
 } from "../actions";
 
 export type FacturaOpcion = {
   id: string;
   folio: string;
+  tipo_doc: number;
   fecha_emision: string | null;
   monto_total: number;
   rut_cliente?: string;
   razon_social?: string | null;
+  observacion?: string | null;
 };
 
 function fmt(iso: string | null): string {
@@ -41,16 +45,23 @@ export function FacturaVinculo({
   const [seleccion, setSeleccion] = useState("");
   const [verTodas, setVerTodas] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // id del doc cuya observación se está editando + texto en curso.
+  const [editandoObs, setEditandoObs] = useState<string | null>(null);
+  const [obsTexto, setObsTexto] = useState("");
 
-  // Las de mismo monto que la nota van primero: son la sugerencia natural.
+  // Facturas de mismo monto que la nota van primero: sugerencia natural. Las
+  // notas de crédito nunca se sugieren como calce.
+  const esSugerida = (f: FacturaOpcion) =>
+    !esNotaCredito(f.tipo_doc) && f.monto_total === total;
   const ordenar = (lista: FacturaOpcion[]) =>
-    [...lista].sort(
-      (a, b) =>
-        Number(b.monto_total === total) - Number(a.monto_total === total)
-    );
+    [...lista].sort((a, b) => Number(esSugerida(b)) - Number(esSugerida(a)));
   const opciones = ordenar(verTodas ? [...candidatas, ...otras] : candidatas);
 
-  const facturado = vinculadas.reduce((s, f) => s + f.monto_total, 0);
+  // Lo facturado neto: facturas suman, notas de crédito restan.
+  const facturado = vinculadas.reduce(
+    (s, f) => s + signoDte(f.tipo_doc) * f.monto_total,
+    0
+  );
   const diferencia = total - facturado;
 
   function vincular() {
@@ -71,34 +82,104 @@ export function FacturaVinculo({
     });
   }
 
+  function guardarObservacion(ventaId: string) {
+    setError(null);
+    startTransition(async () => {
+      const r = await setObservacionVenta(ventaId, notaId, obsTexto);
+      if (r.error) setError(r.error);
+      else setEditandoObs(null);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-3 text-sm">
       {vinculadas.length > 0 && (
         <ul className="flex flex-col divide-y divide-slate-100 rounded-md border border-slate-200">
-          {vinculadas.map((f) => (
-            <li
-              key={f.id}
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <span className="text-slate-700">
-                <span className="font-medium text-slate-900">{f.folio}</span> ·{" "}
-                {fmt(f.fecha_emision)}
-              </span>
-              <span className="flex items-center gap-3">
-                <span className="font-medium text-slate-900">
-                  {formatCLP(f.monto_total)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => desvincular(f.id)}
-                  disabled={isPending}
-                  className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-                >
-                  Quitar
-                </button>
-              </span>
-            </li>
-          ))}
+          {vinculadas.map((f) => {
+            const esNC = esNotaCredito(f.tipo_doc);
+            return (
+              <li key={f.id} className="flex flex-col gap-1 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-700">
+                    <span
+                      className={`mr-2 rounded px-1.5 py-0.5 text-xs font-semibold ${
+                        esNC
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {TIPO_DOC_CORTO[f.tipo_doc] ?? `Tipo ${f.tipo_doc}`}
+                    </span>
+                    <span className="font-medium text-slate-900">
+                      {f.folio}
+                    </span>{" "}
+                    · {fmt(f.fecha_emision)}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span
+                      className={`font-medium ${esNC ? "text-amber-700" : "text-slate-900"}`}
+                    >
+                      {esNC ? "-" : ""}
+                      {formatCLP(f.monto_total)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditandoObs(f.id);
+                        setObsTexto(f.observacion ?? "");
+                      }}
+                      disabled={isPending}
+                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Obs.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => desvincular(f.id)}
+                      disabled={isPending}
+                      className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Quitar
+                    </button>
+                  </span>
+                </div>
+                {editandoObs === f.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={obsTexto}
+                      onChange={(e) => setObsTexto(e.target.value)}
+                      placeholder="Ej: Descuenta factura 123"
+                      disabled={isPending}
+                      className="w-full max-w-sm rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => guardarObservacion(f.id)}
+                      disabled={isPending}
+                      className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditandoObs(null)}
+                      disabled={isPending}
+                      className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  f.observacion && (
+                    <p className="text-xs italic text-slate-500">
+                      {f.observacion}
+                    </p>
+                  )
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -159,10 +240,11 @@ export function FacturaVinculo({
               <option value="">Agregar factura del SII…</option>
               {opciones.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.monto_total === total ? "★ " : ""}
+                  {esSugerida(f) ? "★ " : ""}
+                  {TIPO_DOC_CORTO[f.tipo_doc] ?? `Tipo ${f.tipo_doc}`}{" "}
                   {f.folio} · {fmt(f.fecha_emision)} ·{" "}
                   {formatCLP(f.monto_total)}
-                  {f.monto_total === total ? " · mismo monto" : ""}
+                  {esSugerida(f) ? " · mismo monto" : ""}
                   {f.razon_social ? ` · ${f.razon_social}` : ""}
                   {f.rut_cliente ? ` (${f.rut_cliente})` : ""}
                 </option>
