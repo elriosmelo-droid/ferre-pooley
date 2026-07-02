@@ -27,6 +27,7 @@ type NotaVentaDetalle = {
   estado: NotaVentaEstado;
   flete: number;
   medio_pago: string[] | null;
+  vendedor: string | null;
   subtotal_neto: number;
   iva: number;
   total: number;
@@ -63,7 +64,7 @@ export default async function DetalleNotaVentaPage({
   const { data, error } = await supabase
     .from("notas_venta")
     .select(
-      `id, folio, estado, flete, medio_pago, subtotal_neto, iva, total, pagada_at, created_at,
+      `id, folio, estado, flete, medio_pago, vendedor, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
        nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
@@ -114,7 +115,17 @@ export default async function DetalleNotaVentaPage({
           <h1 className="text-2xl font-bold text-slate-900">{nota.folio}</h1>
           <NotaEstadoBadge estado={nota.estado} />
         </div>
-        <AccionesNota notaVentaId={nota.id} estado={nota.estado} />
+        <div className="flex flex-wrap items-center gap-3">
+          {nota.estado === "pendiente" && (
+            <Link
+              href={`/notas-venta/${nota.id}/editar`}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Editar
+            </Link>
+          )}
+          <AccionesNota notaVentaId={nota.id} estado={nota.estado} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -153,6 +164,12 @@ export default async function DetalleNotaVentaPage({
                 )}
               </dd>
             </div>
+            {nota.vendedor && (
+              <div className="flex justify-between">
+                <dt>Vendedor</dt>
+                <dd className="font-medium text-slate-900">{nota.vendedor}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt>Creada</dt>
               <dd>{formatFechaHora(nota.created_at)}</dd>
