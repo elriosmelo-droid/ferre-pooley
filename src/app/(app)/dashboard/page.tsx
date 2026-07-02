@@ -9,6 +9,7 @@ import {
   NotaEstadoBadge,
   type NotaVentaEstado,
 } from "../notas-venta/nota-estado-badge";
+import { Margenes } from "./margenes";
 
 type CotizacionResumen = {
   id: string;
@@ -136,6 +137,8 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <Margenes />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white">
