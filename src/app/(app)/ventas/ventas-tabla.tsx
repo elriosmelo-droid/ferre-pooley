@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
-import { TIPO_DOC } from "@/lib/dte-doc";
+import { TIPO_DOC, esNotaCredito, signoDte } from "@/lib/dte-doc";
 
 export type VentaRow = {
   id: string;
@@ -42,7 +42,11 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
     });
   }, [ventas, desde, hasta, cliente, tipo]);
 
-  const total = filtradas.reduce((sum, v) => sum + v.monto_total, 0);
+  // Total neto: facturas suman, notas de crédito restan.
+  const total = filtradas.reduce(
+    (sum, v) => sum + signoDte(v.tipo_doc) * v.monto_total,
+    0
+  );
   const tipos = Array.from(new Set(ventas.map((v) => v.tipo_doc))).sort((a, b) => a - b);
 
   const inputCls =
@@ -128,7 +132,10 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                       <span className="text-slate-400">Sin vincular</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-slate-900">{formatCLP(v.monto_total)}</td>
+                  <td className={`px-4 py-3 text-right font-medium ${esNotaCredito(v.tipo_doc) ? "text-amber-700" : "text-slate-900"}`}>
+                    {esNotaCredito(v.tipo_doc) ? "-" : ""}
+                    {formatCLP(v.monto_total)}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <a
                       href={`/ventas/${v.id}/pdf`}
