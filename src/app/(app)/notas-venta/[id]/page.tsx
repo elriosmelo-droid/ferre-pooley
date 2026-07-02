@@ -91,7 +91,9 @@ export default async function DetalleNotaVentaPage({
   // mismo cliente (RUT) que no estén asignadas a ninguna nota.
   const { data: ventasData } = await supabase
     .from("ventas_sii")
-    .select("id, folio, fecha_emision, monto_total, rut_cliente, nota_venta_id")
+    .select(
+      "id, folio, fecha_emision, monto_total, rut_cliente, razon_social, nota_venta_id"
+    )
     .order("fecha_emision", { ascending: false, nullsFirst: false });
 
   const rutCliente = normalizarRut(cliente?.rut);
@@ -102,11 +104,14 @@ export default async function DetalleNotaVentaPage({
   const facturasVinculadas: FacturaOpcion[] = ventas.filter(
     (v) => v.nota_venta_id === nota.id
   );
+  const sinNota = ventas.filter((v) => !v.nota_venta_id);
   const candidatas: FacturaOpcion[] = rutCliente
-    ? ventas.filter(
-        (v) => !v.nota_venta_id && normalizarRut(v.rut_cliente) === rutCliente
-      )
+    ? sinNota.filter((v) => normalizarRut(v.rut_cliente) === rutCliente)
     : [];
+  // Resto de facturas libres (otro RUT o cliente sin RUT): vinculables a mano.
+  const otras: FacturaOpcion[] = sinNota.filter(
+    (v) => !rutCliente || normalizarRut(v.rut_cliente) !== rutCliente
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -192,6 +197,7 @@ export default async function DetalleNotaVentaPage({
             total={nota.total}
             vinculadas={facturasVinculadas}
             candidatas={candidatas}
+            otras={otras}
           />
         </div>
       </div>

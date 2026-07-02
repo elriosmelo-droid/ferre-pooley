@@ -12,6 +12,8 @@ export type FacturaOpcion = {
   folio: string;
   fecha_emision: string | null;
   monto_total: number;
+  rut_cliente?: string;
+  razon_social?: string | null;
 };
 
 function fmt(iso: string | null): string {
@@ -25,15 +27,22 @@ export function FacturaVinculo({
   total,
   vinculadas,
   candidatas,
+  otras,
 }: {
   notaId: string;
   total: number;
   vinculadas: FacturaOpcion[];
   candidatas: FacturaOpcion[];
+  // Facturas sin nota de otros RUT (o cliente sin RUT): se ofrecen al
+  // activar "ver todas".
+  otras: FacturaOpcion[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [seleccion, setSeleccion] = useState("");
+  const [verTodas, setVerTodas] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const opciones = verTodas ? [...candidatas, ...otras] : candidatas;
 
   const facturado = vinculadas.reduce((s, f) => s + f.monto_total, 0);
   const diferencia = total - facturado;
@@ -114,36 +123,63 @@ export function FacturaVinculo({
         </dl>
       )}
 
-      {candidatas.length === 0 ? (
-        vinculadas.length === 0 && (
-          <p className="text-slate-500">
-            No hay facturas del SII de este cliente para vincular. Actualiza las
-            ventas o revisa que el RUT coincida.
-          </p>
-        )
+      {opciones.length === 0 ? (
+        <div className="flex flex-col gap-2">
+          {vinculadas.length === 0 && (
+            <p className="text-slate-500">
+              No hay facturas del SII de este cliente para vincular. Actualiza
+              las ventas o revisa que el RUT coincida.
+            </p>
+          )}
+          {!verTodas && otras.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setVerTodas(true)}
+              className="self-start text-xs font-medium text-brand-600 hover:text-brand-800"
+            >
+              Ver todas las facturas sin vincular ({otras.length})
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={seleccion}
-            onChange={(e) => setSeleccion(e.target.value)}
-            disabled={isPending}
-            className="rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
-          >
-            <option value="">Agregar factura del SII…</option>
-            {candidatas.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.folio} · {fmt(f.fecha_emision)} · {formatCLP(f.monto_total)}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={vincular}
-            disabled={isPending || !seleccion}
-            className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-          >
-            {isPending ? "Vinculando…" : "Vincular"}
-          </button>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={seleccion}
+              onChange={(e) => setSeleccion(e.target.value)}
+              disabled={isPending}
+              className="rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+            >
+              <option value="">Agregar factura del SII…</option>
+              {opciones.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.folio} · {fmt(f.fecha_emision)} ·{" "}
+                  {formatCLP(f.monto_total)}
+                  {f.razon_social ? ` · ${f.razon_social}` : ""}
+                  {f.rut_cliente ? ` (${f.rut_cliente})` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={vincular}
+              disabled={isPending || !seleccion}
+              className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              {isPending ? "Vinculando…" : "Vincular"}
+            </button>
+          </div>
+          {otras.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setVerTodas((v) => !v)}
+              className="self-start text-xs font-medium text-brand-600 hover:text-brand-800"
+            >
+              {verTodas
+                ? "Mostrar solo las del cliente"
+                : `Ver todas las facturas sin vincular (${otras.length} más)`}
+            </button>
+          )}
         </div>
       )}
 
