@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 
@@ -17,6 +18,12 @@ export default async function NotasVentaPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Notas de Venta</h1>
+        <Link
+          href="/notas-venta/nueva"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        >
+          Nueva nota de venta
+        </Link>
       </div>
 
       {error ? (
