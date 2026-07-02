@@ -25,7 +25,6 @@ async function enviarAvisoInterno(
   supabase: ReturnType<typeof createAdminClient>,
   token: string,
   aceptada: boolean,
-  notaVentaFolio: string | null,
   motivo: string | null
 ) {
   try {
@@ -59,9 +58,9 @@ async function enviarAvisoInterno(
     };
 
     const asunto = aceptada
-      ? `Cotización ${cot.folio} ACEPTADA — Nota de venta ${notaVentaFolio}`
+      ? `Cotización ${cot.folio} ACEPTADA`
       : `Cotización ${cot.folio} RECHAZADA`;
-    const linkNotasVenta = `${APP_URL}/notas-venta`;
+    const linkCotizaciones = `${APP_URL}/cotizaciones`;
 
     await enviarCorreo({
       para: perfil.correo_aviso,
@@ -70,8 +69,7 @@ async function enviarAvisoInterno(
         folio: cot.folio,
         clienteNombre: cot.clientes?.nombre ?? "Cliente",
         aceptada,
-        notaVentaFolio,
-        linkNotasVenta,
+        linkCotizaciones,
         motivo,
       }),
     });
@@ -148,13 +146,9 @@ export async function POST(
       supabase,
       token,
       fila.resultado === "aceptada",
-      fila.nota_venta_folio,
       fila.resultado === "rechazada" ? (parsed.data.motivo ?? null) : null
     );
   }
 
-  return NextResponse.json({
-    resultado: fila.resultado,
-    nota_venta_folio: fila.nota_venta_folio,
-  });
+  return NextResponse.json({ resultado: fila.resultado });
 }

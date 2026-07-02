@@ -13,8 +13,7 @@ export type AvisoRespuestaEmailProps = {
   folio: string;
   clienteNombre: string;
   aceptada: boolean;
-  notaVentaFolio: string | null;
-  linkNotasVenta: string | null;
+  linkCotizaciones: string | null;
   motivo?: string | null;
 };
 
@@ -22,8 +21,7 @@ export function AvisoRespuestaEmail({
   folio,
   clienteNombre,
   aceptada,
-  notaVentaFolio,
-  linkNotasVenta,
+  linkCotizaciones,
   motivo,
 }: AvisoRespuestaEmailProps) {
   return (
@@ -76,18 +74,10 @@ export function AvisoRespuestaEmail({
               <strong>Motivo del rechazo:</strong> {motivo}
             </Text>
           )}
-          {aceptada && notaVentaFolio && (
-            <Text
-              style={{ color: "#334155", fontSize: "14px", lineHeight: "22px" }}
-            >
-              Se creó automáticamente la nota de venta{" "}
-              <strong>{notaVentaFolio}</strong>.
-            </Text>
-          )}
-          {aceptada && linkNotasVenta && (
+          {aceptada && linkCotizaciones && (
             <Section style={{ textAlign: "center", margin: "28px 0" }}>
               <Button
-                href={linkNotasVenta}
+                href={linkCotizaciones}
                 style={{
                   backgroundColor: "#16a34a",
                   borderRadius: "6px",
@@ -98,7 +88,7 @@ export function AvisoRespuestaEmail({
                   textDecoration: "none",
                 }}
               >
-                Ver notas de venta
+                Ver cotización
               </Button>
             </Section>
           )}
