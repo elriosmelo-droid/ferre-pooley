@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { formatCLP } from "@/lib/money";
-import { TIPO_DOC_CORTO, esNotaCredito, signoDte } from "@/lib/dte-doc";
+import { TIPO_DOC_CORTO, esNotaCredito } from "@/lib/dte-doc";
 import {
   vincularFacturaVenta,
   desvincularFacturaVenta,
@@ -58,10 +58,13 @@ export function FacturaVinculo({
   const opciones = ordenar(verTodas ? [...candidatas, ...otras] : candidatas);
 
   // Lo facturado neto: facturas suman, notas de crédito restan.
-  const facturado = vinculadas.reduce(
-    (s, f) => s + signoDte(f.tipo_doc) * f.monto_total,
-    0
-  );
+  const totalFacturas = vinculadas
+    .filter((f) => !esNotaCredito(f.tipo_doc))
+    .reduce((s, f) => s + f.monto_total, 0);
+  const totalNC = vinculadas
+    .filter((f) => esNotaCredito(f.tipo_doc))
+    .reduce((s, f) => s + f.monto_total, 0);
+  const facturado = totalFacturas - totalNC;
   const diferencia = total - facturado;
 
   function vincular() {
@@ -190,11 +193,27 @@ export function FacturaVinculo({
             <dd className="font-medium text-slate-900">{formatCLP(total)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Facturado (SII)</dt>
+            <dt>Facturas (SII)</dt>
             <dd className="font-medium text-slate-900">
-              {formatCLP(facturado)}
+              {formatCLP(totalFacturas)}
             </dd>
           </div>
+          {totalNC > 0 && (
+            <>
+              <div className="flex justify-between">
+                <dt>Notas de crédito (SII)</dt>
+                <dd className="font-medium text-amber-700">
+                  -{formatCLP(totalNC)}
+                </dd>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-1">
+                <dt>Facturado neto</dt>
+                <dd className="font-medium text-slate-900">
+                  {formatCLP(facturado)}
+                </dd>
+              </div>
+            </>
+          )}
           <div className="flex justify-between border-t border-slate-200 pt-1">
             <dt>Diferencia</dt>
             <dd
@@ -207,6 +226,13 @@ export function FacturaVinculo({
               {diferencia === 0 ? "Cuadra" : formatCLP(diferencia)}
             </dd>
           </div>
+          {diferencia !== 0 && diferencia === totalNC && (
+            <p className="text-xs text-slate-500">
+              La diferencia corresponde exactamente a la nota de crédito: la
+              factura cubre el total de la nota y la NC devuelve{" "}
+              {formatCLP(totalNC)}.
+            </p>
+          )}
         </dl>
       )}
 
