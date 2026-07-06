@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { formatCLP } from "@/lib/money";
 import { calcularTotales } from "@/lib/totals";
+import { formatearRut } from "@/lib/rut";
+import { crearProveedor } from "../proveedores/actions";
 import type { OrdenCompraFormState } from "./actions";
 
 type ProveedorOption = {
@@ -76,6 +78,14 @@ export function OrdenCompraForm({
   action,
 }: OrdenCompraFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
+  const [listaProveedores, setListaProveedores] = useState(proveedores);
+  const [proveedorId, setProveedorId] = useState(orden?.proveedor_id ?? "");
+  const [creandoProveedor, setCreandoProveedor] = useState(false);
+  const [nuevoRut, setNuevoRut] = useState("");
+  const [nuevaRazon, setNuevaRazon] = useState("");
+  const [nuevoCorreo, setNuevoCorreo] = useState("");
+  const [errorProveedor, setErrorProveedor] = useState<string | null>(null);
+  const [guardandoProveedor, startGuardarProveedor] = useTransition();
   const [items, setItems] = useState<ItemRow[]>(() =>
     (orden?.items ?? []).map((item, i) => ({ ...item, uid: `init-${i}` }))
   );
@@ -127,6 +137,37 @@ export function OrdenCompraForm({
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function cerrarNuevoProveedor() {
+    setCreandoProveedor(false);
+    setNuevoRut("");
+    setNuevaRazon("");
+    setNuevoCorreo("");
+    setErrorProveedor(null);
+  }
+
+  function guardarNuevoProveedor() {
+    setErrorProveedor(null);
+    startGuardarProveedor(async () => {
+      const res = await crearProveedor({
+        rut: nuevoRut,
+        razon_social: nuevaRazon,
+        correo: nuevoCorreo,
+      });
+      if ("error" in res) {
+        setErrorProveedor(res.error);
+        return;
+      }
+      // Lo agrego a la lista local y lo dejo seleccionado sin recargar.
+      setListaProveedores((prev) =>
+        [...prev, res.proveedor].sort((a, b) =>
+          nombreProveedor(a).localeCompare(nombreProveedor(b))
+        )
+      );
+      setProveedorId(res.proveedor.id);
+      cerrarNuevoProveedor();
+    });
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <input
@@ -147,28 +188,106 @@ export function OrdenCompraForm({
         <label htmlFor="proveedor_id" className={labelClass}>
           Proveedor *
         </label>
-        <select
-          id="proveedor_id"
-          name="proveedor_id"
-          required
-          defaultValue={orden?.proveedor_id ?? ""}
-          className={inputClass}
-        >
-          <option value="" disabled>
-            Selecciona un proveedor…
-          </option>
-          {proveedores.map((p) => (
-            <option key={p.id} value={p.id}>
-              {nombreProveedor(p)}
-              {p.correo ? "" : " (sin correo)"}
+        <div className="flex items-center gap-2">
+          <select
+            id="proveedor_id"
+            name="proveedor_id"
+            required
+            value={proveedorId}
+            onChange={(e) => setProveedorId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="" disabled>
+              Selecciona un proveedor…
             </option>
-          ))}
-        </select>
+            {listaProveedores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {nombreProveedor(p)}
+                {p.correo ? "" : " (sin correo)"}
+              </option>
+            ))}
+          </select>
+          {!creandoProveedor && (
+            <button
+              type="button"
+              onClick={() => setCreandoProveedor(true)}
+              className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              + Nuevo
+            </button>
+          )}
+        </div>
         <FieldErrors errors={state.fieldErrors?.proveedor_id} />
         <p className="mt-1 text-xs text-slate-500">
           El proveedor necesita correo para poder enviarle la orden. Se carga en
           Proveedores.
         </p>
+
+        {creandoProveedor && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+              Nuevo proveedor
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="np-oc-rut" className={labelClass}>
+                  RUT *
+                </label>
+                <input
+                  id="np-oc-rut"
+                  value={nuevoRut}
+                  onChange={(e) => setNuevoRut(formatearRut(e.target.value))}
+                  placeholder="76.109.779-2"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="np-oc-razon" className={labelClass}>
+                  Razón social *
+                </label>
+                <input
+                  id="np-oc-razon"
+                  value={nuevaRazon}
+                  onChange={(e) => setNuevaRazon(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="np-oc-correo" className={labelClass}>
+                  Correo
+                </label>
+                <input
+                  id="np-oc-correo"
+                  type="email"
+                  value={nuevoCorreo}
+                  onChange={(e) => setNuevoCorreo(e.target.value)}
+                  placeholder="Para enviarle la orden"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            {errorProveedor && (
+              <p className="mt-2 text-sm text-red-600">{errorProveedor}</p>
+            )}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={guardarNuevoProveedor}
+                disabled={guardandoProveedor}
+                className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+              >
+                {guardandoProveedor ? "Creando…" : "Crear y seleccionar"}
+              </button>
+              <button
+                type="button"
+                onClick={cerrarNuevoProveedor}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

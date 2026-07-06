@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { type TipoProveedor } from "./tipos";
 import { ProveedoresTabla, type ProveedorRow } from "./proveedores-tabla";
+import { NuevoProveedor } from "./nuevo-proveedor";
 
 type ProveedorDB = {
   id: string;
@@ -47,10 +48,11 @@ export default async function ProveedoresPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Proveedores</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Generados desde las compras del SII. Asigna un tipo a cada uno para
-            filtrarlos.
+            Generados desde las compras del SII o creados a mano. Asigna un tipo
+            a cada uno para filtrarlos.
           </p>
         </div>
+        <NuevoProveedor />
       </div>
 
       {error ? (
