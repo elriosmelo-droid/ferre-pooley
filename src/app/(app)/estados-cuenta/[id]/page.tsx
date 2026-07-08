@@ -40,7 +40,9 @@ export default async function EstadoCuentaClientePage({
   const [{ data: ventas }, { data: notas }] = await Promise.all([
     supabase
       .from("ventas_sii")
-      .select("id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total")
+      .select(
+        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento"
+      )
       .eq("rut_cliente", rutSii),
     supabase
       .from("notas_venta")
@@ -48,10 +50,14 @@ export default async function EstadoCuentaClientePage({
       .eq("cliente_id", cliente.id),
   ]);
 
+  const hoy = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Santiago",
+  });
   const { filas, totales } = construirEstadoCuenta(
     cliente.rut,
     (ventas ?? []) as VentaSiiEstadoCuenta[],
-    (notas ?? []) as NotaEstadoCuenta[]
+    (notas ?? []) as NotaEstadoCuenta[],
+    hoy
   );
 
   const saldoAFavor = totales.saldo < 0;
@@ -102,19 +108,24 @@ export default async function EstadoCuentaClientePage({
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Folio</th>
               <th className="px-4 py-3 text-right">Monto</th>
+              <th className="px-4 py-3">Plazo</th>
+              <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filas.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   Este cliente no tiene documentos del SII.
                 </td>
               </tr>
             ) : (
               filas.map((f) => (
-                <tr key={f.id} className="text-slate-700">
+                <tr
+                  key={f.id}
+                  className={f.vencida ? "bg-red-50 text-slate-700" : "text-slate-700"}
+                >
                   <td className="px-4 py-3">{fmtFecha(f.fecha)}</td>
                   <td className="px-4 py-3">{f.tipoLabel}</td>
                   <td className="px-4 py-3">{f.folio}</td>
@@ -125,6 +136,15 @@ export default async function EstadoCuentaClientePage({
                   >
                     {f.esCredito ? "− " : ""}
                     {formatCLP(f.monto)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{f.plazoLabel}</td>
+                  <td
+                    className={`px-4 py-3 ${
+                      f.vencida ? "font-semibold text-red-600" : ""
+                    }`}
+                  >
+                    {fmtFecha(f.vencimiento)}
+                    {f.vencida && " ⚠"}
                   </td>
                   <td className="px-4 py-3">
                     <EstadoPagoBadge estado={f.estadoPago} />

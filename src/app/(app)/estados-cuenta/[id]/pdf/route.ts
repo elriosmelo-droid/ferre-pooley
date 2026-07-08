@@ -35,7 +35,9 @@ export async function GET(
   const [{ data: ventas }, { data: notas }] = await Promise.all([
     supabase
       .from("ventas_sii")
-      .select("id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total")
+      .select(
+        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento"
+      )
       .eq("rut_cliente", rutSii),
     supabase
       .from("notas_venta")
@@ -43,10 +45,14 @@ export async function GET(
       .eq("cliente_id", cliente.id),
   ]);
 
+  const hoy = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Santiago",
+  });
   const estado = construirEstadoCuenta(
     cliente.rut,
     (ventas ?? []) as VentaSiiEstadoCuenta[],
-    (notas ?? []) as NotaEstadoCuenta[]
+    (notas ?? []) as NotaEstadoCuenta[],
+    hoy
   );
 
   const pdf = await generarPdfEstadoCuenta({

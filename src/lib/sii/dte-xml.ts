@@ -16,6 +16,11 @@ export type DteParsed = {
   tipoDte: number;
   folio: string;
   fchEmis: string;
+  idDoc: {
+    fmaPago: number | null;
+    fchVenc: string | null;
+    termPagoDias: number | null;
+  };
   emisor: {
     rut: string;
     rznSoc: string;
@@ -85,10 +90,20 @@ export function parseDte(xml: string): DteParsed {
     });
   }
 
+  const fmaPago = intTag(idB, "FmaPago");
+  const termPagoDias = intTag(idB, "TermPagoDias");
+
   return {
     tipoDte: intTag(idB, "TipoDTE"),
     folio: tag(idB, "Folio") ?? "",
     fchEmis: tag(idB, "FchEmis") ?? "",
+    // Datos de pago del DTE (pueden faltar): FmaPago 1=contado 2=crédito 3=canje;
+    // FchVenc = fecha de vencimiento; TermPagoDias = plazo en días.
+    idDoc: {
+      fmaPago: fmaPago || null,
+      fchVenc: tag(idB, "FchVenc"),
+      termPagoDias: termPagoDias || null,
+    },
     emisor: {
       rut: tag(emisorB, "RUTEmisor") ?? "",
       rznSoc: tag(emisorB, "RznSoc") ?? "",

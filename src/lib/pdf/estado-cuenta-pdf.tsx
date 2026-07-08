@@ -102,12 +102,15 @@ const styles = StyleSheet.create({
     color: "#64748b",
     textTransform: "uppercase",
   },
-  colFecha: { width: "16%" },
-  colTipo: { width: "22%" },
-  colFolio: { width: "20%" },
-  colMonto: { width: "22%", textAlign: "right" },
-  colEstado: { width: "20%", textAlign: "right" },
+  colFecha: { width: "14%" },
+  colTipo: { width: "13%" },
+  colFolio: { width: "14%" },
+  colMonto: { width: "19%", textAlign: "right" },
+  colPlazo: { width: "13%" },
+  colVenc: { width: "15%" },
+  colEstado: { width: "12%", textAlign: "right" },
   credito: { color: "#dc2626" },
+  vencida: { color: "#dc2626", fontFamily: "Helvetica-Bold" },
   totales: { marginTop: 14, alignSelf: "flex-end", width: 240 },
   totalFila: {
     flexDirection: "row",
@@ -173,6 +176,8 @@ function EstadoCuentaPdf({ cliente, estado, fecha }: DatosPdfEstadoCuenta) {
           <Text style={[styles.th, styles.colTipo]}>Tipo</Text>
           <Text style={[styles.th, styles.colFolio]}>Folio</Text>
           <Text style={[styles.th, styles.colMonto]}>Monto</Text>
+          <Text style={[styles.th, styles.colPlazo]}>Plazo</Text>
+          <Text style={[styles.th, styles.colVenc]}>Vence</Text>
           <Text style={[styles.th, styles.colEstado]}>Estado</Text>
         </View>
         {filas.length === 0 ? (
@@ -190,6 +195,10 @@ function EstadoCuentaPdf({ cliente, estado, fecha }: DatosPdfEstadoCuenta) {
               >
                 {f.esCredito ? "− " : ""}
                 {clp(f.monto)}
+              </Text>
+              <Text style={styles.colPlazo}>{f.plazoLabel}</Text>
+              <Text style={[styles.colVenc, ...(f.vencida ? [styles.vencida] : [])]}>
+                {f.vencimiento ? fmtFecha(f.vencimiento) : "—"}
               </Text>
               <Text style={styles.colEstado}>
                 {f.estadoPago ? ETIQUETA_PAGO[f.estadoPago] : "Crédito"}

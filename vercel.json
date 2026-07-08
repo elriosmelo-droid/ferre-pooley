@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/sii/sync", "schedule": "0 6 * * *" },
-    { "path": "/api/sii/sync-ventas", "schedule": "0 7 * * *" }
+    { "path": "/api/sii/sync-ventas", "schedule": "0 7 * * *" },
+    { "path": "/api/sii/avisos-vencimiento", "schedule": "0 12 * * *" }
   ]
 }

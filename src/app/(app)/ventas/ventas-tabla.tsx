@@ -13,6 +13,9 @@ export type VentaRow = {
   folio: string;
   fecha_emision: string | null;
   monto_total: number;
+  forma_pago: number | null;
+  term_pago_dias: number | null;
+  fecha_vencimiento: string | null;
   notas_venta: { id: string; folio: string } | null;
 };
 
@@ -20,6 +23,13 @@ function formatFecha(iso: string | null): string {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+function plazoTexto(v: VentaRow): string {
+  if (v.forma_pago === 1) return "Contado";
+  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
+  if (v.fecha_vencimiento) return "Crédito";
+  return "";
 }
 
 export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
@@ -101,6 +111,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Documento</th>
               <th className="px-4 py-3">Folio SII</th>
+              <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Nota de venta</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-center">PDF</th>
@@ -109,7 +120,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No hay ventas que coincidan con los filtros.
                 </td>
               </tr>
@@ -123,6 +134,18 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                   </td>
                   <td className="px-4 py-3">{TIPO_DOC[v.tipo_doc] ?? `Tipo ${v.tipo_doc}`}</td>
                   <td className="px-4 py-3">{v.folio}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {esNotaCredito(v.tipo_doc) ? (
+                      <span className="text-slate-400">—</span>
+                    ) : v.fecha_vencimiento ? (
+                      <div>
+                        <div>{formatFecha(v.fecha_vencimiento)}</div>
+                        <div className="text-xs text-slate-500">{plazoTexto(v)}</div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">{plazoTexto(v) || "—"}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {v.notas_venta ? (
                       <Link href={`/notas-venta/${v.notas_venta.id}`} className="font-medium text-brand-600 hover:text-brand-800">
@@ -153,7 +176,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
           {filtradas.length > 0 && (
             <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
               <tr>
-                <td className="px-4 py-3" colSpan={5}>
+                <td className="px-4 py-3" colSpan={6}>
                   {filtradas.length} venta{filtradas.length === 1 ? "" : "s"}
                 </td>
                 <td className="px-4 py-3 text-right">{formatCLP(total)}</td>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sincronizarVentas } from "@/lib/sii/sync";
+import { precachearVencimientos } from "@/lib/sii/precache-vencimientos";
 
 // Sync del RCV de ventas: baja las facturas emitidas del SII, las upserta en
 // `ventas_sii` y las vincula con notas de venta. Cron de Vercel (vercel.json)
@@ -26,12 +27,24 @@ export async function GET(request: Request) {
   try {
     const { periodos, encontradas, guardadas, vinculadas } =
       await sincronizarVentas();
+
+    // Tras el sync, completa plazos/vencimientos de las facturas nuevas
+    // (acotado; lo que no alcance lo toma la corrida siguiente).
+    let vencimientos = 0;
+    try {
+      const venc = await precachearVencimientos();
+      vencimientos = venc.conVencimiento;
+    } catch (e) {
+      console.error("Precache de vencimientos en el cron de ventas falló:", e);
+    }
+
     return NextResponse.json({
       ok: true,
       periodos,
       encontradas,
       guardadas,
       vinculadas,
+      vencimientos,
     });
   } catch (err) {
     console.error("Error en el sync de ventas del SII:", err);

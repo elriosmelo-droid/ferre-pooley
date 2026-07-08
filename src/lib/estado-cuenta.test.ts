@@ -90,4 +90,31 @@ describe("construirEstadoCuenta", () => {
     expect(filas).toHaveLength(0);
     expect(totales.saldo).toBe(0);
   });
+
+  it("marca vencida una factura pendiente con vencimiento pasado", () => {
+    const v = { ...venta("a", 33, 10000), fecha_vencimiento: "2026-01-31", term_pago_dias: 30 };
+    const { filas } = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+    expect(filas[0].plazoLabel).toBe("30 días");
+    expect(filas[0].vencida).toBe(true);
+  });
+
+  it("no marca vencida si aún no llega la fecha o si está pagada", () => {
+    const v = { ...venta("a", 33, 10000), fecha_vencimiento: "2026-12-31" };
+    const futura = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+    expect(futura.filas[0].vencida).toBe(false);
+
+    const pagada = construirEstadoCuenta(
+      "76109779-2",
+      [{ ...venta("a", 33, 10000), fecha_vencimiento: "2026-01-01" }],
+      [{ venta_sii_id: "a", estado: "pagada" }],
+      "2026-03-01"
+    );
+    expect(pagada.filas[0].vencida).toBe(false);
+  });
+
+  it("plazo Contado cuando forma de pago es 1", () => {
+    const v = { ...venta("a", 33, 10000), forma_pago: 1 };
+    const { filas } = construirEstadoCuenta("76109779-2", [v], []);
+    expect(filas[0].plazoLabel).toBe("Contado");
+  });
 });

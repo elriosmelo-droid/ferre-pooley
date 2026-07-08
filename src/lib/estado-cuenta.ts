@@ -10,6 +10,9 @@ export type VentaSiiEstadoCuenta = {
   folio: string;
   fecha_emision: string | null;
   monto_total: number;
+  forma_pago?: number | null;
+  term_pago_dias?: number | null;
+  fecha_vencimiento?: string | null;
 };
 
 export type NotaEstadoCuenta = {
@@ -28,6 +31,9 @@ export type FilaEstadoCuenta = {
   // null para notas de crédito (no aplica "pagada"); si no hay nota vinculada,
   // la factura/ND se asume "pendiente".
   estadoPago: EstadoPago | null;
+  plazoLabel: string; // "30 días" / "Contado" / "Crédito" / "—"
+  vencimiento: string | null; // ISO
+  vencida: boolean; // vencimiento < hoy y sigue pendiente
 };
 
 export type TotalesEstadoCuenta = {
@@ -44,10 +50,18 @@ export type EstadoCuenta = {
 
 // Arma el estado de cuenta de un cliente a partir de sus documentos del SII y
 // sus notas de venta. Fuente de verdad única para la página y el PDF.
+function plazoLabel(v: VentaSiiEstadoCuenta): string {
+  if (v.forma_pago === 1) return "Contado";
+  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
+  if (v.fecha_vencimiento) return "Crédito";
+  return "—";
+}
+
 export function construirEstadoCuenta(
   clienteRut: string | null,
   ventasSii: VentaSiiEstadoCuenta[],
-  notas: NotaEstadoCuenta[]
+  notas: NotaEstadoCuenta[],
+  hoy?: string
 ): EstadoCuenta {
   const rutObjetivo = normalizarRut(clienteRut);
 
@@ -68,6 +82,15 @@ export function construirEstadoCuenta(
 
   const filas: FilaEstadoCuenta[] = docs.map((v) => {
     const esCredito = esNotaCredito(v.tipo_doc);
+    const estadoPago = esCredito
+      ? null
+      : (estadoPorVenta.get(v.id) ?? "pendiente");
+    const vencimiento = esCredito ? null : (v.fecha_vencimiento ?? null);
+    const vencida =
+      estadoPago === "pendiente" &&
+      !!vencimiento &&
+      !!hoy &&
+      vencimiento < hoy;
     return {
       id: v.id,
       fecha: v.fecha_emision,
@@ -76,7 +99,10 @@ export function construirEstadoCuenta(
       folio: v.folio,
       monto: v.monto_total,
       esCredito,
-      estadoPago: esCredito ? null : (estadoPorVenta.get(v.id) ?? "pendiente"),
+      estadoPago,
+      plazoLabel: esCredito ? "—" : plazoLabel(v),
+      vencimiento,
+      vencida,
     };
   });
 
