@@ -39,6 +39,10 @@ export function EstadoCuentaTabla({ filas }: { filas: FilaEstadoCuenta[] }) {
       if (estado) {
         if (estado === "credito") {
           if (!f.esCredito) return false;
+        } else if (estado === "vencida") {
+          if (f.estadoPago !== "pendiente" || !f.vencida) return false;
+        } else if (estado === "pendiente") {
+          if (f.estadoPago !== "pendiente" || f.vencida) return false;
         } else if (f.estadoPago !== estado) {
           return false;
         }
@@ -88,6 +92,7 @@ export function EstadoCuentaTabla({ filas }: { filas: FilaEstadoCuenta[] }) {
           <select value={estado} onChange={(e) => setEstado(e.target.value)} className={inputCls}>
             <option value="">Todos</option>
             <option value="pendiente">Pendiente</option>
+            <option value="vencida">Vencida</option>
             <option value="pagada">Pagada</option>
             <option value="anulada">Anulada</option>
             <option value="credito">Nota de crédito</option>
@@ -173,7 +178,7 @@ export function EstadoCuentaTabla({ filas }: { filas: FilaEstadoCuenta[] }) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <EstadoPagoBadge estado={f.estadoPago} />
+                    <EstadoPagoBadge estado={f.estadoPago} vencida={f.vencida} />
                   </td>
                 </tr>
               ))

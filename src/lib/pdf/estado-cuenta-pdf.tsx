@@ -203,8 +203,12 @@ function EstadoCuentaPdf({ cliente, estado, fecha }: DatosPdfEstadoCuenta) {
               <Text style={[styles.colVenc, ...(f.vencida ? [styles.vencida] : [])]}>
                 {f.vencimiento ? fmtFecha(f.vencimiento) : "—"}
               </Text>
-              <Text style={styles.colEstado}>
-                {f.estadoPago ? ETIQUETA_PAGO[f.estadoPago] : "Crédito"}
+              <Text style={[styles.colEstado, ...(f.vencida ? [styles.vencida] : [])]}>
+                {!f.estadoPago
+                  ? "Crédito"
+                  : f.estadoPago === "pendiente" && f.vencida
+                    ? "Vencida"
+                    : ETIQUETA_PAGO[f.estadoPago]}
               </Text>
             </View>
           ))
