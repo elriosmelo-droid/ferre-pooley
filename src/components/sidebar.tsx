@@ -137,11 +137,11 @@ const isGroup = (e: Entry): e is Group => "items" in e;
 
 const menu: Entry[] = [
   { href: "/dashboard", label: "Dashboard", icon: IconDashboard },
-  { href: "/cotizaciones", label: "Cotizaciones", icon: IconCotizaciones },
   {
     label: "Ventas",
     icon: IconVentas,
     items: [
+      { href: "/cotizaciones", label: "Cotizaciones", icon: IconCotizaciones },
       { href: "/ventas", label: "Ventas", icon: IconVenta },
       { href: "/notas-venta", label: "Notas de Venta", icon: IconNota },
       { href: "/conciliacion", label: "Conciliación", icon: IconConciliacion },
