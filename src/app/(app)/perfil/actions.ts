@@ -63,18 +63,21 @@ export async function guardarPerfil(
     };
   }
 
-  const { error } = await supabase.from("perfiles").upsert(
-    {
-      user_id: user.id,
+  // Update (no upsert): la fila de perfil ya existe para todo usuario
+  // provisionado (backfill 011 + panel de usuarios). La RLS ya no permite que
+  // un usuario inserte su propia fila, así que no se intenta crearla aquí.
+  // No se toca `rol`: lo gestiona el panel de administración.
+  const { error } = await supabase
+    .from("perfiles")
+    .update({
       nombre: parsed.data.nombre || null,
       razon_social: parsed.data.razon_social || null,
       rut_empresa: parsed.data.rut_empresa || null,
       direccion_empresa: parsed.data.direccion_empresa || null,
       telefono_empresa: parsed.data.telefono_empresa || null,
       correo_aviso: parsed.data.correo_aviso || null,
-    },
-    { onConflict: "user_id" }
-  );
+    })
+    .eq("user_id", user.id);
 
   if (error) {
     console.error("Error al guardar perfil:", error.message);

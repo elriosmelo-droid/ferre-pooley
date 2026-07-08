@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPerfilActual } from "@/lib/auth/rol";
 import { descargarDteEmitidoXml } from "@/lib/sii/mipe";
 import { parseDte } from "@/lib/sii/dte-xml";
 import { generarPdfVenta } from "@/lib/pdf/venta-pdf";
@@ -22,6 +23,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Este handler usa el service role (salta RLS), así que verifica membresía a
+  // mano: solo usuarios provisionados pueden ver el PDF (datos financieros).
+  const perfil = await getPerfilActual();
+  if (!perfil) {
+    return new Response("No autorizado", { status: 401 });
+  }
+
   const db = createAdminClient();
 
   const { data: venta, error } = await db
