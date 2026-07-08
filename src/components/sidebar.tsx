@@ -27,7 +27,7 @@ function linkClasses(active: boolean) {
   }`;
 }
 
-export function Sidebar() {
+export function Sidebar({ esAdmin = false }: { esAdmin?: boolean }) {
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
 
@@ -63,6 +63,15 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="space-y-1 border-t border-slate-800 px-3 py-4">
+        {esAdmin && (
+          <Link
+            href="/usuarios"
+            onClick={cerrar}
+            className={linkClasses(isActive("/usuarios"))}
+          >
+            Usuarios
+          </Link>
+        )}
         <Link
           href="/perfil"
           onClick={cerrar}
