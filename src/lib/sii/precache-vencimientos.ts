@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { calcularVencimiento } from "@/lib/estado-cuenta";
 import { descargarDteEmitidoXml } from "./mipe";
 import { parseDte } from "./dte-xml";
 
@@ -6,10 +7,12 @@ import { parseDte } from "./dte-xml";
 // no exceder el maxDuration ni gatillar el rate-limit.
 const MAX_POR_CORRIDA = 40;
 
-function addDias(fechaISO: string, dias: number): string {
-  const d = new Date(`${fechaISO}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString().slice(0, 10);
+// Extrae los días de plazo de la glosa (ej. "CREDITO 30 DIAS" -> 30).
+function diasDeGlosa(glosa: string | null): number | null {
+  if (!glosa) return null;
+  const m = glosa.match(/(\d{1,3})\s*d[ií]as?/i) ?? glosa.match(/(\d{1,3})/);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export type PrecacheVencResult = {
@@ -58,20 +61,22 @@ export async function precachearVencimientos(
 
     let forma_pago: number | null = null;
     let term_pago_dias: number | null = null;
-    let fecha_vencimiento: string | null = null;
 
     if (xml) {
       const { idDoc } = parseDte(xml);
       forma_pago = idDoc.fmaPago;
-      term_pago_dias = idDoc.termPagoDias;
-      if (idDoc.fchVenc) {
-        fecha_vencimiento = idDoc.fchVenc;
-      } else if (idDoc.termPagoDias && forma_pago !== 1) {
-        // Sin FchVenc pero con plazo (y no contado): emisión + plazo.
-        fecha_vencimiento = addDias(f.fecha_emision as string, idDoc.termPagoDias);
-      }
-      if (fecha_vencimiento) conVencimiento++;
+      // Plazo del DTE: TermPagoDias, o los días que aparezcan en la glosa.
+      term_pago_dias = idDoc.termPagoDias ?? diasDeGlosa(idDoc.termPagoGlosa);
     }
+
+    // El vencimiento se calcula (emisión + plazo; default 30 crédito / 5
+    // contado). Se guarda como referencia; la app también lo recalcula al leer.
+    const fecha_vencimiento = calcularVencimiento(
+      f.fecha_emision as string,
+      forma_pago,
+      term_pago_dias
+    );
+    if (fecha_vencimiento) conVencimiento++;
 
     // Se marca procesada aunque no haya DTE (nada que traer) para no reintentar
     // en vano; un error transitorio sí deja la fila sin procesar (break arriba).

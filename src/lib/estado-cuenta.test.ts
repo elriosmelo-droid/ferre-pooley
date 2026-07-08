@@ -91,30 +91,43 @@ describe("construirEstadoCuenta", () => {
     expect(totales.saldo).toBe(0);
   });
 
-  it("marca vencida una factura pendiente con vencimiento pasado", () => {
-    const v = { ...venta("a", 33, 10000), fecha_vencimiento: "2026-01-31", term_pago_dias: 30 };
+  it("crédito por defecto: vencimiento = emisión + 30 días", () => {
+    const v = { ...venta("a", 33, 10000, "2026-01-01"), forma_pago: 2 };
     const { filas } = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+    expect(filas[0].tipoPago).toBe("Crédito");
     expect(filas[0].plazoLabel).toBe("30 días");
+    expect(filas[0].vencimiento).toBe("2026-01-31");
     expect(filas[0].vencida).toBe(true);
   });
 
-  it("no marca vencida si aún no llega la fecha o si está pagada", () => {
-    const v = { ...venta("a", 33, 10000), fecha_vencimiento: "2026-12-31" };
-    const futura = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+  it("contado: vencimiento = emisión + 5 días y también vence", () => {
+    const v = { ...venta("a", 33, 10000, "2026-02-01"), forma_pago: 1 };
+    const { filas } = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+    expect(filas[0].tipoPago).toBe("Contado");
+    expect(filas[0].plazoLabel).toBe("5 días");
+    expect(filas[0].vencimiento).toBe("2026-02-06");
+    expect(filas[0].vencida).toBe(true);
+  });
+
+  it("usa TermPagoDias del DTE cuando existe", () => {
+    const v = { ...venta("a", 33, 10000, "2026-01-01"), forma_pago: 2, term_pago_dias: 60 };
+    const { filas } = construirEstadoCuenta("76109779-2", [v], [], "2026-03-01");
+    expect(filas[0].plazoLabel).toBe("60 días");
+    expect(filas[0].vencimiento).toBe("2026-03-02");
+    expect(filas[0].vencida).toBe(false);
+  });
+
+  it("no vence si aún no llega la fecha o si está pagada", () => {
+    const reciente = { ...venta("a", 33, 10000, "2026-02-28"), forma_pago: 2 };
+    const futura = construirEstadoCuenta("76109779-2", [reciente], [], "2026-03-01");
     expect(futura.filas[0].vencida).toBe(false);
 
     const pagada = construirEstadoCuenta(
       "76109779-2",
-      [{ ...venta("a", 33, 10000), fecha_vencimiento: "2026-01-01" }],
+      [{ ...venta("a", 33, 10000, "2026-01-01"), forma_pago: 2 }],
       [{ venta_sii_id: "a", estado: "pagada" }],
       "2026-03-01"
     );
     expect(pagada.filas[0].vencida).toBe(false);
-  });
-
-  it("plazo Contado cuando forma de pago es 1", () => {
-    const v = { ...venta("a", 33, 10000), forma_pago: 1 };
-    const { filas } = construirEstadoCuenta("76109779-2", [v], []);
-    expect(filas[0].plazoLabel).toBe("Contado");
   });
 });

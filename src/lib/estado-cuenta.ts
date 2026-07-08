@@ -31,10 +31,44 @@ export type FilaEstadoCuenta = {
   // null para notas de crédito (no aplica "pagada"); si no hay nota vinculada,
   // la factura/ND se asume "pendiente".
   estadoPago: EstadoPago | null;
-  plazoLabel: string; // "30 días" / "Contado" / "Crédito" / "—"
+  tipoPago: string; // "Contado" / "Crédito" / "Canje" / "—"
+  plazoLabel: string; // "30 días" / "5 días" / "—"
   vencimiento: string | null; // ISO
   vencida: boolean; // vencimiento < hoy y sigue pendiente
 };
+
+// Plazo de pago en días. Muchas facturas no traen TermPagoDias en el DTE, así
+// que se usa un default: contado = 5 días, crédito o desconocido = 30 días.
+export function plazoDias(
+  formaPago: number | null | undefined,
+  termPagoDias: number | null | undefined
+): number {
+  if (termPagoDias && termPagoDias > 0) return termPagoDias;
+  return formaPago === 1 ? 5 : 30;
+}
+
+function addDias(fechaISO: string, dias: number): string {
+  const d = new Date(`${fechaISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+// Vencimiento = fecha de emisión + plazo. Todas las facturas/ND tienen
+// vencimiento (incluido contado, a 5 días).
+export function calcularVencimiento(
+  fechaEmision: string | null,
+  formaPago: number | null | undefined,
+  termPagoDias: number | null | undefined
+): string | null {
+  if (!fechaEmision) return null;
+  return addDias(fechaEmision.slice(0, 10), plazoDias(formaPago, termPagoDias));
+}
+
+export function tipoPagoLabel(formaPago: number | null | undefined): string {
+  if (formaPago === 1) return "Contado";
+  if (formaPago === 3) return "Canje";
+  return "Crédito";
+}
 
 export type TotalesEstadoCuenta = {
   facturado: number; // facturas + ND no anuladas
@@ -50,13 +84,6 @@ export type EstadoCuenta = {
 
 // Arma el estado de cuenta de un cliente a partir de sus documentos del SII y
 // sus notas de venta. Fuente de verdad única para la página y el PDF.
-function plazoLabel(v: VentaSiiEstadoCuenta): string {
-  if (v.forma_pago === 1) return "Contado";
-  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
-  if (v.fecha_vencimiento) return "Crédito";
-  return "—";
-}
-
 export function construirEstadoCuenta(
   clienteRut: string | null,
   ventasSii: VentaSiiEstadoCuenta[],
@@ -85,7 +112,9 @@ export function construirEstadoCuenta(
     const estadoPago = esCredito
       ? null
       : (estadoPorVenta.get(v.id) ?? "pendiente");
-    const vencimiento = esCredito ? null : (v.fecha_vencimiento ?? null);
+    const vencimiento = esCredito
+      ? null
+      : calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias);
     const vencida =
       estadoPago === "pendiente" &&
       !!vencimiento &&
@@ -100,7 +129,10 @@ export function construirEstadoCuenta(
       monto: v.monto_total,
       esCredito,
       estadoPago,
-      plazoLabel: esCredito ? "—" : plazoLabel(v),
+      tipoPago: esCredito ? "—" : tipoPagoLabel(v.forma_pago),
+      plazoLabel: esCredito
+        ? "—"
+        : `${plazoDias(v.forma_pago, v.term_pago_dias)} días`,
       vencimiento,
       vencida,
     };

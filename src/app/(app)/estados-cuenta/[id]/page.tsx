@@ -108,6 +108,7 @@ export default async function EstadoCuentaClientePage({
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Folio</th>
               <th className="px-4 py-3 text-right">Monto</th>
+              <th className="px-4 py-3">Tipo de pago</th>
               <th className="px-4 py-3">Plazo</th>
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Estado</th>
@@ -116,7 +117,7 @@ export default async function EstadoCuentaClientePage({
           <tbody className="divide-y divide-slate-100">
             {filas.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   Este cliente no tiene documentos del SII.
                 </td>
               </tr>
@@ -137,6 +138,7 @@ export default async function EstadoCuentaClientePage({
                     {f.esCredito ? "− " : ""}
                     {formatCLP(f.monto)}
                   </td>
+                  <td className="px-4 py-3 text-slate-500">{f.tipoPago}</td>
                   <td className="px-4 py-3 text-slate-500">{f.plazoLabel}</td>
                   <td
                     className={`px-4 py-3 ${

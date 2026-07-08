@@ -5,6 +5,7 @@ import { enviarCorreo } from "@/lib/email/send";
 import { VencimientosEmail, type FacturaVencida } from "@/lib/email/vencimientos-email";
 import { formatCLP } from "@/lib/money";
 import { TIPO_DOC_CORTO } from "@/lib/dte-doc";
+import { calcularVencimiento } from "@/lib/estado-cuenta";
 
 // Aviso diario a Victor de facturas vencidas e impagas. Una sola vez por
 // factura (venc_notificado_at). Protegido por SII_SYNC_SECRET.
@@ -46,7 +47,9 @@ type VentaVencida = {
   razon_social: string | null;
   rut_cliente: string;
   monto_total: number;
-  fecha_vencimiento: string;
+  fecha_emision: string | null;
+  forma_pago: number | null;
+  term_pago_dias: number | null;
   notas_venta: { estado: string } | { estado: string }[] | null;
 };
 
@@ -66,11 +69,10 @@ export async function GET(request: Request) {
   const { data, error } = await db
     .from("ventas_sii")
     .select(
-      "id, tipo_doc, folio, razon_social, rut_cliente, monto_total, fecha_vencimiento, notas_venta(estado)"
+      "id, tipo_doc, folio, razon_social, rut_cliente, monto_total, fecha_emision, forma_pago, term_pago_dias, notas_venta(estado)"
     )
     .in("tipo_doc", [33, 34, 56])
-    .not("fecha_vencimiento", "is", null)
-    .lt("fecha_vencimiento", hoy)
+    .not("fecha_emision", "is", null)
     .is("venc_notificado_at", null);
 
   if (error) {
@@ -79,27 +81,34 @@ export async function GET(request: Request) {
   }
 
   const ventas = (data ?? []) as unknown as VentaVencida[];
-  // Impaga: sin nota vinculada, o nota 'pendiente'. Pagada/anulada se excluyen.
-  const impagas = ventas.filter((v) => {
-    const e = estadoNota(v);
-    return e === null || e === "pendiente";
-  });
+  // Vencimiento se calcula (emisión + plazo; default 30 crédito / 5 contado).
+  // Impaga: sin nota vinculada o nota 'pendiente'. Pagada/anulada se excluyen.
+  const impagas = ventas
+    .map((v) => ({
+      v,
+      vencimiento: calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias),
+    }))
+    .filter(({ v, vencimiento }) => {
+      if (!vencimiento || vencimiento >= hoy) return false;
+      const e = estadoNota(v);
+      return e === null || e === "pendiente";
+    });
 
   if (impagas.length === 0) {
     return NextResponse.json({ ok: true, avisadas: 0 });
   }
 
-  impagas.sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento));
+  impagas.sort((a, b) => a.vencimiento!.localeCompare(b.vencimiento!));
 
-  const facturas: FacturaVencida[] = impagas.map((v) => ({
+  const facturas: FacturaVencida[] = impagas.map(({ v, vencimiento }) => ({
     cliente: v.razon_social ?? v.rut_cliente,
     folio: v.folio,
     tipo: TIPO_DOC_CORTO[v.tipo_doc] ?? `T${v.tipo_doc}`,
     monto: formatCLP(v.monto_total),
-    vencimiento: fmtFecha(v.fecha_vencimiento),
-    diasAtraso: diasAtraso(v.fecha_vencimiento, hoy),
+    vencimiento: fmtFecha(vencimiento!),
+    diasAtraso: diasAtraso(vencimiento!, hoy),
   }));
-  const totalImpago = impagas.reduce((s, v) => s + v.monto_total, 0);
+  const totalImpago = impagas.reduce((s, { v }) => s + v.monto_total, 0);
 
   try {
     await enviarCorreo({
@@ -124,7 +133,7 @@ export async function GET(request: Request) {
     .update({ venc_notificado_at: new Date().toISOString() })
     .in(
       "id",
-      impagas.map((v) => v.id)
+      impagas.map(({ v }) => v.id)
     );
 
   return NextResponse.json({ ok: true, avisadas: impagas.length });

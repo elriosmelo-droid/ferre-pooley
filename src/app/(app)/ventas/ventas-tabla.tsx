@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { TIPO_DOC, esNotaCredito, signoDte } from "@/lib/dte-doc";
+import { tipoPagoLabel, plazoDias, calcularVencimiento } from "@/lib/estado-cuenta";
 
 export type VentaRow = {
   id: string;
@@ -25,23 +26,6 @@ function formatFecha(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-const FORMA_PAGO: Record<number, string> = {
-  1: "Contado",
-  2: "Crédito",
-  3: "Canje",
-};
-
-function tipoPagoTexto(v: VentaRow): string {
-  if (v.forma_pago && FORMA_PAGO[v.forma_pago]) return FORMA_PAGO[v.forma_pago];
-  if (v.fecha_vencimiento) return "Crédito";
-  return "—";
-}
-
-function plazoTexto(v: VentaRow): string {
-  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
-  if (v.forma_pago === 1) return "Contado";
-  return "—";
-}
 
 export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
   const [desde, setDesde] = useState("");
@@ -151,19 +135,21 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                     {esNotaCredito(v.tipo_doc) ? (
                       <span className="text-slate-400">—</span>
                     ) : (
-                      tipoPagoTexto(v)
+                      tipoPagoLabel(v.forma_pago)
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-500">
-                    {esNotaCredito(v.tipo_doc) ? "—" : plazoTexto(v)}
+                    {esNotaCredito(v.tipo_doc)
+                      ? "—"
+                      : `${plazoDias(v.forma_pago, v.term_pago_dias)} días`}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {esNotaCredito(v.tipo_doc) ? (
                       <span className="text-slate-400">—</span>
-                    ) : v.fecha_vencimiento ? (
-                      formatFecha(v.fecha_vencimiento)
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      formatFecha(
+                        calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias)
+                      )
                     )}
                   </td>
                   <td className="px-4 py-3">

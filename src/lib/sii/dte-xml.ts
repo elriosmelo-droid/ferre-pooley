@@ -20,6 +20,7 @@ export type DteParsed = {
     fmaPago: number | null;
     fchVenc: string | null;
     termPagoDias: number | null;
+    termPagoGlosa: string | null;
   };
   emisor: {
     rut: string;
@@ -103,6 +104,7 @@ export function parseDte(xml: string): DteParsed {
       fmaPago: fmaPago || null,
       fchVenc: tag(idB, "FchVenc"),
       termPagoDias: termPagoDias || null,
+      termPagoGlosa: tag(idB, "TermPagoGlosa"),
     },
     emisor: {
       rut: tag(emisorB, "RUTEmisor") ?? "",
