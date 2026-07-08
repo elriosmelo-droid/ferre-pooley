@@ -25,11 +25,22 @@ function formatFecha(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-function plazoTexto(v: VentaRow): string {
-  if (v.forma_pago === 1) return "Contado";
-  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
+const FORMA_PAGO: Record<number, string> = {
+  1: "Contado",
+  2: "Crédito",
+  3: "Canje",
+};
+
+function tipoPagoTexto(v: VentaRow): string {
+  if (v.forma_pago && FORMA_PAGO[v.forma_pago]) return FORMA_PAGO[v.forma_pago];
   if (v.fecha_vencimiento) return "Crédito";
-  return "";
+  return "—";
+}
+
+function plazoTexto(v: VentaRow): string {
+  if (v.term_pago_dias) return `${v.term_pago_dias} días`;
+  if (v.forma_pago === 1) return "Contado";
+  return "—";
 }
 
 export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
@@ -111,6 +122,8 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Documento</th>
               <th className="px-4 py-3">Folio SII</th>
+              <th className="px-4 py-3">Tipo de pago</th>
+              <th className="px-4 py-3">Plazo</th>
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Nota de venta</th>
               <th className="px-4 py-3 text-right">Total</th>
@@ -120,7 +133,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   No hay ventas que coincidan con los filtros.
                 </td>
               </tr>
@@ -134,16 +147,23 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                   </td>
                   <td className="px-4 py-3">{TIPO_DOC[v.tipo_doc] ?? `Tipo ${v.tipo_doc}`}</td>
                   <td className="px-4 py-3">{v.folio}</td>
+                  <td className="px-4 py-3">
+                    {esNotaCredito(v.tipo_doc) ? (
+                      <span className="text-slate-400">—</span>
+                    ) : (
+                      tipoPagoTexto(v)
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {esNotaCredito(v.tipo_doc) ? "—" : plazoTexto(v)}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {esNotaCredito(v.tipo_doc) ? (
                       <span className="text-slate-400">—</span>
                     ) : v.fecha_vencimiento ? (
-                      <div>
-                        <div>{formatFecha(v.fecha_vencimiento)}</div>
-                        <div className="text-xs text-slate-500">{plazoTexto(v)}</div>
-                      </div>
+                      formatFecha(v.fecha_vencimiento)
                     ) : (
-                      <span className="text-slate-400">{plazoTexto(v) || "—"}</span>
+                      <span className="text-slate-400">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -176,7 +196,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
           {filtradas.length > 0 && (
             <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
               <tr>
-                <td className="px-4 py-3" colSpan={6}>
+                <td className="px-4 py-3" colSpan={8}>
                   {filtradas.length} venta{filtradas.length === 1 ? "" : "s"}
                 </td>
                 <td className="px-4 py-3 text-right">{formatCLP(total)}</td>
