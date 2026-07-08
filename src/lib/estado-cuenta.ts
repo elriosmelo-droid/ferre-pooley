@@ -157,6 +157,12 @@ export function construirEstadoCuenta(
     };
   });
 
+  return { filas, totales: totalesDeFilas(filas) };
+}
+
+// Totales a partir de un conjunto de filas (permite recalcular sobre filas ya
+// filtradas en el cliente).
+export function totalesDeFilas(filas: FilaEstadoCuenta[]): TotalesEstadoCuenta {
   let facturado = 0;
   let creditos = 0;
   let pagado = 0;
@@ -169,9 +175,5 @@ export function construirEstadoCuenta(
     facturado += f.monto;
     if (f.estadoPago === "pagada") pagado += f.monto;
   }
-
-  return {
-    filas,
-    totales: { facturado, creditos, pagado, saldo: facturado - creditos - pagado },
-  };
+  return { facturado, creditos, pagado, saldo: facturado - creditos - pagado };
 }
