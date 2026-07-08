@@ -9,6 +9,7 @@ import {
   type NotaEstadoCuenta,
 } from "@/lib/estado-cuenta";
 import { EstadoPagoBadge } from "../estado-pago-badge";
+import { VencimientoEditable } from "../vencimiento-editable";
 
 function fmtFecha(iso: string | null) {
   if (!iso) return "—";
@@ -41,7 +42,7 @@ export default async function EstadoCuentaClientePage({
     supabase
       .from("ventas_sii")
       .select(
-        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento"
+        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento, fecha_vencimiento_manual"
       )
       .eq("rut_cliente", rutSii),
     supabase
@@ -140,13 +141,17 @@ export default async function EstadoCuentaClientePage({
                   </td>
                   <td className="px-4 py-3 text-slate-500">{f.tipoPago}</td>
                   <td className="px-4 py-3 text-slate-500">{f.plazoLabel}</td>
-                  <td
-                    className={`px-4 py-3 ${
-                      f.vencida ? "font-semibold text-red-600" : ""
-                    }`}
-                  >
-                    {fmtFecha(f.vencimiento)}
-                    {f.vencida && " ⚠"}
+                  <td className="px-4 py-3">
+                    {f.esCredito ? (
+                      "—"
+                    ) : (
+                      <VencimientoEditable
+                        ventaId={f.id}
+                        vencimiento={f.vencimiento}
+                        manual={f.vencimientoManual}
+                        vencida={f.vencida}
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <EstadoPagoBadge estado={f.estadoPago} />

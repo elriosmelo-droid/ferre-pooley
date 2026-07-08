@@ -5,7 +5,7 @@ import { enviarCorreo } from "@/lib/email/send";
 import { VencimientosEmail, type FacturaVencida } from "@/lib/email/vencimientos-email";
 import { formatCLP } from "@/lib/money";
 import { TIPO_DOC_CORTO } from "@/lib/dte-doc";
-import { calcularVencimiento } from "@/lib/estado-cuenta";
+import { vencimientoEfectivo } from "@/lib/estado-cuenta";
 
 // Aviso diario a Victor de facturas vencidas e impagas. Una sola vez por
 // factura (venc_notificado_at). Protegido por SII_SYNC_SECRET.
@@ -50,6 +50,7 @@ type VentaVencida = {
   fecha_emision: string | null;
   forma_pago: number | null;
   term_pago_dias: number | null;
+  fecha_vencimiento_manual: string | null;
   notas_venta: { estado: string } | { estado: string }[] | null;
 };
 
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
   const { data, error } = await db
     .from("ventas_sii")
     .select(
-      "id, tipo_doc, folio, razon_social, rut_cliente, monto_total, fecha_emision, forma_pago, term_pago_dias, notas_venta(estado)"
+      "id, tipo_doc, folio, razon_social, rut_cliente, monto_total, fecha_emision, forma_pago, term_pago_dias, fecha_vencimiento_manual, notas_venta(estado)"
     )
     .in("tipo_doc", [33, 34, 56])
     .not("fecha_emision", "is", null)
@@ -86,7 +87,12 @@ export async function GET(request: Request) {
   const impagas = ventas
     .map((v) => ({
       v,
-      vencimiento: calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias),
+      vencimiento: vencimientoEfectivo(
+        v.fecha_vencimiento_manual,
+        v.fecha_emision,
+        v.forma_pago,
+        v.term_pago_dias
+      ),
     }))
     .filter(({ v, vencimiento }) => {
       if (!vencimiento || vencimiento >= hoy) return false;

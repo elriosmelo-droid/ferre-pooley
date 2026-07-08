@@ -36,7 +36,7 @@ export async function GET(
     supabase
       .from("ventas_sii")
       .select(
-        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento"
+        "id, tipo_doc, rut_cliente, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento, fecha_vencimiento_manual"
       )
       .eq("rut_cliente", rutSii),
     supabase

@@ -13,7 +13,7 @@ export default async function VentasPage() {
   const { data, error } = await supabase
     .from("ventas_sii")
     .select(
-      "id, tipo_doc, rut_cliente, razon_social, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento, notas_venta(id, folio)"
+      "id, tipo_doc, rut_cliente, razon_social, folio, fecha_emision, monto_total, forma_pago, term_pago_dias, fecha_vencimiento, fecha_vencimiento_manual, notas_venta(id, folio)"
     )
     .order("fecha_emision", { ascending: false, nullsFirst: false })
     .order("folio", { ascending: false });

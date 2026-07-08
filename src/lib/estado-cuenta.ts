@@ -13,6 +13,7 @@ export type VentaSiiEstadoCuenta = {
   forma_pago?: number | null;
   term_pago_dias?: number | null;
   fecha_vencimiento?: string | null;
+  fecha_vencimiento_manual?: string | null;
 };
 
 export type NotaEstadoCuenta = {
@@ -33,7 +34,8 @@ export type FilaEstadoCuenta = {
   estadoPago: EstadoPago | null;
   tipoPago: string; // "Contado" / "Crédito" / "Canje" / "—"
   plazoLabel: string; // "30 días" / "5 días" / "—"
-  vencimiento: string | null; // ISO
+  vencimiento: string | null; // ISO (efectivo: manual si existe, si no calculado)
+  vencimientoManual: boolean; // true si el vencimiento fue editado a mano
   vencida: boolean; // vencimiento < hoy y sigue pendiente
 };
 
@@ -68,6 +70,17 @@ export function tipoPagoLabel(formaPago: number | null | undefined): string {
   if (formaPago === 1) return "Contado";
   if (formaPago === 3) return "Canje";
   return "Crédito";
+}
+
+// Vencimiento efectivo: el override manual gana sobre el calculado.
+export function vencimientoEfectivo(
+  manual: string | null | undefined,
+  fechaEmision: string | null,
+  formaPago: number | null | undefined,
+  termPagoDias: number | null | undefined
+): string | null {
+  if (manual) return manual.slice(0, 10);
+  return calcularVencimiento(fechaEmision, formaPago, termPagoDias);
 }
 
 export type TotalesEstadoCuenta = {
@@ -114,7 +127,12 @@ export function construirEstadoCuenta(
       : (estadoPorVenta.get(v.id) ?? "pendiente");
     const vencimiento = esCredito
       ? null
-      : calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias);
+      : vencimientoEfectivo(
+          v.fecha_vencimiento_manual,
+          v.fecha_emision,
+          v.forma_pago,
+          v.term_pago_dias
+        );
     const vencida =
       estadoPago === "pendiente" &&
       !!vencimiento &&
@@ -134,6 +152,7 @@ export function construirEstadoCuenta(
         ? "—"
         : `${plazoDias(v.forma_pago, v.term_pago_dias)} días`,
       vencimiento,
+      vencimientoManual: !esCredito && !!v.fecha_vencimiento_manual,
       vencida,
     };
   });

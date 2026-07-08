@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { TIPO_DOC, esNotaCredito, signoDte } from "@/lib/dte-doc";
-import { tipoPagoLabel, plazoDias, calcularVencimiento } from "@/lib/estado-cuenta";
+import { tipoPagoLabel, plazoDias, vencimientoEfectivo } from "@/lib/estado-cuenta";
 
 export type VentaRow = {
   id: string;
@@ -17,6 +17,7 @@ export type VentaRow = {
   forma_pago: number | null;
   term_pago_dias: number | null;
   fecha_vencimiento: string | null;
+  fecha_vencimiento_manual: string | null;
   notas_venta: { id: string; folio: string } | null;
 };
 
@@ -148,7 +149,12 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                       <span className="text-slate-400">—</span>
                     ) : (
                       formatFecha(
-                        calcularVencimiento(v.fecha_emision, v.forma_pago, v.term_pago_dias)
+                        vencimientoEfectivo(
+                          v.fecha_vencimiento_manual,
+                          v.fecha_emision,
+                          v.forma_pago,
+                          v.term_pago_dias
+                        )
                       )
                     )}
                   </td>
