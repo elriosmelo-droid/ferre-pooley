@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { EstadoBadge, type CotizacionEstado } from "./estado-badge";
-import { pasarANotaVenta } from "./actions";
+import { pasarANotaVenta, eliminarCotizacion } from "./actions";
 
 const ESTADO_LABEL: Record<CotizacionEstado, string> = {
   borrador: "Borrador",
@@ -52,6 +52,7 @@ export function CotizacionesTabla({
   const [isPending, startTransition] = useTransition();
   // Fila cuya conversión a nota está en curso (deshabilita solo ese botón).
   const [pasandoId, setPasandoId] = useState<string | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
 
   function pasarANota(id: string) {
     setPasandoId(id);
@@ -60,6 +61,21 @@ export function CotizacionesTabla({
       // el botón para reintentar.
       await pasarANotaVenta(id);
       setPasandoId(null);
+    });
+  }
+
+  function eliminar(c: CotizacionRow) {
+    const nota = notaDe(c);
+    const aviso = nota
+      ? `Vas a eliminar la cotización ${c.folio}.\n\nTambién se eliminará su nota de venta vinculada ${nota.folio}.\n\nEsta acción no se puede deshacer.`
+      : `Vas a eliminar la cotización ${c.folio}.\n\nEsta acción no se puede deshacer.`;
+    if (!confirm(aviso)) return;
+
+    setEliminandoId(c.id);
+    startTransition(async () => {
+      const res = await eliminarCotizacion(c.id);
+      setEliminandoId(null);
+      if (res.error) alert(res.error);
     });
   }
 
@@ -231,6 +247,22 @@ export function CotizacionesTabla({
                           </button>
                         );
                       })()}
+                      <button
+                        type="button"
+                        onClick={() => eliminar(cotizacion)}
+                        disabled={isPending && eliminandoId === cotizacion.id}
+                        title="Eliminar cotización"
+                        aria-label="Eliminar cotización"
+                        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {isPending && eliminandoId === cotizacion.id ? (
+                          <span className="text-xs">…</span>
+                        ) : (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -512,3 +512,41 @@ export async function pasarANotaVenta(id: string): Promise<void> {
   revalidatePath(`/cotizaciones/${id}`);
   redirect(`/notas-venta/${nota.id}`);
 }
+
+export type EliminarCotizacionResult = { error?: string; success?: boolean };
+
+// Elimina la cotización y, si tiene, su nota de venta vinculada. Los ítems de
+// ambas se borran por cascada (FK on delete cascade). La nota se borra primero
+// porque su FK a cotizaciones no tiene cascada.
+export async function eliminarCotizacion(
+  id: string
+): Promise<EliminarCotizacionResult> {
+  const supabase = await createClient();
+
+  const { data: nota } = await supabase
+    .from("notas_venta")
+    .select("id")
+    .eq("cotizacion_id", id)
+    .maybeSingle();
+
+  if (nota) {
+    const { error: notaError } = await supabase
+      .from("notas_venta")
+      .delete()
+      .eq("id", nota.id);
+    if (notaError) {
+      console.error("Error al eliminar nota vinculada:", notaError.message);
+      return { error: "No se pudo eliminar la nota de venta vinculada." };
+    }
+  }
+
+  const { error } = await supabase.from("cotizaciones").delete().eq("id", id);
+  if (error) {
+    console.error("Error al eliminar cotización:", error.message);
+    return { error: "No se pudo eliminar la cotización. Intenta nuevamente." };
+  }
+
+  revalidatePath("/cotizaciones");
+  revalidatePath("/notas-venta");
+  return { success: true };
+}
