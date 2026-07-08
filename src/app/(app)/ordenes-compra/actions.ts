@@ -338,13 +338,39 @@ export async function marcarRecibida(id: string): Promise<void> {
   revalidatePath(`/ordenes-compra/${id}`);
 }
 
-export async function cerrarOrden(id: string): Promise<void> {
+export type CerrarOrdenResult = { error?: string; success?: boolean };
+
+export async function cerrarOrden(
+  id: string,
+  observacion: string
+): Promise<CerrarOrdenResult> {
+  const obs = observacion.trim();
+  if (obs === "") {
+    return { error: "Debes dejar una observación para cerrar la orden." };
+  }
+
   const supabase = await createClient();
-  await supabase
+  // .eq("estado","recibida") mantiene la transición atómica.
+  const { data, error } = await supabase
     .from("ordenes_compra")
-    .update({ estado: "cerrada" })
+    .update({
+      estado: "cerrada",
+      observacion_cierre: obs,
+      cerrada_at: new Date().toISOString(),
+    })
     .eq("id", id)
-    .eq("estado", "recibida");
+    .eq("estado", "recibida")
+    .select("id");
+
+  if (error) {
+    console.error("Error al cerrar orden:", error.message);
+    return { error: "No se pudo cerrar la orden. Intenta nuevamente." };
+  }
+  if (!data?.length) {
+    return { error: "La orden ya no se puede cerrar." };
+  }
+
   revalidatePath("/ordenes-compra");
   revalidatePath(`/ordenes-compra/${id}`);
+  return { success: true };
 }

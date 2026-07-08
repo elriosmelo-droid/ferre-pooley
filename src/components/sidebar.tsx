@@ -103,6 +103,13 @@ const IconClientes = (p: IconProps) => (
     <path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
   </svg>
 );
+const IconEstadoCuenta = (p: IconProps) => (
+  <svg {...baseIcon(p)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9h18M8 14h4" />
+    <circle cx="16.5" cy="14" r="1" />
+  </svg>
+);
 const IconUsuarios = (p: IconProps) => (
   <svg {...baseIcon(p)}>
     <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5Z" />
@@ -157,7 +164,14 @@ const menu: Entry[] = [
   },
   { href: "/proveedores", label: "Proveedores", icon: IconProveedores },
   { href: "/productos", label: "Productos", icon: IconProductos },
-  { href: "/clientes", label: "Clientes", icon: IconClientes },
+  {
+    label: "Clientes",
+    icon: IconClientes,
+    items: [
+      { href: "/clientes", label: "Clientes", icon: IconClientes },
+      { href: "/estados-cuenta", label: "Estados de Cuenta", icon: IconEstadoCuenta },
+    ],
+  },
 ];
 
 function itemClasses(active: boolean) {

@@ -216,11 +216,18 @@ export function CotizacionesTabla({
                             onClick={() => pasarANota(cotizacion.id)}
                             disabled={isPending && pasandoId === cotizacion.id}
                             title="Crear nota de venta con los ítems de esta cotización"
-                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-md border border-green-600 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50"
                           >
-                            {isPending && pasandoId === cotizacion.id
-                              ? "Creando…"
-                              : "A nota de venta"}
+                            {isPending && pasandoId === cotizacion.id ? (
+                              "Creando…"
+                            ) : (
+                              <>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
+                                a N. Venta
+                              </>
+                            )}
                           </button>
                         );
                       })()}

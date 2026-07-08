@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
-import { marcarRecibida, cerrarOrden } from "../actions";
+import { marcarRecibida } from "../actions";
 import { EstadoBadge, type OrdenCompraEstado } from "../estado-badge";
 import { EnviarButton } from "./enviar-button";
+import { CerrarOrdenButton } from "./cerrar-orden-button";
 
 type ItemRow = {
   id: string;
@@ -24,8 +25,10 @@ type OrdenDetalle = {
   iva: number;
   total: number;
   notas: string | null;
+  observacion_cierre: string | null;
   enviada_at: string | null;
   recibida_at: string | null;
+  cerrada_at: string | null;
   created_at: string;
   proveedores: {
     razon_social: string | null;
@@ -53,7 +56,7 @@ export default async function DetalleOrdenCompraPage({
     .from("ordenes_compra")
     .select(
       `id, folio, estado, comprador, subtotal_neto, iva, total, notas,
-       enviada_at, recibida_at, created_at,
+       observacion_cierre, enviada_at, recibida_at, cerrada_at, created_at,
        proveedores(razon_social, rut, correo),
        orden_compra_items(id, sku, descripcion, cantidad, precio, posicion)`
     )
@@ -70,7 +73,6 @@ export default async function DetalleOrdenCompraPage({
   );
   const proveedor = orden.proveedores;
   const recibir = marcarRecibida.bind(null, orden.id);
-  const cerrar = cerrarOrden.bind(null, orden.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,14 +104,7 @@ export default async function DetalleOrdenCompraPage({
             </form>
           )}
           {orden.estado === "recibida" && (
-            <form action={cerrar}>
-              <button
-                type="submit"
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                Cerrar orden
-              </button>
-            </form>
+            <CerrarOrdenButton ordenId={orden.id} />
           )}
         </div>
       </div>
@@ -163,7 +158,23 @@ export default async function DetalleOrdenCompraPage({
                 <dd>{formatFechaHora(orden.recibida_at)}</dd>
               </div>
             )}
+            {orden.cerrada_at && (
+              <div className="flex justify-between">
+                <dt>Cerrada</dt>
+                <dd>{formatFechaHora(orden.cerrada_at)}</dd>
+              </div>
+            )}
           </dl>
+          {orden.observacion_cierre && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Observación de cierre
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                {orden.observacion_cierre}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
