@@ -54,12 +54,14 @@ export async function enviarCorreoTexto({
   para,
   asunto,
   cuerpo,
+  from: fromArg,
 }: {
   para: string;
   asunto: string;
   cuerpo: string;
+  from?: string;
 }): Promise<{ id: string; from: string }> {
-  const from = process.env.RESEND_FROM;
+  const from = fromArg || process.env.RESEND_FROM;
   if (!from) {
     throw new Error("RESEND_FROM no está configurada.");
   }

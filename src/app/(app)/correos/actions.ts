@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { enviarCorreoTexto } from "@/lib/email/send";
+import { getPerfilActual } from "@/lib/auth/rol";
+
+// Remitente según el usuario que envía: Victor sale con su casilla; el resto
+// con la casilla de ventas.
+const REMITENTES: Record<string, string> = {
+  "vpooleyf@outlook.com": "Victor Pooley <vpooley@tulbless.cl>",
+};
+const REMITENTE_DEFAULT = "Ventas Tulbless <ventas@tulbless.cl>";
 
 export type EnviarCorreoState = {
   error?: string;
@@ -30,9 +38,13 @@ export async function enviarCorreoNuevo(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
+  const perfil = await getPerfilActual();
+  const from =
+    (perfil?.email && REMITENTES[perfil.email]) || REMITENTE_DEFAULT;
+
   let enviado: { id: string; from: string };
   try {
-    enviado = await enviarCorreoTexto(parsed.data);
+    enviado = await enviarCorreoTexto({ ...parsed.data, from });
   } catch (e) {
     console.error("Error al enviar correo:", e);
     return {
