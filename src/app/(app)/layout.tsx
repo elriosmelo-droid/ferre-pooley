@@ -19,9 +19,17 @@ export default async function AppLayout({
 
   const perfil = await getPerfilActual();
 
+  const { count: correosSinLeer } = await supabase
+    .from("correos")
+    .select("id", { count: "exact", head: true })
+    .eq("leido", false);
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar esAdmin={perfil?.rol === "admin"} />
+      <Sidebar
+        esAdmin={perfil?.rol === "admin"}
+        correosSinLeer={correosSinLeer ?? 0}
+      />
       <main className="p-4 sm:p-6 lg:ml-[220px] lg:p-8">{children}</main>
     </div>
   );

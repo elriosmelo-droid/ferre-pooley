@@ -110,6 +110,12 @@ const IconEstadoCuenta = (p: IconProps) => (
     <circle cx="16.5" cy="14" r="1" />
   </svg>
 );
+const IconCorreos = (p: IconProps) => (
+  <svg {...baseIcon(p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </svg>
+);
 const IconUsuarios = (p: IconProps) => (
   <svg {...baseIcon(p)}>
     <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5Z" />
@@ -182,7 +188,13 @@ function itemClasses(active: boolean) {
   }`;
 }
 
-export function Sidebar({ esAdmin = false }: { esAdmin?: boolean }) {
+export function Sidebar({
+  esAdmin = false,
+  correosSinLeer = 0,
+}: {
+  esAdmin?: boolean;
+  correosSinLeer?: number;
+}) {
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -277,6 +289,19 @@ export function Sidebar({ esAdmin = false }: { esAdmin?: boolean }) {
         })}
       </nav>
       <div className="space-y-1 border-t border-slate-800 px-3 py-4">
+        <Link
+          href="/correos"
+          onClick={cerrar}
+          className={itemClasses(isActive("/correos"))}
+        >
+          <IconCorreos />
+          <span className="flex-1">Correos</span>
+          {correosSinLeer > 0 && (
+            <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
+              {correosSinLeer}
+            </span>
+          )}
+        </Link>
         {esAdmin && (
           <Link
             href="/usuarios"
