@@ -14,11 +14,9 @@ export type VentaSiiEstadoCuenta = {
   term_pago_dias?: number | null;
   fecha_vencimiento?: string | null;
   fecha_vencimiento_manual?: string | null;
-};
-
-export type NotaEstadoCuenta = {
-  venta_sii_id: string | null;
-  estado: EstadoPago;
+  // Estado de la nota de venta vinculada (vía ventas_sii.nota_venta_id). null si
+  // no hay nota vinculada.
+  estado_nota?: EstadoPago | null;
 };
 
 export type FilaEstadoCuenta = {
@@ -95,21 +93,15 @@ export type EstadoCuenta = {
   totales: TotalesEstadoCuenta;
 };
 
-// Arma el estado de cuenta de un cliente a partir de sus documentos del SII y
-// sus notas de venta. Fuente de verdad única para la página y el PDF.
+// Arma el estado de cuenta de un cliente a partir de sus documentos del SII. El
+// estado de pago sale de la nota de venta vinculada (ventas_sii.nota_venta_id).
+// Fuente de verdad única para la página y el PDF.
 export function construirEstadoCuenta(
   clienteRut: string | null,
   ventasSii: VentaSiiEstadoCuenta[],
-  notas: NotaEstadoCuenta[],
   hoy?: string
 ): EstadoCuenta {
   const rutObjetivo = normalizarRut(clienteRut);
-
-  // Estado de pago por documento SII (vía la nota vinculada).
-  const estadoPorVenta = new Map<string, EstadoPago>();
-  for (const n of notas) {
-    if (n.venta_sii_id) estadoPorVenta.set(n.venta_sii_id, n.estado);
-  }
 
   const docs = rutObjetivo
     ? ventasSii.filter((v) => normalizarRut(v.rut_cliente) === rutObjetivo)
@@ -122,9 +114,7 @@ export function construirEstadoCuenta(
 
   const filas: FilaEstadoCuenta[] = docs.map((v) => {
     const esCredito = esNotaCredito(v.tipo_doc);
-    const estadoPago = esCredito
-      ? null
-      : (estadoPorVenta.get(v.id) ?? "pendiente");
+    const estadoPago = esCredito ? null : (v.estado_nota ?? "pendiente");
     const vencimiento = esCredito
       ? null
       : vencimientoEfectivo(
