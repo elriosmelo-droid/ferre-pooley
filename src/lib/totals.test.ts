@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularTotales } from "./totals";
+import { calcularTotales, calcularMargen, margenPctLinea } from "./totals";
 
 describe("calcularTotales", () => {
   it("suma cantidad por (precio + flete unitario) y aplica IVA 19%", () => {
@@ -59,5 +59,27 @@ describe("calcularTotales", () => {
       iva: 0,
       total: 0,
     });
+  });
+});
+
+describe("margen", () => {
+  it("margen % por línea sobre la venta (con descuento, sin flete)", () => {
+    // precio 1000, costo 600 → venta 1000, margen 400 → 40%
+    expect(margenPctLinea(1000, 600, 0)).toBeCloseTo(40, 5);
+    // con 10% desc: venta 900, margen 300 → 33.33%
+    expect(margenPctLinea(1000, 600, 10)).toBeCloseTo((300 / 900) * 100, 5);
+    // sin venta → 0
+    expect(margenPctLinea(0, 0, 0)).toBe(0);
+  });
+
+  it("margen total: monto y % sobre la venta, sin flete", () => {
+    const r = calcularMargen([
+      { cantidad: 2, precio: 1000, costo: 600, descuento: 0 },
+      { cantidad: 1, precio: 500, costo: 500, descuento: 0 },
+    ]);
+    // venta = 2000 + 500 = 2500; costo = 1200 + 500 = 1700; margen = 800
+    expect(r.venta).toBe(2500);
+    expect(r.margen).toBe(800);
+    expect(r.pct).toBeCloseTo((800 / 2500) * 100, 5);
   });
 });

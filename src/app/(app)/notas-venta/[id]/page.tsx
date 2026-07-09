@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
-import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import {
+  calcularTotales,
+  descuentoUnitario,
+  calcularMargen,
+  margenPctLinea,
+  formatPct,
+} from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { normalizarRut } from "@/lib/rut";
 import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
@@ -85,6 +91,7 @@ export default async function DetalleNotaVentaPage({
     (a, b) => a.posicion - b.posicion
   );
   const totales = calcularTotales(items);
+  const margen = calcularMargen(items);
   const cliente = nota.clientes;
 
   // Facturas del SII de esta nota + candidatas para vincular: facturas del
@@ -273,6 +280,11 @@ export default async function DetalleNotaVentaPage({
                           descuentoUnitario(item.precio, item.descuento) -
                           item.costo)
                     )}
+                    <div className="text-xs text-amber-500">
+                      {formatPct(
+                        margenPctLinea(item.precio, item.costo, item.descuento)
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -312,6 +324,12 @@ export default async function DetalleNotaVentaPage({
           <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
             <dt>Total</dt>
             <dd>{formatCLP(nota.total)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
+            <dt>Margen (interno)</dt>
+            <dd className="font-semibold">
+              {formatCLP(margen.margen)} · {formatPct(margen.pct)}
+            </dd>
           </div>
         </dl>
       </div>

@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
-import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import {
+  calcularTotales,
+  descuentoUnitario,
+  calcularMargen,
+  margenPctLinea,
+  formatPct,
+} from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { APP_URL } from "@/lib/app-url";
 import { duplicarCotizacion, pasarANotaVenta } from "../actions";
@@ -97,6 +103,7 @@ export default async function DetalleCotizacionPage({
     (a, b) => a.posicion - b.posicion
   );
   const totales = calcularTotales(items);
+  const margen = calcularMargen(items);
   const cliente = cotizacion.clientes;
   const linkPublico = `${APP_URL}/cotizacion/${cotizacion.token_aceptacion}`;
   const mostrarLinkPublico = ["enviada", "aceptada", "rechazada"].includes(
@@ -291,6 +298,11 @@ export default async function DetalleCotizacionPage({
                           descuentoUnitario(item.precio, item.descuento) -
                           item.costo)
                     )}
+                    <div className="text-xs text-amber-500">
+                      {formatPct(
+                        margenPctLinea(item.precio, item.costo, item.descuento)
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -330,6 +342,12 @@ export default async function DetalleCotizacionPage({
           <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
             <dt>Total</dt>
             <dd>{formatCLP(cotizacion.total)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
+            <dt>Margen (interno)</dt>
+            <dd className="font-semibold">
+              {formatCLP(margen.margen)} · {formatPct(margen.pct)}
+            </dd>
           </div>
         </dl>
       </div>
