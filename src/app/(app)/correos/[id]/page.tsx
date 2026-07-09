@@ -112,14 +112,15 @@ export default async function CorreoDetallePage({
         {correo.adjuntos.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
             {correo.adjuntos.map((a) => (
-              <span
+              <a
                 key={a.id}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600"
-                title={a.content_type}
+                href={`/correos/${correo.id}/adjunto/${a.id}`}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                title={`Descargar ${a.filename}`}
               >
                 📎 {a.filename}
                 {a.size ? ` · ${tamano(a.size)}` : ""}
-              </span>
+              </a>
             ))}
           </div>
         )}
