@@ -116,6 +116,17 @@ const IconCorreos = (p: IconProps) => (
     <path d="m3 7 9 6 9-6" />
   </svg>
 );
+const IconRecibidos = (p: IconProps) => (
+  <svg {...baseIcon(p)}>
+    <path d="M4 4h16v10h-4l-2 3h-4l-2-3H4z" />
+    <path d="M12 4v6M9 7l3 3 3-3" />
+  </svg>
+);
+const IconEnviados = (p: IconProps) => (
+  <svg {...baseIcon(p)}>
+    <path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z" />
+  </svg>
+);
 const IconUsuarios = (p: IconProps) => (
   <svg {...baseIcon(p)}>
     <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5Z" />
@@ -176,6 +187,14 @@ const menu: Entry[] = [
     items: [
       { href: "/clientes", label: "Clientes", icon: IconClientes },
       { href: "/estados-cuenta", label: "Estados de Cuenta", icon: IconEstadoCuenta },
+    ],
+  },
+  {
+    label: "Correos",
+    icon: IconCorreos,
+    items: [
+      { href: "/correos", label: "Recibidos", icon: IconRecibidos },
+      { href: "/correos/enviados", label: "Enviados", icon: IconEnviados },
     ],
   },
 ];
@@ -260,6 +279,11 @@ export function Sidebar({
               >
                 <Icon />
                 <span className="flex-1 text-left">{entry.label}</span>
+                {entry.label === "Correos" && correosSinLeer > 0 && (
+                  <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
+                    {correosSinLeer}
+                  </span>
+                )}
                 <Chevron
                   className={`shrink-0 transition-transform ${
                     abiertoGrupo ? "rotate-180" : ""
@@ -289,19 +313,6 @@ export function Sidebar({
         })}
       </nav>
       <div className="space-y-1 border-t border-slate-800 px-3 py-4">
-        <Link
-          href="/correos"
-          onClick={cerrar}
-          className={itemClasses(isActive("/correos"))}
-        >
-          <IconCorreos />
-          <span className="flex-1">Correos</span>
-          {correosSinLeer > 0 && (
-            <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">
-              {correosSinLeer}
-            </span>
-          )}
-        </Link>
         {esAdmin && (
           <Link
             href="/usuarios"

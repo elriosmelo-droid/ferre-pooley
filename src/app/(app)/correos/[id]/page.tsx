@@ -14,7 +14,14 @@ type Correo = {
   adjuntos: Adjunto[];
   recibido_at: string;
   leido: boolean;
+  direccion: "entrante" | "saliente";
 };
+
+// Extrae el email de un "Nombre <email@x>" o devuelve el texto si ya es email.
+function soloEmail(de: string | null): string {
+  if (!de) return "";
+  return de.match(/<([^>]+)>/)?.[1] ?? de.trim();
+}
 
 function fmtFechaHora(iso: string) {
   return new Date(iso).toLocaleString("es-CL", {
@@ -41,28 +48,52 @@ export default async function CorreoDetallePage({
 
   const { data } = await supabase
     .from("correos")
-    .select("id, de, para, asunto, texto, html, adjuntos, recibido_at, leido")
+    .select("id, de, para, asunto, texto, html, adjuntos, recibido_at, leido, direccion")
     .eq("id", id)
     .maybeSingle();
 
   if (!data) notFound();
   const correo = data as Correo;
+  const esEntrante = correo.direccion === "entrante";
+  const volver = esEntrante ? "/correos" : "/correos/enviados";
 
-  // Marcar como leído al abrir (el badge se actualiza en la próxima navegación).
-  if (!correo.leido) {
+  // Marcar como leído al abrir (solo entrantes; el badge se actualiza en la
+  // próxima navegación).
+  if (esEntrante && !correo.leido) {
     await supabase.from("correos").update({ leido: true }).eq("id", id);
   }
 
+  const responderHref = `/correos/nuevo?para=${encodeURIComponent(
+    soloEmail(correo.de)
+  )}&asunto=${encodeURIComponent(
+    correo.asunto?.startsWith("Re:") ? correo.asunto : `Re: ${correo.asunto ?? ""}`
+  )}`;
+
   return (
     <div className="mx-auto max-w-3xl">
-      <Link
-        href="/correos"
-        className="text-sm text-slate-500 hover:text-slate-700"
-      >
-        ← Correos
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href={volver} className="text-sm text-slate-500 hover:text-slate-700">
+          ← {esEntrante ? "Recibidos" : "Enviados"}
+        </Link>
+        {esEntrante && (
+          <Link
+            href={responderHref}
+            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 0 1 5 5v1" />
+            </svg>
+            Responder
+          </Link>
+        )}
+      </div>
 
       <div className="mt-2 rounded-xl border border-slate-200 bg-white p-6">
+        {!esEntrante && (
+          <span className="mb-2 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+            Enviado
+          </span>
+        )}
         <h1 className="text-xl font-bold text-slate-900">
           {correo.asunto || "(sin asunto)"}
         </h1>

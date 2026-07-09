@@ -1,28 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
-import { CorreosLista, type CorreoRow } from "./correos-lista";
-import { CorreosNav } from "./correos-nav";
+import { CorreosLista, type CorreoRow } from "../correos-lista";
+import { CorreosNav } from "../correos-nav";
 
-export default async function CorreosPage() {
+export default async function CorreosEnviadosPage() {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("correos")
     .select("id, de, para, asunto, recibido_at, leido")
-    .eq("direccion", "entrante")
+    .eq("direccion", "saliente")
     .order("recibido_at", { ascending: false });
 
   const correos = (data ?? []) as CorreoRow[];
-  const sinLeer = correos.filter((c) => !c.leido).length;
 
   return (
     <div>
-      <CorreosNav activo="recibidos" sinLeer={sinLeer} />
+      <CorreosNav activo="enviados" />
       {error ? (
         <p className="text-sm text-red-600">
-          No se pudieron cargar los correos. Intenta nuevamente.
+          No se pudieron cargar los enviados. Intenta nuevamente.
         </p>
       ) : (
-        <CorreosLista correos={correos} modo="recibidos" />
+        <CorreosLista correos={correos} modo="enviados" />
       )}
     </div>
   );

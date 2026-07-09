@@ -48,6 +48,35 @@ export async function enviarCorreo({
   }
 }
 
+// Envía un correo de texto plano (redactado desde la app). Devuelve el id de
+// Resend y el remitente usado, para guardarlo en la bandeja de Enviados.
+export async function enviarCorreoTexto({
+  para,
+  asunto,
+  cuerpo,
+}: {
+  para: string;
+  asunto: string;
+  cuerpo: string;
+}): Promise<{ id: string; from: string }> {
+  const from = process.env.RESEND_FROM;
+  if (!from) {
+    throw new Error("RESEND_FROM no está configurada.");
+  }
+
+  const { data, error } = await getResend().emails.send({
+    from,
+    to: para,
+    subject: asunto,
+    text: cuerpo,
+  });
+
+  if (error || !data) {
+    throw new Error(`Resend rechazó el envío: ${error?.message ?? "sin id"}`);
+  }
+  return { id: data.id, from };
+}
+
 export async function enviarCorreoCotizacion({
   para,
   asunto,
