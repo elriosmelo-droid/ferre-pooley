@@ -22,8 +22,22 @@ export type EnviarCorreoState = {
 const schema = z.object({
   para: z.email("Ingresa un correo de destino válido"),
   asunto: z.string().trim().min(1, "Ingresa un asunto"),
-  cuerpo: z.string().trim().min(1, "Escribe un mensaje"),
+  cuerpo: z.string(), // HTML del editor
 });
+
+// Versión en texto plano del HTML (respaldo del correo + para la vista de lista).
+function aTexto(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 export async function enviarCorreoNuevo(
   _prev: EnviarCorreoState,
@@ -38,13 +52,25 @@ export async function enviarCorreoNuevo(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
+  const html = parsed.data.cuerpo;
+  const texto = aTexto(html);
+  if (texto === "") {
+    return { fieldErrors: { cuerpo: ["Escribe un mensaje"] } };
+  }
+
   const perfil = await getPerfilActual();
   const from =
     (perfil?.email && REMITENTES[perfil.email]) || REMITENTE_DEFAULT;
 
   let enviado: { id: string; from: string };
   try {
-    enviado = await enviarCorreoTexto({ ...parsed.data, from });
+    enviado = await enviarCorreoTexto({
+      para: parsed.data.para,
+      asunto: parsed.data.asunto,
+      html,
+      texto,
+      from,
+    });
   } catch (e) {
     console.error("Error al enviar correo:", e);
     return {
@@ -60,7 +86,8 @@ export async function enviarCorreoNuevo(
     de: enviado.from,
     para: [parsed.data.para],
     asunto: parsed.data.asunto,
-    texto: parsed.data.cuerpo,
+    texto,
+    html,
     direccion: "saliente",
     leido: true,
   });

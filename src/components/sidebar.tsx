@@ -292,20 +292,27 @@ export function Sidebar({
               </button>
               {abiertoGrupo && (
                 <div className="mt-1 space-y-1 border-l border-slate-800 pl-3 ml-4">
-                  {entry.items.map((sub) => {
-                    const SubIcon = sub.icon;
-                    return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        onClick={cerrar}
-                        className={itemClasses(isActive(sub.href))}
-                      >
-                        <SubIcon />
-                        {sub.label}
-                      </Link>
-                    );
-                  })}
+                  {(() => {
+                    // Ítem activo = el de match más largo (evita que /correos
+                    // marque a la vez que /correos/enviados).
+                    const activoHref = entry.items
+                      .filter((i) => isActive(i.href))
+                      .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+                    return entry.items.map((sub) => {
+                      const SubIcon = sub.icon;
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={cerrar}
+                          className={itemClasses(sub.href === activoHref)}
+                        >
+                          <SubIcon />
+                          {sub.label}
+                        </Link>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import { Resend, type CreateEmailOptions } from "resend";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 
@@ -53,12 +53,14 @@ export async function enviarCorreo({
 export async function enviarCorreoTexto({
   para,
   asunto,
-  cuerpo,
+  html,
+  texto,
   from: fromArg,
 }: {
   para: string;
   asunto: string;
-  cuerpo: string;
+  html?: string;
+  texto?: string;
   from?: string;
 }): Promise<{ id: string; from: string }> {
   const from = fromArg || process.env.RESEND_FROM;
@@ -66,12 +68,17 @@ export async function enviarCorreoTexto({
     throw new Error("RESEND_FROM no está configurada.");
   }
 
-  const { data, error } = await getResend().emails.send({
+  // Resend exige html o text. Se mandan ambos cuando hay: html para clientes
+  // que lo rendericen, text como respaldo. (El tipo del SDK es una unión
+  // estricta html|text; el cast permite enviar ambos, soportado en runtime.)
+  const payload = {
     from,
     to: para,
     subject: asunto,
-    text: cuerpo,
-  });
+    html: html || undefined,
+    text: texto || undefined,
+  } as CreateEmailOptions;
+  const { data, error } = await getResend().emails.send(payload);
 
   if (error || !data) {
     throw new Error(`Resend rechazó el envío: ${error?.message ?? "sin id"}`);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { enviarCorreoNuevo } from "./actions";
+import { RichEditor } from "./rich-editor";
 
 export function RedactarForm({
   para = "",
@@ -55,17 +56,8 @@ export function RedactarForm({
       </div>
 
       <div>
-        <label htmlFor="cuerpo" className={labelClass}>
-          Mensaje *
-        </label>
-        <textarea
-          id="cuerpo"
-          name="cuerpo"
-          required
-          rows={10}
-          defaultValue={cuerpo}
-          className={inputClass}
-        />
+        <label className={labelClass}>Mensaje *</label>
+        <RichEditor name="cuerpo" defaultValue={cuerpo} />
         <FieldErrors errors={state.fieldErrors?.cuerpo} />
       </div>
 
