@@ -118,6 +118,14 @@ export default async function DetalleCotizacionPage({
           <EstadoBadge estado={cotizacion.estado} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={`/cotizaciones/${cotizacion.id}/pdf`}
+            target="_blank"
+            rel="noopener"
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Ver PDF
+          </a>
           {cotizacion.estado === "borrador" && (
             <>
               <Link

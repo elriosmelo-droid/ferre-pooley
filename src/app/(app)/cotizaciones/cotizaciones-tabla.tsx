@@ -216,6 +216,14 @@ export function CotizacionesTabla({
                       >
                         Ver
                       </Link>
+                      <a
+                        href={`/cotizaciones/${cotizacion.id}/pdf`}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                      >
+                        PDF
+                      </a>
                       {(() => {
                         const nota = notaDe(cotizacion);
                         return nota ? (
