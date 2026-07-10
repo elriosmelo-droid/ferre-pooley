@@ -32,6 +32,24 @@ function sumarTotales(rows: { total: number }[] | null) {
   return (rows ?? []).reduce((acc, row) => acc + row.total, 0);
 }
 
+type VentaConNota = {
+  notas_venta: { id: string; total: number; estado: string } | { id: string; total: number; estado: string }[] | null;
+};
+
+// Suma el total de las notas PAGADAS vinculadas a las facturas dadas, sin
+// duplicar una nota que aparezca en más de una factura.
+function sumarNotasPagadas(rows: VentaConNota[] | null): number {
+  const vistos = new Set<string>();
+  let total = 0;
+  for (const r of rows ?? []) {
+    const n = Array.isArray(r.notas_venta) ? r.notas_venta[0] : r.notas_venta;
+    if (!n || n.estado !== "pagada" || vistos.has(n.id)) continue;
+    vistos.add(n.id);
+    total += n.total ?? 0;
+  }
+  return total;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
@@ -41,6 +59,9 @@ export default async function DashboardPage() {
     ahora.getMonth(),
     1
   ).toISOString();
+  // Primer día del mes en curso como fecha ('AAAA-MM-01') para comparar contra
+  // ventas_sii.fecha_emision (columna date).
+  const inicioMesFecha = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-01`;
 
   const [
     enviadasResult,
@@ -60,14 +81,16 @@ export default async function DashboardPage() {
       .eq("estado", "aceptada")
       .gte("respondida_at", inicioMes),
     supabase.from("notas_venta").select("total").eq("estado", "pendiente"),
-    // Ventas del mes: notas emitidas (creadas) este mes que ya están pagadas.
-    // Se fecha por emisión de la nota (created_at), NO por cuándo entró el pago
-    // (pagada_at), así un pago tardío no infla el mes de una venta vieja.
+    // Ventas del mes: notas pagadas cuya FACTURA del SII se emitió este mes. Se
+    // fecha por la emisión de la factura vinculada (ventas_sii.fecha_emision),
+    // NO por cuándo entró el pago ni cuándo se creó la nota. Así una nota pagada
+    // de una factura de otro período no cuenta acá.
     supabase
-      .from("notas_venta")
-      .select("total")
-      .eq("estado", "pagada")
-      .gte("created_at", inicioMes),
+      .from("ventas_sii")
+      .select("notas_venta(id, total, estado)")
+      .in("tipo_doc", [33, 34])
+      .gte("fecha_emision", inicioMesFecha)
+      .not("nota_venta_id", "is", null),
     supabase
       .from("cotizaciones")
       .select("id, folio, total, estado, clientes(nombre)")
@@ -107,8 +130,10 @@ export default async function DashboardPage() {
     },
     {
       label: "Ventas del mes",
-      value: formatCLP(sumarTotales(ventasMesResult.data)),
-      detail: "Notas emitidas este mes ya pagadas",
+      value: formatCLP(
+        sumarNotasPagadas(ventasMesResult.data as unknown as VentaConNota[])
+      ),
+      detail: "Facturas emitidas este mes con nota pagada",
     },
   ];
 
