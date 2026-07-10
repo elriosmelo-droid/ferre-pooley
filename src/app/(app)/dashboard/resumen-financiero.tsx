@@ -32,6 +32,10 @@ function etiquetaMes(clave: string): string {
   const [anio, mes] = clave.split("-").map(Number);
   return `${MESES_CORTOS[mes - 1]} ${String(anio).slice(2)}`;
 }
+function etiquetaDia(clave: string): string {
+  const [, mes, dia] = clave.split("-");
+  return `${dia}/${mes}`;
+}
 
 function hoyChile(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -116,6 +120,15 @@ export function ResumenFinanciero({
       return agg;
     };
 
+    // Margen por día (para el gráfico): venta conciliada = costo + margen.
+    const dias = new Map<string, { clave: string; margenVenta: number; margenCosto: number; notas: number }>();
+    const dia = (fecha: string) => {
+      const clave = fecha.slice(0, 10);
+      let agg = dias.get(clave);
+      if (!agg) { agg = { clave, margenVenta: 0, margenCosto: 0, notas: 0 }; dias.set(clave, agg); }
+      return agg;
+    };
+
     let totalVentas = 0;
     let totalCompras = 0;
     let margenVenta = 0;
@@ -143,9 +156,16 @@ export function ResumenFinanciero({
       agg.margenVenta += n.venta;
       agg.margenCosto += n.costo;
       agg.notas += 1;
+      const ad = dia(n.fecha);
+      ad.margenVenta += n.venta;
+      ad.margenCosto += n.costo;
+      ad.notas += 1;
     }
 
     const filas = [...meses.values()].sort((a, b) =>
+      a.clave.localeCompare(b.clave)
+    );
+    const diasMargen = [...dias.values()].sort((a, b) =>
       a.clave.localeCompare(b.clave)
     );
 
@@ -156,12 +176,13 @@ export function ResumenFinanciero({
       margenVenta,
       nNotas,
       filas,
+      diasMargen,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ventas, compras, notas, desde, hasta]);
 
   const maxMargenVenta = Math.max(
-    ...resumen.filas.map((f) => f.margenVenta),
+    ...resumen.diasMargen.map((f) => f.margenVenta),
     1
   );
 
@@ -278,72 +299,55 @@ export function ResumenFinanciero({
         ) : (
           <>
             <div>
-              <div className="flex h-44 items-end gap-3">
-                {resumen.filas.map((f) => {
-                  const margen = f.margenVenta - f.margenCosto;
-                  const hVenta = Math.round(
-                    (f.margenVenta / maxMargenVenta) * 100
-                  );
-                  const hMargen =
-                    f.margenVenta > 0 && margen > 0
-                      ? Math.round((margen / f.margenVenta) * hVenta)
-                      : 0;
-                  const hCosto = Math.max(hVenta - hMargen, 0);
-                  const titulo = `${etiquetaMes(f.clave)}: venta conciliada ${formatCLP(
-                    f.margenVenta
-                  )} · costo ${formatCLP(f.margenCosto)} · margen ${formatCLP(margen)} (${pct(
-                    margen,
-                    f.margenVenta
-                  )}) · ${f.notas} notas`;
-                  return (
-                    <div
-                      key={f.clave}
-                      title={titulo}
-                      className="flex h-full flex-1 flex-col items-center justify-end gap-1"
-                    >
-                      <span
-                        className={`text-xs font-medium ${
-                          margen < 0 ? "text-red-600" : "text-slate-600"
-                        }`}
-                      >
-                        {f.margenVenta > 0 ? pct(margen, f.margenVenta) : ""}
-                      </span>
+              {resumen.diasMargen.length === 0 ? (
+                <p className="py-4 text-center text-sm text-slate-500">
+                  Sin notas conciliadas en el período (nada que graficar por día).
+                </p>
+              ) : (
+                <div className="flex h-44 items-end gap-1">
+                  {resumen.diasMargen.map((f) => {
+                    const margen = f.margenVenta - f.margenCosto;
+                    const hVenta = Math.round((f.margenVenta / maxMargenVenta) * 100);
+                    const hMargen =
+                      f.margenVenta > 0 && margen > 0
+                        ? Math.round((margen / f.margenVenta) * hVenta)
+                        : 0;
+                    const hCosto = Math.max(hVenta - hMargen, 0);
+                    const titulo = `${etiquetaDia(f.clave)}: venta conciliada ${formatCLP(
+                      f.margenVenta
+                    )} · costo ${formatCLP(f.margenCosto)} · margen ${formatCLP(margen)} (${pct(
+                      margen,
+                      f.margenVenta
+                    )}) · ${f.notas} nota${f.notas === 1 ? "" : "s"}`;
+                    return (
                       <div
-                        className="flex w-full max-w-16 flex-col justify-end"
-                        style={{ height: "85%" }}
+                        key={f.clave}
+                        title={titulo}
+                        className="flex h-full flex-1 flex-col items-center justify-end gap-1"
                       >
-                        {hMargen > 0 && (
-                          <div
-                            className="w-full rounded-t"
-                            style={{
-                              height: `${hMargen}%`,
-                              backgroundColor: COLOR_MARGEN,
-                              marginBottom: hCosto > 0 ? "2px" : 0,
-                            }}
-                          />
-                        )}
-                        {hCosto > 0 && (
-                          <div
-                            className={`w-full ${hMargen > 0 ? "" : "rounded-t"}`}
-                            style={{
-                              height: `${hCosto}%`,
-                              backgroundColor: COLOR_COSTO,
-                            }}
-                          />
-                        )}
-                        {hVenta === 0 && (
-                          <div className="w-full border-b-2 border-slate-200" />
-                        )}
+                        <div className="flex w-full max-w-10 flex-col justify-end" style={{ height: "88%" }}>
+                          {hMargen > 0 && (
+                            <div
+                              className="w-full rounded-t"
+                              style={{ height: `${hMargen}%`, backgroundColor: COLOR_MARGEN, marginBottom: hCosto > 0 ? "2px" : 0 }}
+                            />
+                          )}
+                          {hCosto > 0 && (
+                            <div
+                              className={`w-full ${hMargen > 0 ? "" : "rounded-t"}`}
+                              style={{ height: `${hCosto}%`, backgroundColor: COLOR_COSTO }}
+                            />
+                          )}
+                          {hVenta === 0 && <div className="w-full border-b-2 border-slate-200" />}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{Number(f.clave.slice(8, 10))}</span>
                       </div>
-                      <span className="text-xs text-slate-500">
-                        {etiquetaMes(f.clave)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
               <p className="mt-2 text-xs text-slate-400">
-                Venta conciliada por mes descompuesta en costo + margen (solo
+                Venta conciliada por día descompuesta en costo + margen (solo
                 notas con factura del SII). Pasa el mouse para el detalle.
               </p>
             </div>

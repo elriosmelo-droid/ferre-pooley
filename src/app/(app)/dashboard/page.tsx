@@ -60,11 +60,14 @@ export default async function DashboardPage() {
       .eq("estado", "aceptada")
       .gte("respondida_at", inicioMes),
     supabase.from("notas_venta").select("total").eq("estado", "pendiente"),
+    // Ventas del mes: notas emitidas (creadas) este mes que ya están pagadas.
+    // Se fecha por emisión de la nota (created_at), NO por cuándo entró el pago
+    // (pagada_at), así un pago tardío no infla el mes de una venta vieja.
     supabase
       .from("notas_venta")
       .select("total")
       .eq("estado", "pagada")
-      .gte("pagada_at", inicioMes),
+      .gte("created_at", inicioMes),
     supabase
       .from("cotizaciones")
       .select("id, folio, total, estado, clientes(nombre)")
@@ -105,7 +108,7 @@ export default async function DashboardPage() {
     {
       label: "Ventas del mes",
       value: formatCLP(sumarTotales(ventasMesResult.data)),
-      detail: "Notas de venta pagadas",
+      detail: "Notas emitidas este mes ya pagadas",
     },
   ];
 
