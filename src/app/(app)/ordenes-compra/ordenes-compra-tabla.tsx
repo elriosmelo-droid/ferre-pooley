@@ -161,16 +161,14 @@ export function OrdenesCompraTabla({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {orden.estado !== "borrador" && (
-                        <a
-                          href={`/ordenes-compra/${orden.id}/pdf`}
-                          target="_blank"
-                          rel="noopener"
-                          className="text-sm font-medium text-slate-500 hover:text-slate-700"
-                        >
-                          PDF
-                        </a>
-                      )}
+                      <a
+                        href={`/ordenes-compra/${orden.id}/pdf`}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                      >
+                        PDF
+                      </a>
                       <Link
                         href={`/ordenes-compra/${orden.id}`}
                         className="text-sm font-medium text-brand-600 hover:text-brand-800"

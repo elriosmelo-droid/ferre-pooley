@@ -246,7 +246,7 @@ export async function enviarOrdenCompra(
   if (!proveedor?.correo?.trim()) {
     return {
       error:
-        "El proveedor no tiene correo. Agrégalo en Proveedores para poder enviar la orden.",
+        "El proveedor no tiene correo cargado. Podés ver el PDF y enviárselo tú (ej. por WhatsApp), o cargarle un correo en Proveedores.",
     };
   }
 

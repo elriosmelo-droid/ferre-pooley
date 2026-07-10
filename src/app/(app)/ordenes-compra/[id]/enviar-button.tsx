@@ -30,7 +30,19 @@ export function EnviarButton({ ordenId }: { ordenId: string }) {
       >
         {isPending ? "Enviando…" : "Enviar al proveedor"}
       </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <div className="flex flex-col items-end gap-1">
+          <p className="max-w-xs text-right text-xs text-red-600">{error}</p>
+          <a
+            href={`/ordenes-compra/${ordenId}/pdf`}
+            target="_blank"
+            rel="noopener"
+            className="text-xs font-semibold text-brand-600 underline hover:text-brand-800"
+          >
+            Ver PDF para enviarlo manual
+          </a>
+        </div>
+      )}
     </div>
   );
 }

@@ -294,7 +294,10 @@ export async function enviarCotizacion(
     return { error: "La cotización no tiene ítems" };
   }
   if (!cliente?.correo?.trim()) {
-    return { error: "El cliente no tiene correo" };
+    return {
+      error:
+        "El cliente no tiene correo cargado. Podés ver el PDF y enviárselo tú (ej. por WhatsApp), o cargarle un correo en Clientes.",
+    };
   }
 
   // El perfil es opcional: puede no existir todavía.
