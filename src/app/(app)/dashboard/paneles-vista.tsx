@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatCLP } from "@/lib/money";
 import { signoDte } from "@/lib/dte-doc";
+import type { EstadoPago } from "@/lib/estado-cuenta";
 
 // Series: ventas verde, compras rojo (paleta validada; se refuerza con forma
 // distinta — círculo vs rombo — para no depender solo del color).
@@ -16,9 +17,8 @@ export type DocSii = {
   iva: number;
   total: number;
   conciliada: boolean;
+  notaEstado: EstadoPago | null; // estado de la nota vinculada (o null)
 };
-
-export type NotaPagada = { fecha: string; total: number };
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 function etiquetaMes(clave: string): string {
@@ -121,16 +121,14 @@ function FiltroBar({ f }: { f: Filtro }) {
 export function PanelesSiiVista({
   ventas,
   compras,
-  notasPagadas,
 }: {
   ventas: DocSii[];
   compras: DocSii[];
-  notasPagadas: NotaPagada[];
 }) {
   return (
     <div className="flex flex-col gap-6">
       <Panel1 ventas={ventas} compras={compras} />
-      <Panel2 ventas={ventas} notasPagadas={notasPagadas} />
+      <Panel2 ventas={ventas} />
       <Panel3 ventas={ventas} compras={compras} />
     </div>
   );
@@ -197,6 +195,27 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
               </g>
             ))}
             <line x1={padL} y1={yFor(0)} x2={W - padR} y2={yFor(0)} stroke="#cbd5e1" strokeWidth={1} />
+            {/* Líneas que conectan los puntos de cada serie (en orden de día). */}
+            <polyline
+              fill="none"
+              stroke={VERDE}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              points={filas
+                .map((r, i) => (r.vCant > 0 ? `${xFor(i)},${yFor(r.vMonto)}` : null))
+                .filter(Boolean)
+                .join(" ")}
+            />
+            <polyline
+              fill="none"
+              stroke={ROJO}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              points={filas
+                .map((r, i) => (r.cCant > 0 ? `${xFor(i)},${yFor(r.cMonto)}` : null))
+                .filter(Boolean)
+                .join(" ")}
+            />
             {filas.map((r, i) => {
               const x = xFor(i);
               const dia = Number(r.fecha.slice(8, 10));
@@ -228,23 +247,23 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
 }
 
 // ---------- Panel 2: ciclo de venta ----------
-function Panel2({ ventas, notasPagadas }: { ventas: DocSii[]; notasPagadas: NotaPagada[] }) {
+// Embudo por EMISIÓN de la factura: facturas de venta ≥ conciliadas (con nota)
+// ≥ pagadas (esa nota pagada). Nunca supera lo facturado del período.
+function Panel2({ ventas }: { ventas: DocSii[] }) {
   const f = useFiltro("6m");
   const ciclo = useMemo(() => {
-    let fMonto = 0, fCant = 0, cMonto = 0, cCant = 0;
+    let fMonto = 0, fCant = 0, cMonto = 0, cCant = 0, pMonto = 0, pCant = 0;
     for (const v of ventas) {
       if (!f.enRango(v.fecha) || !esFactura(v.tipo_doc)) continue;
       fMonto += v.total; fCant += 1;
-      if (v.conciliada) { cMonto += v.total; cCant += 1; }
-    }
-    let pMonto = 0, pCant = 0;
-    for (const n of notasPagadas) {
-      if (!f.enRango(n.fecha)) continue;
-      pMonto += n.total; pCant += 1;
+      if (v.conciliada) {
+        cMonto += v.total; cCant += 1;
+        if (v.notaEstado === "pagada") { pMonto += v.total; pCant += 1; }
+      }
     }
     return { fMonto, fCant, cMonto, cCant, pMonto, pCant };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventas, notasPagadas, f.desde, f.hasta]);
+  }, [ventas, f.desde, f.hasta]);
 
   const max = Math.max(1, ciclo.fMonto, ciclo.cMonto, ciclo.pMonto);
   const barras = [
@@ -272,7 +291,7 @@ function Panel2({ ventas, notasPagadas }: { ventas: DocSii[]; notasPagadas: Nota
           </div>
         ))}
       </div>
-      <p className="text-xs text-slate-400">Facturas de venta (33/34) → cuáles quedaron conciliadas con una nota → notas de venta ya pagadas.</p>
+      <p className="text-xs text-slate-400">Por emisión de la factura: facturas de venta (33/34) → conciliadas con una nota → esa nota ya pagada. Es un embudo (cada una ⊆ la anterior).</p>
     </Card>
   );
 }
