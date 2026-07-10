@@ -39,17 +39,6 @@ function hoyChile(): string {
   }).format(new Date());
 }
 
-// Resta meses a un 'AAAA-MM-DD' y devuelve el día 1 de ese mes.
-function inicioMesAtras(desde: string, meses: number): string {
-  let [anio, mes] = desde.slice(0, 7).split("-").map(Number);
-  mes -= meses;
-  while (mes <= 0) {
-    mes += 12;
-    anio -= 1;
-  }
-  return `${anio}-${String(mes).padStart(2, "0")}-01`;
-}
-
 function pct(margen: number, venta: number): string {
   if (venta === 0) return "—";
   return `${Math.round((margen / venta) * 100)}%`;
@@ -66,11 +55,18 @@ type MesAgg = {
 
 const PRESETS = [
   { id: "mes", label: "Este mes" },
-  { id: "3m", label: "3 meses" },
-  { id: "6m", label: "6 meses" },
-  { id: "12m", label: "12 meses" },
-  { id: "todo", label: "Todo" },
+  { id: "mes-ant", label: "Mes anterior" },
 ] as const;
+
+// Rango [desde, hasta] del mes anterior a partir de un 'AAAA-MM-DD'.
+function rangoMesAnterior(hoy: string): [string, string] {
+  const [a, m] = hoy.slice(0, 7).split("-").map(Number);
+  let pa = a, pm = m - 1;
+  if (pm === 0) { pm = 12; pa -= 1; }
+  const ult = new Date(pa, pm, 0).getDate();
+  const mm = String(pm).padStart(2, "0");
+  return [`${pa}-${mm}-01`, `${pa}-${mm}-${String(ult).padStart(2, "0")}`];
+}
 
 export function ResumenFinanciero({
   ventas,
@@ -82,18 +78,20 @@ export function ResumenFinanciero({
   notas: NotaConciliada[];
 }) {
   const hoy = hoyChile();
-  const [desde, setDesde] = useState(() => inicioMesAtras(hoy, 5)); // 6 meses
+  const [desde, setDesde] = useState(() => `${hoy.slice(0, 7)}-01`); // mes en curso
   const [hasta, setHasta] = useState(hoy);
-  const [preset, setPreset] = useState<string>("6m");
+  const [preset, setPreset] = useState<string>("mes");
 
   function aplicarPreset(id: string) {
     setPreset(id);
-    setHasta(hoy);
-    if (id === "mes") setDesde(`${hoy.slice(0, 7)}-01`);
-    else if (id === "3m") setDesde(inicioMesAtras(hoy, 2));
-    else if (id === "6m") setDesde(inicioMesAtras(hoy, 5));
-    else if (id === "12m") setDesde(inicioMesAtras(hoy, 11));
-    else setDesde("");
+    if (id === "mes") {
+      setDesde(`${hoy.slice(0, 7)}-01`);
+      setHasta(hoy);
+    } else if (id === "mes-ant") {
+      const [d, h] = rangoMesAnterior(hoy);
+      setDesde(d);
+      setHasta(h);
+    }
   }
 
   const enRango = (fecha: string | null) =>
