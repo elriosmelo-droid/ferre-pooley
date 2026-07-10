@@ -58,6 +58,12 @@ const PRESETS = [
   { id: "todo", label: "Todo" },
 ] as const;
 
+// IVA: solo mes en curso / mes anterior (+ rango desde-hasta manual).
+const PRESETS_IVA = [
+  { id: "mes", label: "Este mes" },
+  { id: "mes-ant", label: "Mes anterior" },
+] as const;
+
 const inputCls =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none";
 
@@ -66,6 +72,14 @@ function useFiltro(inicial: string) {
   const hoy = hoyChile();
   const rango = (id: string): [string, string] => {
     if (id === "mes") return [`${hoy.slice(0, 7)}-01`, hoy];
+    if (id === "mes-ant") {
+      const [a, m] = hoy.slice(0, 7).split("-").map(Number);
+      let pa = a, pm = m - 1;
+      if (pm === 0) { pm = 12; pa -= 1; }
+      const ult = new Date(pa, pm, 0).getDate(); // último día del mes anterior
+      const mm = String(pm).padStart(2, "0");
+      return [`${pa}-${mm}-01`, `${pa}-${mm}-${String(ult).padStart(2, "0")}`];
+    }
     if (id === "3m") return [inicioMesAtras(hoy, 2), hoy];
     if (id === "6m") return [inicioMesAtras(hoy, 5), hoy];
     if (id === "12m") return [inicioMesAtras(hoy, 11), hoy];
@@ -90,11 +104,17 @@ function useFiltro(inicial: string) {
 
 type Filtro = ReturnType<typeof useFiltro>;
 
-function FiltroBar({ f }: { f: Filtro }) {
+function FiltroBar({
+  f,
+  presets = PRESETS,
+}: {
+  f: Filtro;
+  presets?: readonly { id: string; label: string }[];
+}) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-wrap gap-1">
-        {PRESETS.map((p) => (
+        {presets.map((p) => (
           <button
             key={p.id}
             type="button"
@@ -312,7 +332,7 @@ function Panel2({ ventas }: { ventas: DocSii[] }) {
 
 // ---------- Panel 3: IVA mensual ----------
 function Panel3({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
-  const f = useFiltro("6m");
+  const f = useFiltro("mes");
   const iva = useMemo(() => {
     const meses = new Map<string, { debito: number; credito: number }>();
     const get = (fe: string) => {
@@ -338,7 +358,7 @@ function Panel3({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
   }, [ventas, compras, f.desde, f.hasta]);
 
   return (
-    <Card titulo="IVA mensual (a pagar)" filtro={<FiltroBar f={f} />}>
+    <Card titulo="IVA mensual (a pagar)" filtro={<FiltroBar f={f} presets={PRESETS_IVA} />}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Tile label="IVA ventas (débito)" value={formatCLP(iva.debitoT)} color={VERDE} />
         <Tile label="IVA compras (crédito)" value={formatCLP(iva.creditoT)} color={ROJO} />
