@@ -36,6 +36,7 @@ type OrdenCompraFormProps = {
   orden?: {
     proveedor_id: string;
     notas: string | null;
+    plazo_pago: string | null;
     items: OrdenCompraItemInput[];
   };
   action: (
@@ -420,6 +421,21 @@ export function OrdenCompraForm({
           </table>
         </div>
         <FieldErrors errors={state.fieldErrors?.items} />
+      </div>
+
+      <div className="max-w-2xl">
+        <label htmlFor="plazo_pago" className={labelClass}>
+          Plazo de pago
+        </label>
+        <input
+          id="plazo_pago"
+          name="plazo_pago"
+          type="text"
+          defaultValue={orden?.plazo_pago ?? ""}
+          placeholder="Ej: 30 días, Contado, Contra entrega"
+          className={inputClass}
+        />
+        <FieldErrors errors={state.fieldErrors?.plazo_pago} />
       </div>
 
       <div className="max-w-2xl">

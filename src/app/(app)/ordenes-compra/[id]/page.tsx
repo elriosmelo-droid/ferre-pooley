@@ -25,6 +25,7 @@ type OrdenDetalle = {
   iva: number;
   total: number;
   notas: string | null;
+  plazo_pago: string | null;
   observacion_cierre: string | null;
   enviada_at: string | null;
   recibida_at: string | null;
@@ -55,7 +56,7 @@ export default async function DetalleOrdenCompraPage({
   const { data } = await supabase
     .from("ordenes_compra")
     .select(
-      `id, folio, estado, comprador, subtotal_neto, iva, total, notas,
+      `id, folio, estado, comprador, subtotal_neto, iva, total, notas, plazo_pago,
        observacion_cierre, enviada_at, recibida_at, cerrada_at, created_at,
        proveedores(razon_social, rut, correo),
        orden_compra_items(id, sku, descripcion, cantidad, precio, posicion)`
@@ -154,6 +155,12 @@ export default async function DetalleOrdenCompraPage({
               <dt>Creada</dt>
               <dd>{formatFechaHora(orden.created_at)}</dd>
             </div>
+            {orden.plazo_pago && (
+              <div className="flex justify-between">
+                <dt>Plazo de pago</dt>
+                <dd className="font-medium text-slate-900">{orden.plazo_pago}</dd>
+              </div>
+            )}
             {orden.enviada_at && (
               <div className="flex justify-between">
                 <dt>Enviada</dt>

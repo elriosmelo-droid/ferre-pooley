@@ -28,7 +28,7 @@ export default async function EditarOrdenCompraPage({
       supabase
         .from("ordenes_compra")
         .select(
-          `id, proveedor_id, estado, notas,
+          `id, proveedor_id, estado, notas, plazo_pago,
            orden_compra_items(producto_id, sku, descripcion, cantidad, precio, posicion)`
         )
         .eq("id", id)
@@ -77,6 +77,7 @@ export default async function EditarOrdenCompraPage({
           orden={{
             proveedor_id: orden.proveedor_id,
             notas: orden.notas,
+            plazo_pago: orden.plazo_pago,
             items,
           }}
           action={action}

@@ -14,7 +14,7 @@ import { enviarCorreoCotizacion } from "@/lib/email/send";
 export type OrdenCompraFormState = {
   error?: string;
   fieldErrors?: Partial<
-    Record<"proveedor_id" | "notas" | "items", string[]>
+    Record<"proveedor_id" | "notas" | "plazo_pago" | "items", string[]>
   >;
 };
 
@@ -35,6 +35,7 @@ const itemSchema = z.object({
 const ordenSchema = z.object({
   proveedor_id: z.uuid("Selecciona un proveedor"),
   notas: z.string().trim().optional(),
+  plazo_pago: z.string().trim().optional(),
   items: z
     .array(itemSchema, "Los ítems no son válidos")
     .min(1, "Agrega al menos un ítem"),
@@ -51,6 +52,7 @@ function parseOrdenForm(formData: FormData) {
   return ordenSchema.safeParse({
     proveedor_id: String(formData.get("proveedor_id") ?? ""),
     notas: String(formData.get("notas") ?? ""),
+    plazo_pago: String(formData.get("plazo_pago") ?? ""),
     items,
   });
 }
@@ -60,6 +62,7 @@ function toOrdenRow(data: z.infer<typeof ordenSchema>) {
   return {
     proveedor_id: data.proveedor_id,
     notas: data.notas || null,
+    plazo_pago: data.plazo_pago || null,
     subtotal_neto: totales.subtotalNeto,
     iva: totales.iva,
     total: totales.total,
@@ -210,7 +213,7 @@ export async function enviarOrdenCompra(
   const { data: orden, error: readError } = await supabase
     .from("ordenes_compra")
     .select(
-      `id, folio, estado, comprador, subtotal_neto, iva, total, notas, created_at,
+      `id, folio, estado, comprador, plazo_pago, subtotal_neto, iva, total, notas, created_at,
        proveedores(razon_social, rut, correo),
        orden_compra_items(sku, descripcion, cantidad, precio, posicion)`
     )
@@ -264,6 +267,7 @@ export async function enviarOrdenCompra(
         folio: orden.folio,
         created_at: orden.created_at,
         comprador: orden.comprador as string | null,
+        plazo_pago: orden.plazo_pago as string | null,
         subtotal_neto: orden.subtotal_neto,
         iva: orden.iva,
         total: orden.total,

@@ -20,7 +20,7 @@ export async function GET(
   const { data: orden, error } = await supabase
     .from("ordenes_compra")
     .select(
-      `id, folio, comprador, subtotal_neto, iva, total, notas, created_at,
+      `id, folio, comprador, plazo_pago, subtotal_neto, iva, total, notas, created_at,
        proveedores(razon_social, rut, correo),
        orden_compra_items(sku, descripcion, cantidad, precio, posicion)`
     )
@@ -56,6 +56,7 @@ export async function GET(
       folio: orden.folio,
       created_at: orden.created_at,
       comprador: orden.comprador as string | null,
+      plazo_pago: orden.plazo_pago as string | null,
       subtotal_neto: orden.subtotal_neto,
       iva: orden.iva,
       total: orden.total,

@@ -17,6 +17,7 @@ export type DatosPdfOrdenCompra = {
     folio: string;
     created_at: string;
     comprador: string | null;
+    plazo_pago: string | null;
     subtotal_neto: number;
     iva: number;
     total: number;
@@ -188,6 +189,9 @@ function OrdenCompraPdf({ orden, items, proveedor }: DatosPdfOrdenCompra) {
             <Text style={styles.docLinea}>
               Fecha de emisión: {formatFecha(orden.created_at)}
             </Text>
+            {orden.plazo_pago ? (
+              <Text style={styles.docLinea}>Plazo de pago: {orden.plazo_pago}</Text>
+            ) : null}
           </View>
         </View>
 
