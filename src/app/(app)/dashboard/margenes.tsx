@@ -17,7 +17,7 @@ type NotaMargen = {
     precio: number;
     descuento: number;
   }[];
-  ventas_sii: { id: string; tipo_doc: number }[];
+  ventas_sii: { id: string; tipo_doc: number; fecha_emision: string | null }[];
 };
 
 // Día calendario en horario de Chile ('AAAA-MM-DD').
@@ -46,7 +46,7 @@ export async function Margenes() {
       .select(
         `id, created_at, estado,
          nota_venta_items(cantidad, costo, precio, descuento),
-         ventas_sii(id, tipo_doc)`
+         ventas_sii(id, tipo_doc, fecha_emision)`
       )
       .neq("estado", "anulada"),
   ]);
@@ -88,8 +88,15 @@ export async function Margenes() {
         venta += item.cantidad * precioNeto;
         costo += item.cantidad * item.costo;
       }
+      // Se fecha por la EMISIÓN de la factura vinculada (33/34), no por la
+      // creación de la nota, para que calce con ventas/compras al filtrar por
+      // mes. Si hay varias, la más antigua; fallback a created_at.
+      const fechaFactura = n.ventas_sii
+        .filter((v) => TIPOS_AUTO_VINCULO.includes(v.tipo_doc) && v.fecha_emision)
+        .map((v) => v.fecha_emision!.slice(0, 10))
+        .sort()[0];
       return {
-        fecha: diaChile(n.created_at),
+        fecha: fechaFactura ?? diaChile(n.created_at),
         venta,
         costo,
         pagada: n.estado === "pagada",
