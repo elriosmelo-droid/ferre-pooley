@@ -400,12 +400,12 @@ function Panel3({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
 // ---------- UI compartida ----------
 function Card({ titulo, filtro, leyenda, children }: { titulo: string; filtro?: React.ReactNode; leyenda?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo}</h2>
-        {leyenda && <div className="flex items-center gap-4 text-xs text-slate-600">{leyenda}</div>}
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+        <h2 className="text-lg font-bold text-slate-900">{titulo}</h2>
+        {leyenda && <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">{leyenda}</div>}
       </div>
-      <div className="flex flex-col gap-5 p-6">
+      <div className="flex flex-col gap-6 p-6">
         {filtro}
         {children}
       </div>
@@ -415,12 +415,12 @@ function Card({ titulo, filtro, leyenda, children }: { titulo: string; filtro?: 
 
 function Tile({ label, value, color, destacado }: { label: string; value: string; color: string; destacado?: boolean }) {
   return (
-    <div className={`rounded-lg p-4 ${destacado ? "bg-slate-900" : "bg-slate-50"}`}>
-      <div className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
-        <p className={`text-xs font-medium ${destacado ? "text-slate-300" : "text-slate-500"}`}>{label}</p>
+    <div className={`rounded-xl p-5 ${destacado ? "bg-slate-900" : "bg-slate-50"}`}>
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
+        <p className={`text-sm font-medium ${destacado ? "text-slate-300" : "text-slate-500"}`}>{label}</p>
       </div>
-      <p className={`mt-1 text-lg font-bold ${destacado ? "text-white" : "text-slate-900"}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-bold tracking-tight sm:text-3xl ${destacado ? "text-white" : "text-slate-900"}`}>{value}</p>
     </div>
   );
 }

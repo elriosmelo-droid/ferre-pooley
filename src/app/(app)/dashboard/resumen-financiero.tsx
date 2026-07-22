@@ -213,12 +213,12 @@ export function ResumenFinanciero({
   ];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-6 py-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-6 py-5">
+        <h2 className="text-lg font-bold text-slate-900">
           Resumen financiero (SII)
         </h2>
-        <div className="flex items-center gap-4 text-xs text-slate-600">
+        <div className="flex items-center gap-4 text-sm text-slate-600">
           <span className="flex items-center gap-1.5">
             <span
               className="h-2.5 w-2.5 rounded-sm"
@@ -282,12 +282,12 @@ export function ResumenFinanciero({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((kpi) => (
-            <div key={kpi.label} className="rounded-lg bg-slate-50 p-4">
+            <div key={kpi.label} className="rounded-xl bg-slate-50 p-5">
               <p className="text-sm font-medium text-slate-500">{kpi.label}</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">
+              <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                 {kpi.value}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{kpi.detail}</p>
+              <p className="mt-1.5 text-xs text-slate-500">{kpi.detail}</p>
             </div>
           ))}
         </div>
@@ -304,7 +304,7 @@ export function ResumenFinanciero({
                   Sin notas conciliadas en el período (nada que graficar por día).
                 </p>
               ) : (
-                <div className="flex h-44 items-end gap-1">
+                <div className="flex h-56 items-end gap-1">
                   {resumen.diasMargen.map((f) => {
                     const margen = f.margenVenta - f.margenCosto;
                     const hVenta = Math.round((f.margenVenta / maxMargenVenta) * 100);

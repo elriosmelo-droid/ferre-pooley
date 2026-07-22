@@ -145,7 +145,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
 
       {hayErrores && (
         <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -157,13 +157,15 @@ export default async function DashboardPage() {
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-xl border border-slate-200 bg-white p-6"
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
           >
-            <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {stat.label}
+            </p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
               {stat.value}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{stat.detail}</p>
+            <p className="mt-1.5 text-xs text-slate-500">{stat.detail}</p>
           </div>
         ))}
       </div>
