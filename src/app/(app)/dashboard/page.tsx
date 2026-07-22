@@ -113,7 +113,7 @@ export default async function DashboardPage() {
       detail: "Neto facturado este mes (NC restan)",
     },
     {
-      label: "Ventas del mes",
+      label: "Venta del mes pagada",
       value: formatCLP(cobradoMes),
       detail: "Neto ya cobrado de facturas del mes",
     },
