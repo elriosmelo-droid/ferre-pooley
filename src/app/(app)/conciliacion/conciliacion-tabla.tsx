@@ -28,21 +28,38 @@ export type ConciliacionRow = {
   estadoConc: string;
 };
 
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function etiquetaMes(clave: string): string {
+  const [anio, mes] = clave.split("-").map(Number);
+  return `${MESES[mes - 1]} ${anio}`;
+}
+
 export function ConciliacionTabla({ filas }: { filas: ConciliacionRow[] }) {
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("");
+  const [mes, setMes] = useState("");
+
+  // Meses presentes (por fecha de creación de la nota), más reciente primero.
+  const meses = useMemo(
+    () =>
+      Array.from(new Set(filas.map((f) => f.created_at.slice(0, 7)))).sort((a, b) =>
+        b.localeCompare(a)
+      ),
+    [filas]
+  );
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return filas.filter((f) => {
       if (estado && f.estadoConc !== estado) return false;
+      if (mes && f.created_at.slice(0, 7) !== mes) return false;
       if (q) {
         const hay = `${f.folio} ${f.clientes?.nombre ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [filas, busqueda, estado]);
+  }, [filas, busqueda, estado, mes]);
 
   const totalNota = filtradas.reduce((sum, f) => sum + f.total, 0);
   const totalFacturado = filtradas.reduce((sum, f) => sum + f.facturado, 0);
@@ -64,6 +81,21 @@ export function ConciliacionTabla({ filas }: { filas: ConciliacionRow[] }) {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Mes
+          <select
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Todos</option>
+            {meses.map((m) => (
+              <option key={m} value={m}>
+                {etiquetaMes(m)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
           Estado
           <select
             value={estado}
@@ -76,12 +108,13 @@ export function ConciliacionTabla({ filas }: { filas: ConciliacionRow[] }) {
             <option value="sin-factura">Sin factura</option>
           </select>
         </label>
-        {(busqueda || estado) && (
+        {(busqueda || estado || mes) && (
           <button
             type="button"
             onClick={() => {
               setBusqueda("");
               setEstado("");
+              setMes("");
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
