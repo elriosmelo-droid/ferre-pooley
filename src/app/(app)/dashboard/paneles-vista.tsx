@@ -233,7 +233,7 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
             {ticks.map((t, i) => (
               <g key={i}>
                 <line x1={padL} y1={yFor(t)} x2={W - padR} y2={yFor(t)} stroke="#e2e8f0" strokeWidth={1} />
-                <text x={padL - 8} y={yFor(t) + 3} textAnchor="end" fontSize="10" fill="#94a3b8">{clpCorto(Math.round(t))}</text>
+                <text x={padL - 8} y={yFor(t) + 3} textAnchor="end" fontSize="11" fill="#64748b">{clpCorto(Math.round(t))}</text>
               </g>
             ))}
             <line x1={padL} y1={yFor(0)} x2={W - padR} y2={yFor(0)} stroke="#cbd5e1" strokeWidth={1} />
@@ -255,7 +255,7 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
               return (
                 <g key={r.fecha}>
                   {(i % paso === 0 || i === filas.length - 1) && (
-                    <text x={x} y={H - 10} textAnchor="middle" fontSize="10" fill="#94a3b8">{dia}</text>
+                    <text x={x} y={H - 10} textAnchor="middle" fontSize="11.5" fill="#64748b">{dia}</text>
                   )}
                   {series.map((s) =>
                     s.cant(r) > 0 ? (

@@ -340,7 +340,7 @@ export function ResumenFinanciero({
                           )}
                           {hVenta === 0 && <div className="w-full border-b-2 border-slate-200" />}
                         </div>
-                        <span className="text-[10px] text-slate-500">{Number(f.clave.slice(8, 10))}</span>
+                        <span className="text-xs font-medium text-slate-600">{Number(f.clave.slice(8, 10))}</span>
                       </div>
                     );
                   })}
