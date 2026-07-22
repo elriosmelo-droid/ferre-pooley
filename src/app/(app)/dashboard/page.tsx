@@ -81,7 +81,11 @@ export default async function DashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("estado", "aceptada")
       .gte("respondida_at", inicioMes),
-    supabase.from("notas_venta").select("total").eq("estado", "pendiente"),
+    // Neto (sin IVA): se aliasa subtotal_neto como total para reusar sumarTotales.
+    supabase
+      .from("notas_venta")
+      .select("total:subtotal_neto")
+      .eq("estado", "pendiente"),
     // Ventas del mes: notas pagadas cuya FACTURA del SII se emitió este mes. Se
     // fecha por la emisión de la factura vinculada (ventas_sii.fecha_emision),
     // NO por cuándo entró el pago ni cuándo se creó la nota. Así una nota pagada
@@ -127,7 +131,7 @@ export default async function DashboardPage() {
     {
       label: "Por cobrar",
       value: formatCLP(sumarTotales(porCobrarResult.data)),
-      detail: "Notas de venta pendientes de pago",
+      detail: "Neto de notas de venta pendientes de pago",
     },
     {
       label: "Ventas del mes",
