@@ -21,6 +21,7 @@ export type NotaConciliada = {
   fecha: string; // 'AAAA-MM-DD' (creación, hora de Chile)
   venta: number; // neto sin flete
   costo: number;
+  pagada: boolean; // la nota ya está pagada
 };
 
 const MESES_CORTOS = [
@@ -134,6 +135,10 @@ export function ResumenFinanciero({
     let margenVenta = 0;
     let margenCosto = 0;
     let nNotas = 0;
+    // Solo notas conciliadas ya pagadas.
+    let margenVentaPag = 0;
+    let margenCostoPag = 0;
+    let nNotasPag = 0;
 
     for (const v of ventas) {
       if (!enRango(v.fecha)) continue;
@@ -152,6 +157,11 @@ export function ResumenFinanciero({
       margenVenta += n.venta;
       margenCosto += n.costo;
       nNotas += 1;
+      if (n.pagada) {
+        margenVentaPag += n.venta;
+        margenCostoPag += n.costo;
+        nNotasPag += 1;
+      }
       const agg = mes(n.fecha);
       agg.margenVenta += n.venta;
       agg.margenCosto += n.costo;
@@ -175,6 +185,9 @@ export function ResumenFinanciero({
       margen: margenVenta - margenCosto,
       margenVenta,
       nNotas,
+      margenPagado: margenVentaPag - margenCostoPag,
+      margenVentaPag,
+      nNotasPag,
       filas,
       diasMargen,
     };
@@ -209,6 +222,11 @@ export function ResumenFinanciero({
       label: "Margen conciliado",
       value: `${formatCLP(resumen.margen)} (${pct(resumen.margen, resumen.margenVenta)})`,
       detail: `${resumen.nNotas} nota${resumen.nNotas === 1 ? "" : "s"} con factura SII · sin flete`,
+    },
+    {
+      label: "Margen conciliado pagado",
+      value: `${formatCLP(resumen.margenPagado)} (${pct(resumen.margenPagado, resumen.margenVentaPag)})`,
+      detail: `${resumen.nNotasPag} nota${resumen.nNotasPag === 1 ? "" : "s"} conciliada${resumen.nNotasPag === 1 ? "" : "s"} ya pagada${resumen.nNotasPag === 1 ? "" : "s"}`,
     },
   ];
 
@@ -280,7 +298,7 @@ export function ResumenFinanciero({
           </label>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {kpis.map((kpi) => (
             <div key={kpi.label} className="rounded-xl bg-slate-50 p-5">
               <p className="text-sm font-medium text-slate-500">{kpi.label}</p>

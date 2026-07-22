@@ -10,6 +10,7 @@ import {
 type NotaMargen = {
   id: string;
   created_at: string;
+  estado: string;
   nota_venta_items: {
     cantidad: number;
     costo: number;
@@ -43,7 +44,7 @@ export async function Margenes() {
     supabase
       .from("notas_venta")
       .select(
-        `id, created_at,
+        `id, created_at, estado,
          nota_venta_items(cantidad, costo, precio, descuento),
          ventas_sii(id, tipo_doc)`
       )
@@ -87,7 +88,12 @@ export async function Margenes() {
         venta += item.cantidad * precioNeto;
         costo += item.cantidad * item.costo;
       }
-      return { fecha: diaChile(n.created_at), venta, costo };
+      return {
+        fecha: diaChile(n.created_at),
+        venta,
+        costo,
+        pagada: n.estado === "pagada",
+      };
     });
 
   return (
