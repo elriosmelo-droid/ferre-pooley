@@ -40,71 +40,42 @@ function sumarVentaNeta(
   );
 }
 
-type NotaEmbed = { id: string; subtotal_neto: number; estado: string };
-type VentaConNota = {
-  notas_venta: NotaEmbed | NotaEmbed[] | null;
+type VentaMesRow = {
+  tipo_doc: number;
+  monto_neto: number;
+  monto_exento: number;
+  notas_venta: { estado: string } | { estado: string }[] | null;
 };
 
-// Suma el NETO (sin IVA) de las notas PAGADAS vinculadas a las facturas dadas,
-// sin duplicar una nota que aparezca en más de una factura.
-function sumarNotasPagadas(rows: VentaConNota[] | null): number {
-  const vistos = new Set<string>();
-  let total = 0;
-  for (const r of rows ?? []) {
-    const n = Array.isArray(r.notas_venta) ? r.notas_venta[0] : r.notas_venta;
-    if (!n || n.estado !== "pagada" || vistos.has(n.id)) continue;
-    vistos.add(n.id);
-    total += n.subtotal_neto ?? 0;
-  }
-  return total;
+function estadoNotaVenta(r: VentaMesRow): string | null {
+  const n = Array.isArray(r.notas_venta) ? r.notas_venta[0] : r.notas_venta;
+  return n?.estado ?? null;
 }
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
   const ahora = new Date();
-  const inicioMes = new Date(
-    ahora.getFullYear(),
-    ahora.getMonth(),
-    1
-  ).toISOString();
   // Primer día del mes en curso como fecha ('AAAA-MM-01') para comparar contra
-  // ventas_sii.fecha_emision (columna date).
+  // fecha_emision (columna date).
   const inicioMesFecha = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-01`;
 
   const [
-    enviadasResult,
-    aceptadasMesResult,
-    montoMesResult,
     ventasMesResult,
+    comprasMesResult,
     ultimasCotizacionesResult,
     ultimasNotasResult,
   ] = await Promise.all([
-    supabase
-      .from("cotizaciones")
-      .select("id", { count: "exact", head: true })
-      .eq("estado", "enviada"),
-    supabase
-      .from("cotizaciones")
-      .select("id", { count: "exact", head: true })
-      .eq("estado", "aceptada")
-      .gte("respondida_at", inicioMes),
-    // Monto venta del mes: neto de las facturas de venta del SII emitidas este
-    // mes (NC restan). Por fecha de emisión.
+    // Ventas del SII emitidas este mes + estado de la nota vinculada.
     supabase
       .from("ventas_sii")
+      .select("tipo_doc, monto_neto, monto_exento, notas_venta(estado)")
+      .gte("fecha_emision", inicioMesFecha),
+    // Compras del SII recibidas (emitidas) este mes.
+    supabase
+      .from("compras_sii")
       .select("tipo_doc, monto_neto, monto_exento")
       .gte("fecha_emision", inicioMesFecha),
-    // Ventas del mes: notas pagadas cuya FACTURA del SII se emitió este mes. Se
-    // fecha por la emisión de la factura vinculada (ventas_sii.fecha_emision),
-    // NO por cuándo entró el pago ni cuándo se creó la nota. Así una nota pagada
-    // de una factura de otro período no cuenta acá.
-    supabase
-      .from("ventas_sii")
-      .select("notas_venta(id, subtotal_neto, estado)")
-      .in("tipo_doc", [33, 34])
-      .gte("fecha_emision", inicioMesFecha)
-      .not("nota_venta_id", "is", null),
     supabase
       .from("cotizaciones")
       .select("id, folio, total, estado, clientes(nombre)")
@@ -118,36 +89,43 @@ export default async function DashboardPage() {
   ]);
 
   const hayErrores = [
-    enviadasResult,
-    aceptadasMesResult,
-    montoMesResult,
     ventasMesResult,
+    comprasMesResult,
     ultimasCotizacionesResult,
     ultimasNotasResult,
   ].some((r) => r.error);
 
+  const ventasMes = (ventasMesResult.data ?? []) as unknown as VentaMesRow[];
+  const montoVentaMes = sumarVentaNeta(ventasMes);
+  // Cobrado = facturas del mes cuya nota vinculada está pagada. Por cobrar = el
+  // resto (facturas sin nota o con nota pendiente). Todo neto, NC restan.
+  const cobradoMes = sumarVentaNeta(
+    ventasMes.filter((r) => estadoNotaVenta(r) === "pagada")
+  );
+  const porCobrarMes = montoVentaMes - cobradoMes;
+  // Por pagar = neto de las compras del mes (no se registra pago de compras).
+  const porPagarMes = sumarVentaNeta(comprasMesResult.data);
+
   const stats = [
     {
-      label: "Cotizaciones enviadas",
-      value: String(enviadasResult.count ?? 0),
-      detail: "Esperando respuesta del cliente",
-    },
-    {
-      label: "Aceptadas este mes",
-      value: String(aceptadasMesResult.count ?? 0),
-      detail: "Cotizaciones aceptadas",
-    },
-    {
       label: "Monto venta del mes",
-      value: formatCLP(sumarVentaNeta(montoMesResult.data)),
+      value: formatCLP(montoVentaMes),
       detail: "Neto facturado este mes (NC restan)",
     },
     {
       label: "Ventas del mes",
-      value: formatCLP(
-        sumarNotasPagadas(ventasMesResult.data as unknown as VentaConNota[])
-      ),
-      detail: "Neto de facturas emitidas este mes con nota pagada",
+      value: formatCLP(cobradoMes),
+      detail: "Neto ya cobrado de facturas del mes",
+    },
+    {
+      label: "Por cobrar del mes",
+      value: formatCLP(porCobrarMes),
+      detail: "Ventas del mes aún sin pagar (neto)",
+    },
+    {
+      label: "Por pagar del mes",
+      value: formatCLP(porPagarMes),
+      detail: "Neto de compras del mes (NC restan)",
     },
   ];
 
