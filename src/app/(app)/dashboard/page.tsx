@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/money";
+import { signoDte } from "@/lib/dte-doc";
 import {
   EstadoBadge,
   type CotizacionEstado,
@@ -28,8 +29,15 @@ type NotaVentaResumen = {
   clientes: { nombre: string } | null;
 };
 
-function sumarTotales(rows: { total: number }[] | null) {
-  return (rows ?? []).reduce((acc, row) => acc + row.total, 0);
+// Monto neto (sin IVA) de ventas del mes: facturas suman, NC restan.
+function sumarVentaNeta(
+  rows: { tipo_doc: number; monto_neto: number; monto_exento: number }[] | null
+): number {
+  return (rows ?? []).reduce(
+    (acc, r) =>
+      acc + signoDte(r.tipo_doc) * ((r.monto_neto ?? 0) + (r.monto_exento ?? 0)),
+    0
+  );
 }
 
 type NotaEmbed = { id: string; subtotal_neto: number; estado: string };
@@ -67,7 +75,7 @@ export default async function DashboardPage() {
   const [
     enviadasResult,
     aceptadasMesResult,
-    porCobrarResult,
+    montoMesResult,
     ventasMesResult,
     ultimasCotizacionesResult,
     ultimasNotasResult,
@@ -81,11 +89,12 @@ export default async function DashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("estado", "aceptada")
       .gte("respondida_at", inicioMes),
-    // Neto (sin IVA): se aliasa subtotal_neto como total para reusar sumarTotales.
+    // Monto venta del mes: neto de las facturas de venta del SII emitidas este
+    // mes (NC restan). Por fecha de emisión.
     supabase
-      .from("notas_venta")
-      .select("total:subtotal_neto")
-      .eq("estado", "pendiente"),
+      .from("ventas_sii")
+      .select("tipo_doc, monto_neto, monto_exento")
+      .gte("fecha_emision", inicioMesFecha),
     // Ventas del mes: notas pagadas cuya FACTURA del SII se emitió este mes. Se
     // fecha por la emisión de la factura vinculada (ventas_sii.fecha_emision),
     // NO por cuándo entró el pago ni cuándo se creó la nota. Así una nota pagada
@@ -111,7 +120,7 @@ export default async function DashboardPage() {
   const hayErrores = [
     enviadasResult,
     aceptadasMesResult,
-    porCobrarResult,
+    montoMesResult,
     ventasMesResult,
     ultimasCotizacionesResult,
     ultimasNotasResult,
@@ -129,9 +138,9 @@ export default async function DashboardPage() {
       detail: "Cotizaciones aceptadas",
     },
     {
-      label: "Notas de venta activas",
-      value: String(porCobrarResult.data?.length ?? 0),
-      detail: `${formatCLP(sumarTotales(porCobrarResult.data))} neto por cobrar`,
+      label: "Monto venta del mes",
+      value: formatCLP(sumarVentaNeta(montoMesResult.data)),
+      detail: "Neto facturado este mes (NC restan)",
     },
     {
       label: "Ventas del mes",
