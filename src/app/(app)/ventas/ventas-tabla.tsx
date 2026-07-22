@@ -13,6 +13,8 @@ export type VentaRow = {
   razon_social: string | null;
   folio: string;
   fecha_emision: string | null;
+  monto_neto: number;
+  monto_exento: number;
   monto_total: number;
   forma_pago: number | null;
   term_pago_dias: number | null;
@@ -48,9 +50,13 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
     });
   }, [ventas, desde, hasta, cliente, tipo]);
 
-  // Total neto: facturas suman, notas de crédito restan.
+  // Totales: facturas suman, notas de crédito restan.
   const total = filtradas.reduce(
     (sum, v) => sum + signoDte(v.tipo_doc) * v.monto_total,
+    0
+  );
+  const totalNeto = filtradas.reduce(
+    (sum, v) => sum + signoDte(v.tipo_doc) * (v.monto_neto + v.monto_exento),
     0
   );
   const tipos = Array.from(new Set(ventas.map((v) => v.tipo_doc))).sort((a, b) => a - b);
@@ -111,6 +117,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
               <th className="px-4 py-3">Plazo</th>
               <th className="px-4 py-3">Vencimiento</th>
               <th className="px-4 py-3">Nota de venta</th>
+              <th className="px-4 py-3 text-right">Neto</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-center">PDF</th>
             </tr>
@@ -118,7 +125,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
                   No hay ventas que coincidan con los filtros.
                 </td>
               </tr>
@@ -167,6 +174,10 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                       <span className="text-slate-400">Sin vincular</span>
                     )}
                   </td>
+                  <td className={`px-4 py-3 text-right ${esNotaCredito(v.tipo_doc) ? "text-amber-700" : "text-slate-700"}`}>
+                    {esNotaCredito(v.tipo_doc) ? "-" : ""}
+                    {formatCLP(v.monto_neto + v.monto_exento)}
+                  </td>
                   <td className={`px-4 py-3 text-right font-medium ${esNotaCredito(v.tipo_doc) ? "text-amber-700" : "text-slate-900"}`}>
                     {esNotaCredito(v.tipo_doc) ? "-" : ""}
                     {formatCLP(v.monto_total)}
@@ -191,6 +202,7 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
                 <td className="px-4 py-3" colSpan={8}>
                   {filtradas.length} venta{filtradas.length === 1 ? "" : "s"}
                 </td>
+                <td className="px-4 py-3 text-right">{formatCLP(totalNeto)}</td>
                 <td className="px-4 py-3 text-right">{formatCLP(total)}</td>
                 <td className="px-4 py-3" />
               </tr>

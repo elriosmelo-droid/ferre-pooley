@@ -25,28 +25,37 @@ export default async function ConciliacionPage() {
       .select("id, folio, total, estado, created_at, clientes(nombre)")
       .neq("estado", "anulada")
       .order("created_at", { ascending: false }),
-    supabase.from("ventas_sii").select("nota_venta_id, monto_total, tipo_doc"),
+    supabase
+      .from("ventas_sii")
+      .select("nota_venta_id, monto_total, tipo_doc, fecha_emision"),
   ]);
 
   const notas = (notasData ?? []) as unknown as NotaRow[];
 
-  const agg = new Map<string, { facturado: number; n: number }>();
+  const agg = new Map<string, { facturado: number; n: number; fem: string | null }>();
   for (const v of ventasData ?? []) {
     if (!v.nota_venta_id) continue;
-    const a = agg.get(v.nota_venta_id) ?? { facturado: 0, n: 0 };
+    const a = agg.get(v.nota_venta_id) ?? { facturado: 0, n: 0, fem: null };
     // Facturas suman, notas de crédito restan.
     a.facturado += signoDte(v.tipo_doc) * (v.monto_total ?? 0);
     a.n += 1;
+    // Fecha de referencia = emisión más antigua de sus facturas (33/34).
+    if ((v.tipo_doc === 33 || v.tipo_doc === 34) && v.fecha_emision) {
+      const d = String(v.fecha_emision).slice(0, 10);
+      if (!a.fem || d < a.fem) a.fem = d;
+    }
     agg.set(v.nota_venta_id, a);
   }
 
   const filas: ConciliacionRow[] = notas.map((n) => {
-    const a = agg.get(n.id) ?? { facturado: 0, n: 0 };
+    const a = agg.get(n.id) ?? { facturado: 0, n: 0, fem: null };
     return {
       ...n,
       facturado: a.facturado,
       nFacturas: a.n,
       estadoConc: clasificar(n.total, a.facturado, a.n),
+      // Para el filtro por mes: emisión de la factura, o creación si no tiene.
+      fechaRef: a.fem ?? n.created_at.slice(0, 10),
     };
   });
 

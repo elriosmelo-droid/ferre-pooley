@@ -26,6 +26,7 @@ export type ConciliacionRow = {
   facturado: number;
   nFacturas: number;
   estadoConc: string;
+  fechaRef: string; // 'AAAA-MM-DD' emisión de factura (o creación) para el mes
 };
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -39,10 +40,10 @@ export function ConciliacionTabla({ filas }: { filas: ConciliacionRow[] }) {
   const [estado, setEstado] = useState("");
   const [mes, setMes] = useState("");
 
-  // Meses presentes (por fecha de creación de la nota), más reciente primero.
+  // Meses presentes (por emisión de la factura vinculada), más reciente primero.
   const meses = useMemo(
     () =>
-      Array.from(new Set(filas.map((f) => f.created_at.slice(0, 7)))).sort((a, b) =>
+      Array.from(new Set(filas.map((f) => f.fechaRef.slice(0, 7)))).sort((a, b) =>
         b.localeCompare(a)
       ),
     [filas]
@@ -52,7 +53,7 @@ export function ConciliacionTabla({ filas }: { filas: ConciliacionRow[] }) {
     const q = busqueda.trim().toLowerCase();
     return filas.filter((f) => {
       if (estado && f.estadoConc !== estado) return false;
-      if (mes && f.created_at.slice(0, 7) !== mes) return false;
+      if (mes && f.fechaRef.slice(0, 7) !== mes) return false;
       if (q) {
         const hay = `${f.folio} ${f.clientes?.nombre ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
