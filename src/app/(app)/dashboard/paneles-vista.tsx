@@ -173,13 +173,13 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
       if (!f.enRango(v.fecha)) continue;
       const d = get(v.fecha!.slice(0, 10));
       vCantT += 1;
-      if (v.tipo_doc === 61) { d.ncM += v.total; d.ncC += 1; vNetT -= v.total; } // NC resta
-      else if (v.tipo_doc === 56) { d.ndM += v.total; d.ndC += 1; vNetT += v.total; } // ND suma
-      else { d.facM += v.total; d.facC += 1; vNetT += v.total; }
+      if (v.tipo_doc === 61) { d.ncM += v.neto; d.ncC += 1; vNetT -= v.neto; } // NC resta
+      else if (v.tipo_doc === 56) { d.ndM += v.neto; d.ndC += 1; vNetT += v.neto; } // ND suma
+      else { d.facM += v.neto; d.facC += 1; vNetT += v.neto; }
     }
     for (const c of compras) {
       if (!f.enRango(c.fecha)) continue;
-      const m = signoDte(c.tipo_doc) * c.total;
+      const m = signoDte(c.tipo_doc) * c.neto;
       const d = get(c.fecha!.slice(0, 10));
       d.cM += m; d.cC += 1; cMontoT += m; cCantT += 1;
     }
@@ -273,7 +273,7 @@ function Panel1({ ventas, compras }: { ventas: DocSii[]; compras: DocSii[] }) {
               );
             })}
           </svg>
-          <p className="mt-1 text-xs text-slate-400">Por día y tipo de documento: factura (verde) y N. débito (azul) suman; N. crédito (gris) resta, bajo la línea cero. Pasa el mouse por cada punto.</p>
+          <p className="mt-1 text-xs text-slate-400">Montos netos (sin IVA), por día y tipo de documento: factura (verde) y N. débito (azul) suman; N. crédito (gris) resta, bajo la línea cero. Pasa el mouse por cada punto.</p>
         </div>
       )}
     </Card>
@@ -289,10 +289,10 @@ function Panel2({ ventas }: { ventas: DocSii[] }) {
     let fMonto = 0, fCant = 0, cMonto = 0, cCant = 0, pMonto = 0, pCant = 0;
     for (const v of ventas) {
       if (!f.enRango(v.fecha) || !esFactura(v.tipo_doc)) continue;
-      fMonto += v.total; fCant += 1;
+      fMonto += v.neto; fCant += 1;
       if (v.conciliada) {
-        cMonto += v.total; cCant += 1;
-        if (v.notaEstado === "pagada") { pMonto += v.total; pCant += 1; }
+        cMonto += v.neto; cCant += 1;
+        if (v.notaEstado === "pagada") { pMonto += v.neto; pCant += 1; }
       }
     }
     return { fMonto, fCant, cMonto, cCant, pMonto, pCant };
@@ -325,7 +325,7 @@ function Panel2({ ventas }: { ventas: DocSii[] }) {
           </div>
         ))}
       </div>
-      <p className="text-xs text-slate-400">Por emisión de la factura: facturas de venta (33/34) → conciliadas con una nota → esa nota ya pagada. Es un embudo (cada una ⊆ la anterior).</p>
+      <p className="text-xs text-slate-400">Montos netos (sin IVA). Por emisión de la factura: facturas de venta (33/34) → conciliadas con una nota → esa nota ya pagada. Es un embudo (cada una ⊆ la anterior).</p>
     </Card>
   );
 }

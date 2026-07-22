@@ -32,12 +32,13 @@ function sumarTotales(rows: { total: number }[] | null) {
   return (rows ?? []).reduce((acc, row) => acc + row.total, 0);
 }
 
+type NotaEmbed = { id: string; subtotal_neto: number; estado: string };
 type VentaConNota = {
-  notas_venta: { id: string; total: number; estado: string } | { id: string; total: number; estado: string }[] | null;
+  notas_venta: NotaEmbed | NotaEmbed[] | null;
 };
 
-// Suma el total de las notas PAGADAS vinculadas a las facturas dadas, sin
-// duplicar una nota que aparezca en más de una factura.
+// Suma el NETO (sin IVA) de las notas PAGADAS vinculadas a las facturas dadas,
+// sin duplicar una nota que aparezca en más de una factura.
 function sumarNotasPagadas(rows: VentaConNota[] | null): number {
   const vistos = new Set<string>();
   let total = 0;
@@ -45,7 +46,7 @@ function sumarNotasPagadas(rows: VentaConNota[] | null): number {
     const n = Array.isArray(r.notas_venta) ? r.notas_venta[0] : r.notas_venta;
     if (!n || n.estado !== "pagada" || vistos.has(n.id)) continue;
     vistos.add(n.id);
-    total += n.total ?? 0;
+    total += n.subtotal_neto ?? 0;
   }
   return total;
 }
@@ -87,7 +88,7 @@ export default async function DashboardPage() {
     // de una factura de otro período no cuenta acá.
     supabase
       .from("ventas_sii")
-      .select("notas_venta(id, total, estado)")
+      .select("notas_venta(id, subtotal_neto, estado)")
       .in("tipo_doc", [33, 34])
       .gte("fecha_emision", inicioMesFecha)
       .not("nota_venta_id", "is", null),
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
       value: formatCLP(
         sumarNotasPagadas(ventasMesResult.data as unknown as VentaConNota[])
       ),
-      detail: "Facturas emitidas este mes con nota pagada",
+      detail: "Neto de facturas emitidas este mes con nota pagada",
     },
   ];
 
