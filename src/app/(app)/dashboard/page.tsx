@@ -129,9 +129,9 @@ export default async function DashboardPage() {
       detail: "Cotizaciones aceptadas",
     },
     {
-      label: "Por cobrar",
-      value: formatCLP(sumarTotales(porCobrarResult.data)),
-      detail: "Neto de notas de venta pendientes de pago",
+      label: "Notas de venta activas",
+      value: String(porCobrarResult.data?.length ?? 0),
+      detail: `${formatCLP(sumarTotales(porCobrarResult.data))} neto por cobrar`,
     },
     {
       label: "Ventas del mes",
