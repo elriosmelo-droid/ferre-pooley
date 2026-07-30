@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sincronizarCompras } from "@/lib/sii/sync";
 import { precachearComprasPdf } from "@/lib/sii/precache-compras";
-import {
-  esFormaPagoCompra,
-  normalizarFormasPago,
-} from "@/lib/forma-pago-compra";
+import { normalizarItemsPago } from "@/lib/forma-pago-compra";
 
 export type ActualizarComprasResult = {
   error?: string;
@@ -44,23 +41,27 @@ export async function actualizarCompras(): Promise<ActualizarComprasResult> {
 
 export type SetFormaPagoResult = { error?: string };
 
-// Guarda las formas de pago de una compra (puede tener varias, ej. cheque +
-// débito). Dato manual y opcional: arreglo vacío la deja en "sin asignar". No
-// usa el service role: la RLS por membresía ya gatea el acceso.
+// Guarda las formas de pago de una compra con su monto (puede tener varias, ej.
+// cheque + débito). Dato manual y opcional: lista vacía la deja en "sin asignar".
+// No usa el service role: la RLS por membresía ya gatea el acceso.
+//
+// Se normaliza en el server además del cliente: descarta formas desconocidas,
+// deduplica y recorta montos negativos. La suma NO se valida contra el total del
+// documento a propósito — se avisa en pantalla, pero un pago parcial o un
+// redondeo del proveedor son casos legítimos y bloquear el guardado obligaría a
+// falsear el dato.
 export async function setFormasPagoCompra(
   id: string,
-  valores: string[]
+  items: unknown
 ): Promise<SetFormaPagoResult> {
-  const invalida = valores.find((v) => !esFormaPagoCompra(v));
-  if (invalida !== undefined) {
-    return { error: `Forma de pago no válida: ${invalida}` };
-  }
-  const formas = normalizarFormasPago(valores);
+  const normalizados = normalizarItemsPago(items);
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("compras_sii")
-    .update({ forma_pago: formas.length === 0 ? null : formas })
+    .update({
+      formas_pago: normalizados.length === 0 ? null : normalizados,
+    })
     .eq("id", id);
 
   if (error) {

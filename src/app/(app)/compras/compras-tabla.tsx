@@ -5,7 +5,14 @@ import { formatCLP } from "@/lib/money";
 import {
   FORMAS_PAGO_COMPRA,
   FORMA_PAGO_COMPRA_LABEL,
-  etiquetaFormasPago,
+  etiquetaItemsPago,
+  normalizarItemsPago,
+  formasDe,
+  sumaMontos,
+  admitePlazo,
+  vencimientoDesde,
+  type FormaPagoCompra,
+  type FormaPagoItem,
 } from "@/lib/forma-pago-compra";
 import { setFormasPagoCompra } from "./actions";
 
@@ -26,9 +33,9 @@ export type CompraRow = {
   monto_neto: number;
   monto_iva: number;
   monto_total: number;
-  // Dato manual y opcional; una compra puede tener varias formas de pago.
-  // null o vacío = sin asignar.
-  forma_pago: string[] | null;
+  // Dato manual y opcional; una compra puede tener varias formas de pago, cada
+  // una con su monto. null o vacío = sin asignar.
+  formas_pago: unknown;
 };
 
 // "Sin asignar" es un filtro útil por sí mismo: son las compras que faltan
@@ -49,27 +56,63 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const [pago, setPago] = useState("");
   // Las formas de pago viven en el estado del padre, no en cada celda: si no, al
   // cambiarlas el filtro seguiría viendo el valor viejo.
-  const [formas, setFormas] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(compras.map((c) => [c.id, c.forma_pago ?? []]))
+  const [items, setItems] = useState<Record<string, FormaPagoItem[]>>(() =>
+    Object.fromEntries(
+      compras.map((c) => [c.id, normalizarItemsPago(c.formas_pago)])
+    )
   );
   const [guardando, setGuardando] = useState<string | null>(null);
+  // Edición local: con montos de por medio no se guarda en cada tecla, así que la
+  // celda trabaja sobre un borrador hasta que se confirma.
   const [editando, setEditando] = useState<string | null>(null);
+  const [borrador, setBorrador] = useState<FormaPagoItem[]>([]);
   const [, startGuardar] = useTransition();
 
-  // Marca o desmarca una forma en una compra y guarda de inmediato.
-  function toggleFormaPago(id: string, forma: string) {
-    const anterior = formas[id] ?? [];
-    const siguiente = anterior.includes(forma)
-      ? anterior.filter((f) => f !== forma)
-      : [...anterior, forma];
-    // Optimista: la casilla responde al instante y se revierte si el server falla.
-    setFormas((prev) => ({ ...prev, [id]: siguiente }));
+  function abrirEdicion(id: string) {
+    setEditando(id);
+    setBorrador(items[id] ?? []);
+  }
+
+  function toggleForma(forma: FormaPagoCompra) {
+    setBorrador((prev) =>
+      prev.some((i) => i.forma === forma)
+        ? prev.filter((i) => i.forma !== forma)
+        : [...prev, { forma, monto: null, plazo_dias: null }]
+    );
+  }
+
+  // Solo dígitos: vacío queda en null para poder borrar el campo.
+  function soloEntero(texto: string): number | null {
+    const limpio = texto.replace(/\D/g, "");
+    return limpio === "" ? null : Number(limpio);
+  }
+
+  function setMonto(forma: FormaPagoCompra, texto: string) {
+    const monto = soloEntero(texto);
+    setBorrador((prev) =>
+      prev.map((i) => (i.forma === forma ? { ...i, monto } : i))
+    );
+  }
+
+  function setPlazo(forma: FormaPagoCompra, texto: string) {
+    const plazo_dias = soloEntero(texto);
+    setBorrador((prev) =>
+      prev.map((i) => (i.forma === forma ? { ...i, plazo_dias } : i))
+    );
+  }
+
+  function guardarEdicion(id: string) {
+    const normalizados = normalizarItemsPago(borrador);
+    const anterior = items[id] ?? [];
+    setItems((prev) => ({ ...prev, [id]: normalizados }));
+    setEditando(null);
     setGuardando(id);
     startGuardar(async () => {
-      const res = await setFormasPagoCompra(id, siguiente);
+      const res = await setFormasPagoCompra(id, normalizados);
       setGuardando(null);
       if (res?.error) {
-        setFormas((prev) => ({ ...prev, [id]: anterior }));
+        // Revierte para no dejar en pantalla algo que no quedó guardado.
+        setItems((prev) => ({ ...prev, [id]: anterior }));
         alert(res.error);
       }
     });
@@ -84,9 +127,11 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       if (pago) {
         // Con varias formas por compra, filtrar es "incluye ésta": una compra
         // pagada con cheque + débito aparece al filtrar por cualquiera de las dos.
-        const actual = formas[c.id] ?? [];
+        const actuales = formasDe(items[c.id] ?? []);
         const coincide =
-          pago === SIN_ASIGNAR ? actual.length === 0 : actual.includes(pago);
+          pago === SIN_ASIGNAR
+            ? actuales.length === 0
+            : actuales.includes(pago as FormaPagoCompra);
         if (!coincide) return false;
       }
       if (q) {
@@ -95,7 +140,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       }
       return true;
     });
-  }, [compras, desde, hasta, proveedor, tipo, pago, formas]);
+  }, [compras, desde, hasta, proveedor, tipo, pago, items]);
 
   const totNeto = filtradas.reduce((s, c) => s + c.monto_neto, 0);
   const totIva = filtradas.reduce((s, c) => s + c.monto_iva, 0);
@@ -193,43 +238,119 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                   <td className="px-4 py-3 text-right font-medium text-slate-900">{formatCLP(c.monto_total)}</td>
                   <td className="px-4 py-3 align-top">
                     {editando === c.id ? (
-                      <div className="min-w-40 rounded-md border border-brand-300 bg-white p-2">
-                        {FORMAS_PAGO_COMPRA.map((f) => (
-                          <label
-                            key={f}
-                            className="flex cursor-pointer items-center gap-2 py-0.5 text-sm text-slate-700"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(formas[c.id] ?? []).includes(f)}
-                              disabled={guardando === c.id}
-                              onChange={() => toggleFormaPago(c.id, f)}
-                              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                            />
-                            {FORMA_PAGO_COMPRA_LABEL[f]}
-                          </label>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setEditando(null)}
-                          className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                        >
-                          Listo
-                        </button>
-                      </div>
+                      (() => {
+                        // Los montos solo tienen sentido con más de una forma: con
+                        // una sola, el monto es el total del documento.
+                        const varias = borrador.length > 1;
+                        const suma = sumaMontos(borrador);
+                        const falta = c.monto_total - suma;
+                        return (
+                          <div className="min-w-56 rounded-md border border-brand-300 bg-white p-2">
+                            {FORMAS_PAGO_COMPRA.map((f) => {
+                              const item = borrador.find((i) => i.forma === f);
+                              return (
+                                <div key={f} className="py-0.5">
+                                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={item !== undefined}
+                                      onChange={() => toggleForma(f)}
+                                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                    />
+                                    {FORMA_PAGO_COMPRA_LABEL[f]}
+                                  </label>
+                                  {item !== undefined && (varias || admitePlazo(f)) && (
+                                    <div className="mt-1 ml-6 flex flex-wrap items-center gap-1">
+                                      {varias && (
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={item.monto ?? ""}
+                                          placeholder="Monto"
+                                          aria-label={`Monto pagado con ${FORMA_PAGO_COMPRA_LABEL[f]}`}
+                                          onChange={(e) => setMonto(f, e.target.value)}
+                                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                        />
+                                      )}
+                                      {admitePlazo(f) && (
+                                        <>
+                                          <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={item.plazo_dias ?? ""}
+                                            placeholder="Días"
+                                            aria-label={`Plazo en días de ${FORMA_PAGO_COMPRA_LABEL[f]}`}
+                                            onChange={(e) => setPlazo(f, e.target.value)}
+                                            className="w-16 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                          />
+                                          <span className="text-xs text-slate-500">
+                                            {vencimientoDesde(c.fecha_emision, item.plazo_dias)
+                                              ? `vence ${vencimientoDesde(c.fecha_emision, item.plazo_dias)}`
+                                              : "días"}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {varias && (
+                              <div className="mt-2 border-t border-slate-200 pt-2 text-xs">
+                                <div className="flex justify-between text-slate-500">
+                                  <span>Suma</span>
+                                  <span className="font-medium text-slate-700">
+                                    {formatCLP(suma)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-slate-500">
+                                  <span>Total documento</span>
+                                  <span>{formatCLP(c.monto_total)}</span>
+                                </div>
+                                {falta !== 0 && (
+                                  <p className="mt-1 text-amber-600">
+                                    {falta > 0
+                                      ? `Faltan ${formatCLP(falta)} por asignar`
+                                      : `Se pasa ${formatCLP(-falta)} del total`}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="mt-2 flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => guardarEdicion(c.id)}
+                                className="flex-1 rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditando(null)}
+                                className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setEditando(c.id)}
-                        title="Editar formas de pago (podés marcar varias)"
-                        className={`min-w-32 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${
-                          (formas[c.id] ?? []).length > 0
+                        onClick={() => abrirEdicion(c.id)}
+                        disabled={guardando === c.id}
+                        title="Editar formas de pago (podés marcar varias e indicar el monto de cada una)"
+                        className={`min-w-32 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50 ${
+                          (items[c.id] ?? []).length > 0
                             ? "border-slate-300 text-slate-900"
                             : "border-slate-200 bg-slate-50 text-slate-400"
                         }`}
                       >
-                        {(formas[c.id] ?? []).length > 0
-                          ? etiquetaFormasPago(formas[c.id])
+                        {(items[c.id] ?? []).length > 0
+                          ? etiquetaItemsPago(items[c.id])
                           : "— Sin asignar"}
                       </button>
                     )}

@@ -13,7 +13,7 @@ export default async function ComprasPage() {
   const { data, error } = await supabase
     .from("compras_sii")
     .select(
-      "id, tipo_doc, rut_proveedor, razon_social, folio, fecha_emision, monto_neto, monto_iva, monto_total, forma_pago"
+      "id, tipo_doc, rut_proveedor, razon_social, folio, fecha_emision, monto_neto, monto_iva, monto_total, formas_pago"
     )
     .order("fecha_emision", { ascending: false, nullsFirst: false })
     .order("folio", { ascending: false });
