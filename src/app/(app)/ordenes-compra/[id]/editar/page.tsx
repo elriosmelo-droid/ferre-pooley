@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarOrdenCompra } from "../../actions";
+import { esEstadoEditable } from "../../estados";
 import {
   OrdenCompraForm,
   type OrdenCompraItemInput,
@@ -28,7 +29,7 @@ export default async function EditarOrdenCompraPage({
       supabase
         .from("ordenes_compra")
         .select(
-          `id, proveedor_id, estado, notas, plazo_pago,
+          `id, folio, proveedor_id, estado, notas, plazo_pago,
            orden_compra_items(producto_id, sku, descripcion, cantidad, precio, posicion)`
         )
         .eq("id", id)
@@ -47,9 +48,11 @@ export default async function EditarOrdenCompraPage({
   if (!orden) {
     notFound();
   }
-  if (orden.estado !== "borrador") {
+  // Recibida y cerrada quedan congeladas: ya llegó la mercadería.
+  if (!esEstadoEditable(orden.estado as string)) {
     redirect(`/ordenes-compra/${id}`);
   }
+  const yaEnviada = orden.estado === "enviada";
 
   const items: OrdenCompraItemInput[] = [
     ...(orden.orden_compra_items as unknown as ItemRow[]),
@@ -68,12 +71,14 @@ export default async function EditarOrdenCompraPage({
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">
-        Editar orden de compra
+        Editar orden de compra {orden.folio}
       </h1>
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <OrdenCompraForm
           proveedores={proveedores ?? []}
           productos={productos ?? []}
+          yaEnviada={yaEnviada}
+          folio={orden.folio as string}
           orden={{
             proveedor_id: orden.proveedor_id,
             notas: orden.notas,

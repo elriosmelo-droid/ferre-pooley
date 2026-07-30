@@ -39,6 +39,9 @@ type OrdenCompraFormProps = {
     plazo_pago: string | null;
     items: OrdenCompraItemInput[];
   };
+  // La orden ya se envió al proveedor: se advierte y se exige motivo.
+  yaEnviada?: boolean;
+  folio?: string;
   action: (
     prevState: OrdenCompraFormState,
     formData: FormData
@@ -76,6 +79,8 @@ export function OrdenCompraForm({
   proveedores,
   productos,
   orden,
+  yaEnviada = false,
+  folio,
   action,
 }: OrdenCompraFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
@@ -170,7 +175,37 @@ export function OrdenCompraForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
+    <form
+      action={formAction}
+      onSubmit={(e) => {
+        // Editar una orden enviada modifica un documento que el proveedor ya
+        // tiene: confirmación explícita antes de guardar.
+        if (
+          yaEnviada &&
+          !confirm(
+            `La orden ${folio ?? ""} ya se envió al proveedor. Vas a modificar un documento que él ya recibió.\n\n` +
+              "El cambio queda registrado con tu nombre y el motivo. Después podrás reenviarle el PDF corregido desde el detalle.\n\n" +
+              "¿Guardar los cambios?"
+          )
+        ) {
+          e.preventDefault();
+        }
+      }}
+      className="flex flex-col gap-6"
+    >
+      {yaEnviada && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Esta orden ya fue enviada al proveedor
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            El proveedor tiene el PDF anterior en su correo. Si la corriges,
+            queda registrado quién editó y por qué, y tendrás que reenviarle la
+            versión corregida desde el detalle de la orden.
+          </p>
+        </div>
+      )}
+
       <input
         type="hidden"
         name="items"
@@ -452,6 +487,26 @@ export function OrdenCompraForm({
         <FieldErrors errors={state.fieldErrors?.notas} />
       </div>
 
+      {yaEnviada && (
+        <div className="max-w-2xl">
+          <label htmlFor="motivo" className={labelClass}>
+            Motivo del cambio *
+          </label>
+          <textarea
+            id="motivo"
+            name="motivo"
+            rows={2}
+            required
+            placeholder="Ej: el proveedor corrigió el precio unitario del ítem 2."
+            className={inputClass}
+          />
+          <FieldErrors errors={state.fieldErrors?.motivo} />
+          <p className="mt-1 text-xs text-slate-500">
+            Queda en el historial de la orden junto a tu nombre y la fecha.
+          </p>
+        </div>
+      )}
+
       <div className="max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <dl className="flex flex-col gap-2">
           <div className="flex justify-between text-slate-600">
@@ -477,7 +532,11 @@ export function OrdenCompraForm({
           disabled={isPending}
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
-          {isPending ? "Guardando…" : "Guardar borrador"}
+          {isPending
+            ? "Guardando…"
+            : yaEnviada
+              ? "Guardar cambios"
+              : "Guardar borrador"}
         </button>
         <Link
           href="/ordenes-compra"

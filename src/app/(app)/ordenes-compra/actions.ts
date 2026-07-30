@@ -10,11 +10,12 @@ import { formatCLP } from "@/lib/money";
 import { generarPdfOrdenCompra } from "@/lib/pdf/orden-compra-pdf";
 import { OrdenCompraEmail } from "@/lib/email/orden-compra-email";
 import { enviarCorreoCotizacion } from "@/lib/email/send";
+import { esEstadoEditable } from "./estados";
 
 export type OrdenCompraFormState = {
   error?: string;
   fieldErrors?: Partial<
-    Record<"proveedor_id" | "notas" | "plazo_pago" | "items", string[]>
+    Record<"proveedor_id" | "notas" | "plazo_pago" | "items" | "motivo", string[]>
   >;
 };
 
@@ -146,6 +147,7 @@ export async function actualizarOrdenCompra(
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
+  const motivo = String(formData.get("motivo") ?? "").trim();
 
   const supabase = await createClient();
 
@@ -158,17 +160,25 @@ export async function actualizarOrdenCompra(
   if (readError || !actual) {
     return { error: "No se encontró la orden." };
   }
-  if (actual.estado !== "borrador") {
-    return { error: "Solo se pueden editar borradores" };
+  if (!esEstadoEditable(actual.estado)) {
+    return { error: "Esta orden ya no se puede editar" };
+  }
+  const estadoActual = actual.estado;
+  if (estadoActual === "enviada" && motivo === "") {
+    return {
+      fieldErrors: {
+        motivo: ["Indica qué cambiaste: la orden ya se envió al proveedor"],
+      },
+    };
   }
 
-  // .eq("estado") hace la transición atómica: si otra pestaña ya la envió,
-  // el update no afecta filas y se rechaza.
+  // .eq("estado") hace la transición atómica: si otra pestaña la avanzó
+  // mientras editábamos, el update no afecta filas y se rechaza.
   const { data: updated, error: updateError } = await supabase
     .from("ordenes_compra")
     .update(toOrdenRow(parsed.data))
     .eq("id", id)
-    .eq("estado", "borrador")
+    .eq("estado", estadoActual)
     .select("id");
 
   if (updateError) {
@@ -176,7 +186,9 @@ export async function actualizarOrdenCompra(
     return { error: "No se pudo actualizar la orden. Intenta nuevamente." };
   }
   if (!updated?.length) {
-    return { error: "Solo se pueden editar borradores" };
+    return {
+      error: "La orden cambió de estado mientras la editabas. Recarga la página.",
+    };
   }
 
   const { error: deleteError } = await supabase
@@ -198,6 +210,25 @@ export async function actualizarOrdenCompra(
     return { error: "No se pudieron actualizar los ítems. Intenta nuevamente." };
   }
 
+  // La edición ya quedó guardada: si falla la bitácora lo logueamos, pero no
+  // hacemos fallar la operación (el usuario tendría que reeditar todo).
+  if (estadoActual === "enviada") {
+    const { error: bitacoraError } = await supabase
+      .from("orden_compra_ediciones")
+      .insert({
+        orden_compra_id: id,
+        editado_por: await resolverComprador(supabase),
+        motivo,
+        estado_al_editar: estadoActual,
+      });
+    if (bitacoraError) {
+      console.error(
+        "Error al registrar edición de orden enviada:",
+        bitacoraError.message
+      );
+    }
+  }
+
   revalidatePath("/ordenes-compra");
   revalidatePath(`/ordenes-compra/${id}`);
   redirect(`/ordenes-compra/${id}`);
@@ -205,11 +236,16 @@ export async function actualizarOrdenCompra(
 
 export type EnviarOrdenResult = { error?: string; success?: boolean };
 
-export async function enviarOrdenCompra(
-  id: string
-): Promise<EnviarOrdenResult> {
-  const supabase = await createClient();
-
+// Arma el PDF y despacha el correo al proveedor. Lo comparten el envío inicial
+// (desde borrador) y el reenvío de una orden ya enviada que se corrigió.
+async function despacharCorreoOrden(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  {
+    estadoEsperado,
+    corregida,
+  }: { estadoEsperado: "borrador" | "enviada"; corregida: boolean }
+): Promise<{ error?: string; folio?: string }> {
   const { data: orden, error: readError } = await supabase
     .from("ordenes_compra")
     .select(
@@ -240,8 +276,13 @@ export async function enviarOrdenCompra(
     }[]),
   ].sort((a, b) => a.posicion - b.posicion);
 
-  if (orden.estado !== "borrador") {
-    return { error: "Solo se pueden enviar borradores" };
+  if (orden.estado !== estadoEsperado) {
+    return {
+      error:
+        estadoEsperado === "borrador"
+          ? "Solo se pueden enviar borradores"
+          : "Solo se puede reenviar una orden enviada",
+    };
   }
   if (items.length === 0) {
     return { error: "La orden no tiene ítems" };
@@ -283,12 +324,15 @@ export async function enviarOrdenCompra(
 
     await enviarCorreoCotizacion({
       para: proveedor.correo,
-      asunto: `Orden de compra ${orden.folio} — ${empresa}`,
+      asunto: corregida
+        ? `Orden de compra ${orden.folio} corregida — ${empresa}`
+        : `Orden de compra ${orden.folio} — ${empresa}`,
       react: createElement(OrdenCompraEmail, {
         folio: orden.folio,
         proveedorNombre: proveedor.razon_social || proveedor.rut,
         total: formatCLP(orden.total),
         empresa,
+        corregida,
       }),
       adjuntoPdf: pdf,
       nombreAdjunto: `${orden.folio}.pdf`,
@@ -299,6 +343,22 @@ export async function enviarOrdenCompra(
       error:
         "No se pudo enviar el correo. Revisa la configuración de Resend e intenta de nuevo.",
     };
+  }
+
+  return { folio: orden.folio };
+}
+
+export async function enviarOrdenCompra(
+  id: string
+): Promise<EnviarOrdenResult> {
+  const supabase = await createClient();
+
+  const despacho = await despacharCorreoOrden(supabase, id, {
+    estadoEsperado: "borrador",
+    corregida: false,
+  });
+  if (despacho.error) {
+    return { error: despacho.error };
   }
 
   // El correo ya salió; recién ahora cambiamos el estado. El .eq("estado")
@@ -312,7 +372,7 @@ export async function enviarOrdenCompra(
 
   if (updateError) {
     console.error(
-      `Correo de orden ${orden.folio} enviado pero falló el cambio de estado:`,
+      `Correo de orden ${despacho.folio} enviado pero falló el cambio de estado:`,
       updateError.message
     );
     return {
@@ -322,6 +382,39 @@ export async function enviarOrdenCompra(
   }
   if (!updated?.length) {
     return { error: "La orden ya no es un borrador" };
+  }
+
+  revalidatePath("/ordenes-compra");
+  revalidatePath(`/ordenes-compra/${id}`);
+  return { success: true };
+}
+
+// Reenvía el PDF actualizado al proveedor tras corregir una orden ya enviada.
+// No cambia de estado: sigue "enviada", solo queda la marca de reenvío.
+export async function reenviarOrdenCompra(
+  id: string
+): Promise<EnviarOrdenResult> {
+  const supabase = await createClient();
+
+  const despacho = await despacharCorreoOrden(supabase, id, {
+    estadoEsperado: "enviada",
+    corregida: true,
+  });
+  if (despacho.error) {
+    return { error: despacho.error };
+  }
+
+  const { error: updateError } = await supabase
+    .from("ordenes_compra")
+    .update({ reenviada_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("estado", "enviada");
+
+  if (updateError) {
+    console.error(
+      `Orden ${despacho.folio} reenviada pero falló la marca de reenvío:`,
+      updateError.message
+    );
   }
 
   revalidatePath("/ordenes-compra");

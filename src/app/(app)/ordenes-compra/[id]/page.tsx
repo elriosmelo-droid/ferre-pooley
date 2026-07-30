@@ -5,6 +5,7 @@ import { formatCLP } from "@/lib/money";
 import { marcarRecibida } from "../actions";
 import { EstadoBadge, type OrdenCompraEstado } from "../estado-badge";
 import { EnviarButton } from "./enviar-button";
+import { ReenviarButton } from "./reenviar-button";
 import { CerrarOrdenButton } from "./cerrar-orden-button";
 
 type ItemRow = {
@@ -14,6 +15,13 @@ type ItemRow = {
   cantidad: number;
   precio: number;
   posicion: number;
+};
+
+type EdicionRow = {
+  id: string;
+  editado_por: string | null;
+  motivo: string;
+  created_at: string;
 };
 
 type OrdenDetalle = {
@@ -28,6 +36,7 @@ type OrdenDetalle = {
   plazo_pago: string | null;
   observacion_cierre: string | null;
   enviada_at: string | null;
+  reenviada_at: string | null;
   recibida_at: string | null;
   cerrada_at: string | null;
   created_at: string;
@@ -45,6 +54,18 @@ function formatFechaHora(value: string) {
   });
 }
 
+// En el historial de ediciones importa la hora: puede haber varias el mismo día.
+function formatFechaConHora(value: string) {
+  return new Date(value).toLocaleString("es-CL", {
+    timeZone: "America/Santiago",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default async function DetalleOrdenCompraPage({
   params,
 }: {
@@ -53,27 +74,41 @@ export default async function DetalleOrdenCompraPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("ordenes_compra")
-    .select(
-      `id, folio, estado, comprador, subtotal_neto, iva, total, notas, plazo_pago,
-       observacion_cierre, enviada_at, recibida_at, cerrada_at, created_at,
-       proveedores(razon_social, rut, correo),
-       orden_compra_items(id, sku, descripcion, cantidad, precio, posicion)`
-    )
-    .eq("id", id)
-    .single();
+  const [{ data }, { data: edicionesData }] = await Promise.all([
+    supabase
+      .from("ordenes_compra")
+      .select(
+        `id, folio, estado, comprador, subtotal_neto, iva, total, notas, plazo_pago,
+         observacion_cierre, enviada_at, reenviada_at, recibida_at, cerrada_at, created_at,
+         proveedores(razon_social, rut, correo),
+         orden_compra_items(id, sku, descripcion, cantidad, precio, posicion)`
+      )
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("orden_compra_ediciones")
+      .select("id, editado_por, motivo, created_at")
+      .eq("orden_compra_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (!data) {
     notFound();
   }
 
   const orden = data as unknown as OrdenDetalle;
+  const ediciones = (edicionesData ?? []) as unknown as EdicionRow[];
   const items = [...orden.orden_compra_items].sort(
     (a, b) => a.posicion - b.posicion
   );
   const proveedor = orden.proveedores;
   const recibir = marcarRecibida.bind(null, orden.id);
+  // Se editó después de enviar y todavía no se reenvía el PDF corregido.
+  const ultimaEdicion = ediciones[0];
+  const pendienteReenvio =
+    ultimaEdicion !== undefined &&
+    (orden.reenviada_at === null ||
+      new Date(ultimaEdicion.created_at) > new Date(orden.reenviada_at));
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,32 +126,45 @@ export default async function DetalleOrdenCompraPage({
           >
             Ver PDF
           </a>
-          {orden.estado === "borrador" && (
-            <>
-              <Link
-                href={`/ordenes-compra/${orden.id}/editar`}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                Editar
-              </Link>
-              <EnviarButton ordenId={orden.id} />
-            </>
+          {(orden.estado === "borrador" || orden.estado === "enviada") && (
+            <Link
+              href={`/ordenes-compra/${orden.id}/editar`}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Editar
+            </Link>
           )}
+          {orden.estado === "borrador" && <EnviarButton ordenId={orden.id} />}
           {orden.estado === "enviada" && (
-            <form action={recibir}>
-              <button
-                type="submit"
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-              >
-                Marcar recibida
-              </button>
-            </form>
+            <>
+              <ReenviarButton ordenId={orden.id} destacado={pendienteReenvio} />
+              <form action={recibir}>
+                <button
+                  type="submit"
+                  className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+                >
+                  Marcar recibida
+                </button>
+              </form>
+            </>
           )}
           {orden.estado === "recibida" && (
             <CerrarOrdenButton ordenId={orden.id} />
           )}
         </div>
       </div>
+
+      {pendienteReenvio && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Modificada después de enviarla al proveedor
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            El proveedor tiene la versión anterior. Reenvíale el PDF corregido
+            para que quede con la orden vigente.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -165,6 +213,12 @@ export default async function DetalleOrdenCompraPage({
               <div className="flex justify-between">
                 <dt>Enviada</dt>
                 <dd>{formatFechaHora(orden.enviada_at)}</dd>
+              </div>
+            )}
+            {orden.reenviada_at && (
+              <div className="flex justify-between">
+                <dt>Reenviada</dt>
+                <dd>{formatFechaHora(orden.reenviada_at)}</dd>
               </div>
             )}
             {orden.recibida_at && (
@@ -257,6 +311,30 @@ export default async function DetalleOrdenCompraPage({
           <p className="whitespace-pre-wrap text-sm text-slate-700">
             {orden.notas}
           </p>
+        </div>
+      )}
+
+      {ediciones.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Ediciones después del envío
+          </h2>
+          <ul className="flex flex-col gap-3">
+            {ediciones.map((edicion) => (
+              <li
+                key={edicion.id}
+                className="border-l-2 border-amber-300 pl-3 text-sm"
+              >
+                <p className="text-xs text-slate-500">
+                  {formatFechaConHora(edicion.created_at)}
+                  {edicion.editado_por ? ` · ${edicion.editado_por}` : ""}
+                </p>
+                <p className="mt-0.5 whitespace-pre-wrap text-slate-700">
+                  {edicion.motivo}
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

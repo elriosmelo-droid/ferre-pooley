@@ -12,6 +12,9 @@ export type OrdenCompraEmailProps = {
   proveedorNombre: string;
   total: string;
   empresa: string;
+  // Reenvío de una orden que se editó después de haberla enviado: el proveedor
+  // ya tiene una versión anterior en su correo y hay que avisarle.
+  corregida?: boolean;
 };
 
 export function OrdenCompraEmail({
@@ -19,6 +22,7 @@ export function OrdenCompraEmail({
   proveedorNombre,
   total,
   empresa,
+  corregida = false,
 }: OrdenCompraEmailProps) {
   return (
     <Html lang="es">
@@ -45,10 +49,26 @@ export function OrdenCompraEmail({
             style={{ color: "#0f172a", fontSize: "20px", margin: "0 0 16px" }}
           >
             Orden de compra {folio}
+            {corregida ? " (corregida)" : ""}
           </Heading>
           <Text style={{ color: "#334155", fontSize: "14px", lineHeight: "22px" }}>
             Estimados {proveedorNombre}:
           </Text>
+          {corregida && (
+            <Text
+              style={{
+                backgroundColor: "#fef3c7",
+                borderRadius: "6px",
+                color: "#92400e",
+                fontSize: "14px",
+                lineHeight: "22px",
+                padding: "12px 14px",
+              }}
+            >
+              <strong>Esta orden fue corregida.</strong> Reemplaza la versión
+              que les enviamos antes: por favor consideren solo el PDF adjunto.
+            </Text>
+          )}
           <Text style={{ color: "#334155", fontSize: "14px", lineHeight: "22px" }}>
             Adjuntamos la orden de compra {folio} por un total de{" "}
             <strong>{total}</strong> (IVA incluido). El detalle va en el PDF
