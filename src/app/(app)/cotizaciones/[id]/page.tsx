@@ -6,7 +6,7 @@ import {
   calcularTotales,
   descuentoUnitario,
   calcularMargen,
-  margenPctLinea,
+  markupPctLinea,
   formatPct,
 } from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
@@ -300,7 +300,7 @@ export default async function DetalleCotizacionPage({
                     )}
                     <div className="text-xs text-amber-500">
                       {formatPct(
-                        margenPctLinea(item.precio, item.costo, item.descuento)
+                        markupPctLinea(item.precio, item.costo, item.descuento)
                       )}
                     </div>
                   </td>
@@ -345,18 +345,13 @@ export default async function DetalleCotizacionPage({
           </div>
           <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
             <dt>Margen (interno)</dt>
-            <dd className="font-semibold">{formatCLP(margen.margen)}</dd>
+            <dd className="font-semibold">
+              {formatCLP(margen.margen)} · {formatPct(margen.pctSobreCosto)}
+            </dd>
           </div>
           <div
             className="flex justify-between text-xs text-amber-600"
-            title="El porcentaje que se carga en el formulario: ganancia sobre el costo"
-          >
-            <dt className="pl-3">sobre costo</dt>
-            <dd>{formatPct(margen.pctSobreCosto)}</dd>
-          </div>
-          <div
-            className="flex justify-between text-xs text-amber-600"
-            title="Margen real: ganancia sobre la venta neta, sin flete"
+            title="El mismo margen medido sobre la venta neta en vez del costo"
           >
             <dt className="pl-3">sobre venta</dt>
             <dd>{formatPct(margen.pct)}</dd>

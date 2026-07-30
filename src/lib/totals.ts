@@ -32,6 +32,19 @@ export function margenPctLinea(
   return venta > 0 ? ((venta - costo) / venta) * 100 : 0;
 }
 
+// El mismo margen de la línea expresado sobre el costo (markup): es el número
+// que se carga en el formulario. A diferencia de `markupPctDesdePrecio`, acá sí
+// se descuenta el descuento, para que la fila cuadre con el total del recuadro.
+export function markupPctLinea(
+  precio: number,
+  costo: number,
+  descuento = 0
+): number {
+  if (costo <= 0) return 0;
+  const venta = precio - descuentoUnitario(precio, descuento);
+  return ((venta - costo) / costo) * 100;
+}
+
 // Margen total (interno) de un conjunto de líneas: monto y % sobre la venta.
 // El flete no entra al margen (es un cargo aparte).
 export function calcularMargen(items: ItemMargen[]) {
