@@ -44,7 +44,11 @@ export function calcularMargen(items: ItemMargen[]) {
   }
   const margen = venta - costo;
   const pct = venta > 0 ? (margen / venta) * 100 : 0;
-  return { venta, costo, margen, pct };
+  // El mismo margen expresado sobre el costo (markup): es el número que se
+  // carga en el formulario. Se muestran los dos en el detalle porque no
+  // coinciden y verlos por separado confunde: markup 10% = margen 9,1%.
+  const pctSobreCosto = costo > 0 ? (margen / costo) * 100 : 0;
+  return { venta, costo, margen, pct, pctSobreCosto };
 }
 
 // Formatea un porcentaje con un decimal ("34.2%").

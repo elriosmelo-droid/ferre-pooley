@@ -345,9 +345,21 @@ export default async function DetalleCotizacionPage({
           </div>
           <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
             <dt>Margen (interno)</dt>
-            <dd className="font-semibold">
-              {formatCLP(margen.margen)} · {formatPct(margen.pct)}
-            </dd>
+            <dd className="font-semibold">{formatCLP(margen.margen)}</dd>
+          </div>
+          <div
+            className="flex justify-between text-xs text-amber-600"
+            title="El porcentaje que se carga en el formulario: ganancia sobre el costo"
+          >
+            <dt className="pl-3">sobre costo</dt>
+            <dd>{formatPct(margen.pctSobreCosto)}</dd>
+          </div>
+          <div
+            className="flex justify-between text-xs text-amber-600"
+            title="Margen real: ganancia sobre la venta neta, sin flete"
+          >
+            <dt className="pl-3">sobre venta</dt>
+            <dd>{formatPct(margen.pct)}</dd>
           </div>
         </dl>
       </div>
