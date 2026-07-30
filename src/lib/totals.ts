@@ -52,6 +52,33 @@ export function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
 
+// --- Markup sobre el costo (para cotizar) ---
+//
+// OJO: el markup NO es el mismo número que `margenPctLinea`. El markup mide
+// cuánto se le carga al costo para llegar al precio de lista; el margen mide
+// cuánto queda de la venta. Con costo 1.000 y precio 1.300 el markup es 30% y
+// el margen 23,1%. En el formulario se cotiza con markup (es como se piensa en
+// mostrador); el detalle muestra el margen real.
+//
+// El markup se calcula sobre el precio de LISTA, sin considerar el descuento ni
+// el flete: si además aplicas un descuento, el margen efectivo baja.
+export function markupPctDesdePrecio(
+  precio: number,
+  costo: number
+): number | null {
+  // Sin costo el markup es indefinido (cualquier precio sería markup infinito).
+  if (costo <= 0) return null;
+  return ((precio - costo) / costo) * 100;
+}
+
+export function precioDesdeMarkupPct(
+  costo: number,
+  markupPct: number
+): number | null {
+  if (costo <= 0) return null;
+  return Math.round(costo * (1 + markupPct / 100));
+}
+
 export function calcularTotales(items: ItemCalculable[]) {
   let subtotalBruto = 0;
   let descuento = 0;

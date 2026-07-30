@@ -4,7 +4,12 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { FieldErrors, inputClass, labelClass } from "@/components/form-ui";
 import { formatCLP } from "@/lib/money";
-import { calcularTotales, descuentoUnitario } from "@/lib/totals";
+import {
+  calcularTotales,
+  descuentoUnitario,
+  markupPctDesdePrecio,
+  precioDesdeMarkupPct,
+} from "@/lib/totals";
 import { MEDIOS_PAGO } from "@/lib/medio-pago";
 import type { CotizacionFormState } from "./actions";
 
@@ -73,6 +78,10 @@ type ItemRow = {
   precio: CampoNumerico;
   flete: CampoNumerico;
   descuento: CampoNumerico;
+  // Markup % sobre el costo. Se guarda como TEXTO (no número) porque admite
+  // decimales y estados intermedios de tecleo ("30.", "-") que un number
+  // rompería. No se envía al servidor: el precio ya lo refleja.
+  markup: string;
 };
 
 const aNumero = (v: CampoNumerico) => (v === "" ? 0 : v);
@@ -92,6 +101,37 @@ function parsePorcentaje(valor: string): CampoNumerico {
   return Number.isNaN(n) ? "" : Math.min(100, Math.max(0, n));
 }
 
+// Deja pasar solo lo que puede formar un markup: un signo menos inicial
+// (vender bajo costo es válido), dígitos y un separador decimal. Se conserva el
+// texto crudo para no pelear con el usuario mientras teclea "30." o "-".
+function sanitizarMarkup(valor: string): string {
+  const limpio = valor.replace(",", ".").replace(/[^\d.-]/g, "");
+  const negativo = limpio.startsWith("-");
+  const [entera, ...resto] = limpio.replace(/-/g, "").split(".");
+  const decimal = resto.length > 0 ? `.${resto.join("").slice(0, 1)}` : "";
+  return `${negativo ? "-" : ""}${entera}${decimal}`;
+}
+
+// Número utilizable, o null si el texto todavía no es un número válido
+// ("", "-", "."). Evita recalcular el precio con basura a medio escribir.
+function markupNumero(texto: string): number | null {
+  if (texto === "" || texto === "-" || texto === "." || texto === "-.") {
+    return null;
+  }
+  const n = Number(texto);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Markup derivado que se muestra en el input: entero cuando da redondo, con un
+// decimal cuando no. "" cuando es indefinido (costo 0).
+function formatMarkup(pct: number | null): string {
+  if (pct === null) return "";
+  const redondeado = Math.round(pct * 10) / 10;
+  return Number.isInteger(redondeado)
+    ? String(redondeado)
+    : redondeado.toFixed(1);
+}
+
 export function CotizacionForm({
   clientes,
   productos,
@@ -100,7 +140,11 @@ export function CotizacionForm({
 }: CotizacionFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
   const [items, setItems] = useState<ItemRow[]>(() =>
-    (cotizacion?.items ?? []).map((item, i) => ({ ...item, uid: `init-${i}` }))
+    (cotizacion?.items ?? []).map((item, i) => ({
+      ...item,
+      uid: `init-${i}`,
+      markup: formatMarkup(markupPctDesdePrecio(item.precio, item.costo)),
+    }))
   );
   const totales = calcularTotales(
     items.map((i) => ({
@@ -124,6 +168,9 @@ export function CotizacionForm({
         precio: producto.precio,
         flete: 0,
         descuento: 0,
+        markup: formatMarkup(
+          markupPctDesdePrecio(producto.precio, producto.costo)
+        ),
       },
     ]);
   }
@@ -141,6 +188,7 @@ export function CotizacionForm({
         precio: "",
         flete: "",
         descuento: "",
+        markup: "",
       },
     ]);
   }
@@ -152,6 +200,53 @@ export function CotizacionForm({
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, ...cambios } : item))
     );
+  }
+
+  // Variante que calcula los cambios a partir de la fila actual. Se lee el
+  // estado dentro del updater para no trabajar sobre un `items` desactualizado.
+  function actualizarItemCon(
+    index: number,
+    calcular: (item: ItemRow) => Partial<Omit<ItemRow, "uid">>
+  ) {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...calcular(item) } : item))
+    );
+  }
+
+  // Markup y precio están acoplados: el campo que toca el usuario manda y el
+  // otro se recalcula solo. Editar el costo NO mueve el precio (sería cambiarle
+  // la cotización al cliente sin pedirlo): recalcula el markup.
+  function cambiarMarkup(index: number, texto: string) {
+    const markup = sanitizarMarkup(texto);
+    actualizarItemCon(index, (item) => {
+      const pct = markupNumero(markup);
+      if (pct === null) return { markup };
+      const precio = precioDesdeMarkupPct(aNumero(item.costo), pct);
+      // Sin costo el precio no se puede derivar: se deja el markup escrito.
+      return precio === null ? { markup } : { markup, precio };
+    });
+  }
+
+  function cambiarPrecio(index: number, texto: string) {
+    const precio = parseEntero(texto);
+    actualizarItemCon(index, (item) => ({
+      precio,
+      markup:
+        precio === ""
+          ? ""
+          : formatMarkup(markupPctDesdePrecio(precio, aNumero(item.costo))),
+    }));
+  }
+
+  function cambiarCosto(index: number, texto: string) {
+    const costo = parseEntero(texto);
+    actualizarItemCon(index, (item) => ({
+      costo,
+      markup:
+        costo === "" || item.precio === ""
+          ? ""
+          : formatMarkup(markupPctDesdePrecio(aNumero(item.precio), costo)),
+    }));
   }
 
   function eliminarItem(index: number) {
@@ -269,13 +364,16 @@ export function CotizacionForm({
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="w-32 px-3 py-3">SKU</th>
                 <th className="min-w-56 px-3 py-3">Descripción</th>
                 <th className="w-24 px-3 py-3">Cantidad</th>
                 <th className="w-28 px-3 py-3">Costo</th>
+                <th className="w-24 px-3 py-3" title="Markup sobre el costo: precio = costo × (1 + margen/100)">
+                  Margen %
+                </th>
                 <th className="w-28 px-3 py-3">Precio</th>
                 <th className="w-28 px-3 py-3">Flete unit.</th>
                 <th className="w-24 px-3 py-3">Desc. %</th>
@@ -286,7 +384,7 @@ export function CotizacionForm({
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
                     Agrega productos del catálogo o ítems libres.
                   </td>
                 </tr>
@@ -343,12 +441,26 @@ export function CotizacionForm({
                           step={1}
                           value={item.costo}
                           aria-label="Costo"
-                          onChange={(e) =>
-                            actualizarItem(index, {
-                              costo: parseEntero(e.target.value),
-                            })
-                          }
+                          onChange={(e) => cambiarCosto(index, e.target.value)}
                           className={itemInputClass}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.markup}
+                          aria-label="Margen porcentual sobre el costo"
+                          title={
+                            aNumero(item.costo) > 0
+                              ? "Escribe el margen y el precio se calcula solo"
+                              : "Carga primero el costo para poder usar el margen"
+                          }
+                          placeholder={aNumero(item.costo) > 0 ? "" : "—"}
+                          onChange={(e) => cambiarMarkup(index, e.target.value)}
+                          className={`${itemInputClass} ${
+                            aNumero(item.costo) > 0 ? "" : "bg-slate-50"
+                          }`}
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -358,11 +470,7 @@ export function CotizacionForm({
                           step={1}
                           value={item.precio}
                           aria-label="Precio"
-                          onChange={(e) =>
-                            actualizarItem(index, {
-                              precio: parseEntero(e.target.value),
-                            })
-                          }
+                          onChange={(e) => cambiarPrecio(index, e.target.value)}
                           className={itemInputClass}
                         />
                       </td>
@@ -433,6 +541,13 @@ export function CotizacionForm({
         <p className="text-xs text-slate-500">
           El flete unitario se suma al precio de cada ítem. El cliente ve el
           precio final sin una línea de flete separada.
+        </p>
+        <p className="text-xs text-slate-500">
+          <strong className="font-semibold">Margen %</strong> se carga sobre el
+          costo (costo 1.000 + 30% = 1.300) y se sincroniza con el precio en
+          ambos sentidos. Ojo: el «Margen (interno)» del detalle mide el margen
+          sobre la venta, así que para esa línea mostrará 23,1%. El descuento y
+          el flete no entran en este cálculo.
         </p>
       </div>
 
