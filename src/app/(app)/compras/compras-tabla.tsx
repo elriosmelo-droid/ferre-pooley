@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { formatCLP } from "@/lib/money";
+import {
+  FORMAS_PAGO_COMPRA,
+  FORMA_PAGO_COMPRA_LABEL,
+} from "@/lib/forma-pago-compra";
+import { setFormaPagoCompra } from "./actions";
 
 const TIPO_DOC: Record<number, string> = {
   33: "Factura electrónica",
@@ -20,7 +25,13 @@ export type CompraRow = {
   monto_neto: number;
   monto_iva: number;
   monto_total: number;
+  // Dato manual y opcional: null = sin asignar.
+  forma_pago: string | null;
 };
+
+// "Sin asignar" es un filtro útil por sí mismo: son las compras que faltan
+// completar. Se distingue de "Todas" con un valor centinela.
+const SIN_ASIGNAR = "__sin__";
 
 function formatFecha(iso: string | null): string {
   if (!iso) return "—";
@@ -33,6 +44,29 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const [hasta, setHasta] = useState("");
   const [proveedor, setProveedor] = useState("");
   const [tipo, setTipo] = useState("");
+  const [pago, setPago] = useState("");
+  // La forma de pago vive en el estado del padre, no en cada select: si no, al
+  // cambiarla el filtro seguiría viendo el valor viejo.
+  const [formas, setFormas] = useState<Record<string, string | null>>(() =>
+    Object.fromEntries(compras.map((c) => [c.id, c.forma_pago]))
+  );
+  const [guardando, setGuardando] = useState<string | null>(null);
+  const [, startGuardar] = useTransition();
+
+  function cambiarFormaPago(id: string, valor: string) {
+    const anterior = formas[id] ?? null;
+    // Optimista: el select responde al instante y se revierte si el server falla.
+    setFormas((prev) => ({ ...prev, [id]: valor === "" ? null : valor }));
+    setGuardando(id);
+    startGuardar(async () => {
+      const res = await setFormaPagoCompra(id, valor);
+      setGuardando(null);
+      if (res?.error) {
+        setFormas((prev) => ({ ...prev, [id]: anterior }));
+        alert(res.error);
+      }
+    });
+  }
 
   const filtradas = useMemo(() => {
     const q = proveedor.trim().toLowerCase();
@@ -40,13 +74,17 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       if (desde && (!c.fecha_emision || c.fecha_emision < desde)) return false;
       if (hasta && (!c.fecha_emision || c.fecha_emision > hasta)) return false;
       if (tipo && String(c.tipo_doc) !== tipo) return false;
+      if (pago) {
+        const actual = formas[c.id] ?? null;
+        if (pago === SIN_ASIGNAR ? actual !== null : actual !== pago) return false;
+      }
       if (q) {
         const hay = `${c.razon_social ?? ""} ${c.rut_proveedor}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [compras, desde, hasta, proveedor, tipo]);
+  }, [compras, desde, hasta, proveedor, tipo, pago, formas]);
 
   const totNeto = filtradas.reduce((s, c) => s + c.monto_neto, 0);
   const totIva = filtradas.reduce((s, c) => s + c.monto_iva, 0);
@@ -86,10 +124,20 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
             ))}
           </select>
         </label>
-        {(desde || hasta || proveedor || tipo) && (
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Forma de pago
+          <select value={pago} onChange={(e) => setPago(e.target.value)} className={inputCls}>
+            <option value="">Todas</option>
+            {FORMAS_PAGO_COMPRA.map((f) => (
+              <option key={f} value={f}>{FORMA_PAGO_COMPRA_LABEL[f]}</option>
+            ))}
+            <option value={SIN_ASIGNAR}>Sin asignar</option>
+          </select>
+        </label>
+        {(desde || hasta || proveedor || tipo || pago) && (
           <button
             type="button"
-            onClick={() => { setDesde(""); setHasta(""); setProveedor(""); setTipo(""); }}
+            onClick={() => { setDesde(""); setHasta(""); setProveedor(""); setTipo(""); setPago(""); }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
             Limpiar
@@ -108,13 +156,14 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
               <th className="px-4 py-3 text-right">Neto</th>
               <th className="px-4 py-3 text-right">IVA</th>
               <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3">Forma de pago</th>
               <th className="px-4 py-3 text-center">PDF</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   No hay compras que coincidan con los filtros.
                 </td>
               </tr>
@@ -131,6 +180,24 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                   <td className="px-4 py-3 text-right">{formatCLP(c.monto_neto)}</td>
                   <td className="px-4 py-3 text-right">{formatCLP(c.monto_iva)}</td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">{formatCLP(c.monto_total)}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={formas[c.id] ?? ""}
+                      disabled={guardando === c.id}
+                      aria-label={`Forma de pago de la compra ${c.folio}`}
+                      onChange={(e) => cambiarFormaPago(c.id, e.target.value)}
+                      className={`w-full min-w-32 rounded-md border px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 ${
+                        formas[c.id]
+                          ? "border-slate-300 text-slate-900"
+                          : "border-slate-200 bg-slate-50 text-slate-400"
+                      }`}
+                    >
+                      <option value="">— Sin asignar</option>
+                      {FORMAS_PAGO_COMPRA.map((f) => (
+                        <option key={f} value={f}>{FORMA_PAGO_COMPRA_LABEL[f]}</option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <a
                       href={`/compras/${c.id}/pdf`}
@@ -154,7 +221,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                 <td className="px-4 py-3 text-right">{formatCLP(totNeto)}</td>
                 <td className="px-4 py-3 text-right">{formatCLP(totIva)}</td>
                 <td className="px-4 py-3 text-right">{formatCLP(totTotal)}</td>
-                <td className="px-4 py-3" />
+                <td className="px-4 py-3" colSpan={2} />
               </tr>
             </tfoot>
           )}

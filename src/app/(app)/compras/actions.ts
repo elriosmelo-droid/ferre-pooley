@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import { sincronizarCompras } from "@/lib/sii/sync";
 import { precachearComprasPdf } from "@/lib/sii/precache-compras";
+import { esFormaPagoCompra } from "@/lib/forma-pago-compra";
 
 export type ActualizarComprasResult = {
   error?: string;
@@ -35,6 +37,34 @@ export async function actualizarCompras(): Promise<ActualizarComprasResult> {
       err instanceof Error ? err.message : "No se pudieron actualizar las compras.";
     return { error: msg };
   }
+}
+
+export type SetFormaPagoResult = { error?: string };
+
+// Guarda (o borra) la forma de pago de una compra. Es un dato manual y opcional:
+// cadena vacía la deja en "sin asignar". No usa el service role: la RLS por
+// membresía ya gatea el acceso.
+export async function setFormaPagoCompra(
+  id: string,
+  valor: string
+): Promise<SetFormaPagoResult> {
+  if (valor !== "" && !esFormaPagoCompra(valor)) {
+    return { error: "Forma de pago no válida." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("compras_sii")
+    .update({ forma_pago: valor === "" ? null : valor })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error al guardar forma de pago:", error.message);
+    return { error: "No se pudo guardar la forma de pago." };
+  }
+
+  revalidatePath("/compras");
+  return {};
 }
 
 export type GenerarPdfsResult = {
