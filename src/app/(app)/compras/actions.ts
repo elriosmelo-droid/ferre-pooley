@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sincronizarCompras } from "@/lib/sii/sync";
 import { precachearComprasPdf } from "@/lib/sii/precache-compras";
-import { esFormaPagoCompra } from "@/lib/forma-pago-compra";
+import {
+  esFormaPagoCompra,
+  normalizarFormasPago,
+} from "@/lib/forma-pago-compra";
 
 export type ActualizarComprasResult = {
   error?: string;
@@ -41,25 +44,27 @@ export async function actualizarCompras(): Promise<ActualizarComprasResult> {
 
 export type SetFormaPagoResult = { error?: string };
 
-// Guarda (o borra) la forma de pago de una compra. Es un dato manual y opcional:
-// cadena vacía la deja en "sin asignar". No usa el service role: la RLS por
-// membresía ya gatea el acceso.
-export async function setFormaPagoCompra(
+// Guarda las formas de pago de una compra (puede tener varias, ej. cheque +
+// débito). Dato manual y opcional: arreglo vacío la deja en "sin asignar". No
+// usa el service role: la RLS por membresía ya gatea el acceso.
+export async function setFormasPagoCompra(
   id: string,
-  valor: string
+  valores: string[]
 ): Promise<SetFormaPagoResult> {
-  if (valor !== "" && !esFormaPagoCompra(valor)) {
-    return { error: "Forma de pago no válida." };
+  const invalida = valores.find((v) => !esFormaPagoCompra(v));
+  if (invalida !== undefined) {
+    return { error: `Forma de pago no válida: ${invalida}` };
   }
+  const formas = normalizarFormasPago(valores);
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("compras_sii")
-    .update({ forma_pago: valor === "" ? null : valor })
+    .update({ forma_pago: formas.length === 0 ? null : formas })
     .eq("id", id);
 
   if (error) {
-    console.error("Error al guardar forma de pago:", error.message);
+    console.error("Error al guardar formas de pago:", error.message);
     return { error: "No se pudo guardar la forma de pago." };
   }
 

@@ -5,8 +5,9 @@ import { formatCLP } from "@/lib/money";
 import {
   FORMAS_PAGO_COMPRA,
   FORMA_PAGO_COMPRA_LABEL,
+  etiquetaFormasPago,
 } from "@/lib/forma-pago-compra";
-import { setFormaPagoCompra } from "./actions";
+import { setFormasPagoCompra } from "./actions";
 
 const TIPO_DOC: Record<number, string> = {
   33: "Factura electrónica",
@@ -25,8 +26,9 @@ export type CompraRow = {
   monto_neto: number;
   monto_iva: number;
   monto_total: number;
-  // Dato manual y opcional: null = sin asignar.
-  forma_pago: string | null;
+  // Dato manual y opcional; una compra puede tener varias formas de pago.
+  // null o vacío = sin asignar.
+  forma_pago: string[] | null;
 };
 
 // "Sin asignar" es un filtro útil por sí mismo: son las compras que faltan
@@ -45,21 +47,26 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const [proveedor, setProveedor] = useState("");
   const [tipo, setTipo] = useState("");
   const [pago, setPago] = useState("");
-  // La forma de pago vive en el estado del padre, no en cada select: si no, al
-  // cambiarla el filtro seguiría viendo el valor viejo.
-  const [formas, setFormas] = useState<Record<string, string | null>>(() =>
-    Object.fromEntries(compras.map((c) => [c.id, c.forma_pago]))
+  // Las formas de pago viven en el estado del padre, no en cada celda: si no, al
+  // cambiarlas el filtro seguiría viendo el valor viejo.
+  const [formas, setFormas] = useState<Record<string, string[]>>(() =>
+    Object.fromEntries(compras.map((c) => [c.id, c.forma_pago ?? []]))
   );
   const [guardando, setGuardando] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
   const [, startGuardar] = useTransition();
 
-  function cambiarFormaPago(id: string, valor: string) {
-    const anterior = formas[id] ?? null;
-    // Optimista: el select responde al instante y se revierte si el server falla.
-    setFormas((prev) => ({ ...prev, [id]: valor === "" ? null : valor }));
+  // Marca o desmarca una forma en una compra y guarda de inmediato.
+  function toggleFormaPago(id: string, forma: string) {
+    const anterior = formas[id] ?? [];
+    const siguiente = anterior.includes(forma)
+      ? anterior.filter((f) => f !== forma)
+      : [...anterior, forma];
+    // Optimista: la casilla responde al instante y se revierte si el server falla.
+    setFormas((prev) => ({ ...prev, [id]: siguiente }));
     setGuardando(id);
     startGuardar(async () => {
-      const res = await setFormaPagoCompra(id, valor);
+      const res = await setFormasPagoCompra(id, siguiente);
       setGuardando(null);
       if (res?.error) {
         setFormas((prev) => ({ ...prev, [id]: anterior }));
@@ -75,8 +82,12 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       if (hasta && (!c.fecha_emision || c.fecha_emision > hasta)) return false;
       if (tipo && String(c.tipo_doc) !== tipo) return false;
       if (pago) {
-        const actual = formas[c.id] ?? null;
-        if (pago === SIN_ASIGNAR ? actual !== null : actual !== pago) return false;
+        // Con varias formas por compra, filtrar es "incluye ésta": una compra
+        // pagada con cheque + débito aparece al filtrar por cualquiera de las dos.
+        const actual = formas[c.id] ?? [];
+        const coincide =
+          pago === SIN_ASIGNAR ? actual.length === 0 : actual.includes(pago);
+        if (!coincide) return false;
       }
       if (q) {
         const hay = `${c.razon_social ?? ""} ${c.rut_proveedor}`.toLowerCase();
@@ -180,23 +191,48 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                   <td className="px-4 py-3 text-right">{formatCLP(c.monto_neto)}</td>
                   <td className="px-4 py-3 text-right">{formatCLP(c.monto_iva)}</td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">{formatCLP(c.monto_total)}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={formas[c.id] ?? ""}
-                      disabled={guardando === c.id}
-                      aria-label={`Forma de pago de la compra ${c.folio}`}
-                      onChange={(e) => cambiarFormaPago(c.id, e.target.value)}
-                      className={`w-full min-w-32 rounded-md border px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 ${
-                        formas[c.id]
-                          ? "border-slate-300 text-slate-900"
-                          : "border-slate-200 bg-slate-50 text-slate-400"
-                      }`}
-                    >
-                      <option value="">— Sin asignar</option>
-                      {FORMAS_PAGO_COMPRA.map((f) => (
-                        <option key={f} value={f}>{FORMA_PAGO_COMPRA_LABEL[f]}</option>
-                      ))}
-                    </select>
+                  <td className="px-4 py-3 align-top">
+                    {editando === c.id ? (
+                      <div className="min-w-40 rounded-md border border-brand-300 bg-white p-2">
+                        {FORMAS_PAGO_COMPRA.map((f) => (
+                          <label
+                            key={f}
+                            className="flex cursor-pointer items-center gap-2 py-0.5 text-sm text-slate-700"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={(formas[c.id] ?? []).includes(f)}
+                              disabled={guardando === c.id}
+                              onChange={() => toggleFormaPago(c.id, f)}
+                              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            />
+                            {FORMA_PAGO_COMPRA_LABEL[f]}
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setEditando(null)}
+                          className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          Listo
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditando(c.id)}
+                        title="Editar formas de pago (podés marcar varias)"
+                        className={`min-w-32 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${
+                          (formas[c.id] ?? []).length > 0
+                            ? "border-slate-300 text-slate-900"
+                            : "border-slate-200 bg-slate-50 text-slate-400"
+                        }`}
+                      >
+                        {(formas[c.id] ?? []).length > 0
+                          ? etiquetaFormasPago(formas[c.id])
+                          : "— Sin asignar"}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <a
