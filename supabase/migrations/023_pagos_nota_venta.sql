@@ -54,7 +54,7 @@ where nv.estado = 'pagada'
 -- Vive en la base y no en el server action para que dos personas registrando
 -- abonos a la vez no puedan dejar el estado inconsistente: el `for update`
 -- serializa por nota.
-create or replace function _recalc_estado_nota_venta(p_nota uuid)
+create or replace function public._recalc_estado_nota_venta(p_nota uuid)
 returns void
 language plpgsql
 security definer
@@ -105,13 +105,13 @@ as $$
 begin
   -- Recalcular nota origen (old)
   if old.nota_venta_id is not null then
-    perform _recalc_estado_nota_venta(old.nota_venta_id);
+    perform public._recalc_estado_nota_venta(old.nota_venta_id);
   end if;
 
   -- Recalcular nota destino (new), solo si es distinta de la origen
   if new.nota_venta_id is not null
     and new.nota_venta_id is distinct from old.nota_venta_id then
-    perform _recalc_estado_nota_venta(new.nota_venta_id);
+    perform public._recalc_estado_nota_venta(new.nota_venta_id);
   end if;
 
   return null;
