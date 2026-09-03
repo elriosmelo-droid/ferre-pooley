@@ -73,17 +73,35 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const [borrador, setBorrador] = useState<FormaPagoItem[]>([]);
   const [, startGuardar] = useTransition();
 
-  function abrirEdicion(id: string) {
+  function abrirEdicion(id: string, montoTotal: number) {
     setEditando(id);
-    setBorrador(items[id] ?? []);
+    const actuales = items[id] ?? [];
+    // Lo cargado antes de que existiera el campo de monto viene con una sola
+    // forma y monto null, que significaba "el total". Se muestra explícito para
+    // que el campo no aparezca vacío.
+    setBorrador(
+      actuales.length === 1 && actuales[0].monto === null
+        ? [{ ...actuales[0], monto: montoTotal }]
+        : actuales
+    );
   }
 
-  function toggleForma(forma: FormaPagoCompra) {
-    setBorrador((prev) =>
-      prev.some((i) => i.forma === forma)
-        ? prev.filter((i) => i.forma !== forma)
-        : [...prev, { forma, monto: null, plazo_dias: null }]
-    );
+  // Al marcar una forma se prellena con lo que queda por asignar, para no
+  // escribir el monto a mano en el caso normal: con una sola forma eso es el
+  // total del documento. Con varias el prellenado queda corto a propósito y se
+  // corrige a mano; el recuadro de abajo avisa cuánto falta o se pasa.
+  function toggleForma(forma: FormaPagoCompra, montoTotal: number) {
+    setBorrador((prev) => {
+      if (prev.some((i) => i.forma === forma)) {
+        const resto = prev.filter((i) => i.forma !== forma);
+        // Al quedar una sola forma su monto vuelve a ser el total: si no, el
+        // campo mostraría un parcial que ya no corresponde a nada.
+        if (resto.length === 1) return [{ ...resto[0], monto: montoTotal }];
+        return resto;
+      }
+      const monto = Math.max(montoTotal - sumaMontos(prev), 0);
+      return [...prev, { forma, monto, plazo_dias: null }];
+    });
   }
 
   // Solo dígitos: vacío queda en null para poder borrar el campo.
@@ -256,9 +274,10 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                   <td className="px-4 py-3 align-top">
                     {editando === c.id ? (
                       (() => {
-                        // Los montos solo tienen sentido con más de una forma: con
-                        // una sola, el monto es el total del documento.
-                        const varias = borrador.length > 1;
+                        // El monto se edita siempre, también con una sola forma:
+                        // viene prellenado con el total y se corrige si el pago
+                        // fue parcial.
+                        const hayFormas = borrador.length > 0;
                         const suma = sumaMontos(borrador);
                         const falta = c.monto_total - suma;
                         return (
@@ -271,24 +290,22 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                                     <input
                                       type="checkbox"
                                       checked={item !== undefined}
-                                      onChange={() => toggleForma(f)}
+                                      onChange={() => toggleForma(f, c.monto_total)}
                                       className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                     />
                                     {FORMA_PAGO_COMPRA_LABEL[f]}
                                   </label>
-                                  {item !== undefined && (varias || admitePlazo(f)) && (
+                                  {item !== undefined && (
                                     <div className="mt-1 ml-6 flex flex-wrap items-center gap-1">
-                                      {varias && (
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={item.monto ?? ""}
-                                          placeholder="Monto"
-                                          aria-label={`Monto pagado con ${FORMA_PAGO_COMPRA_LABEL[f]}`}
-                                          onChange={(e) => setMonto(f, e.target.value)}
-                                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                        />
-                                      )}
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={item.monto ?? ""}
+                                        placeholder="Monto"
+                                        aria-label={`Monto pagado con ${FORMA_PAGO_COMPRA_LABEL[f]}`}
+                                        onChange={(e) => setMonto(f, e.target.value)}
+                                        className="w-24 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                      />
                                       {admitePlazo(f) && (
                                         <>
                                           <input
@@ -313,7 +330,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                               );
                             })}
 
-                            {varias && (
+                            {hayFormas && (
                               <div className="mt-2 border-t border-slate-200 pt-2 text-xs">
                                 <div className="flex justify-between text-slate-500">
                                   <span>Suma</span>
@@ -357,7 +374,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => abrirEdicion(c.id)}
+                        onClick={() => abrirEdicion(c.id, c.monto_total)}
                         disabled={guardando === c.id}
                         title="Editar formas de pago (podés marcar varias e indicar el monto de cada una)"
                         className={`min-w-32 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50 ${
@@ -367,7 +384,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                         }`}
                       >
                         {(items[c.id] ?? []).length > 0
-                          ? etiquetaItemsPago(items[c.id])
+                          ? etiquetaItemsPago(items[c.id], c.monto_total)
                           : "— Sin asignar"}
                       </button>
                     )}

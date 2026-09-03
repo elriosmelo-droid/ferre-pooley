@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { montoDeuda, totalDeuda, type FormaPagoItem } from "./forma-pago-compra";
+import {
+  montoDeuda,
+  totalDeuda,
+  etiquetaItemsPago,
+  type FormaPagoItem,
+} from "./forma-pago-compra";
 
 // Atajo: arma un item con plazo nulo, que es lo que no importa para la deuda.
 function item(
@@ -83,5 +88,41 @@ describe("totalDeuda", () => {
 
   it("sin compras da cero y nada pendiente", () => {
     expect(totalDeuda([])).toEqual({ total: 0, pendientes: 0 });
+  });
+});
+
+describe("etiquetaItemsPago", () => {
+  it("sin formas muestra guion", () => {
+    expect(etiquetaItemsPago([], 100000)).toBe("—");
+  });
+
+  it("con una sola forma omite el monto cuando es el total del documento", () => {
+    // Repetir el total al lado de la columna Total sería ruido.
+    expect(etiquetaItemsPago([item("credito", 100000)], 100000)).toBe("Crédito");
+  });
+
+  it("con una sola forma muestra el monto cuando difiere del total", () => {
+    expect(etiquetaItemsPago([item("credito", 40000)], 100000)).toBe(
+      "Crédito $40.000"
+    );
+  });
+
+  it("con una sola forma sin monto omite el monto", () => {
+    expect(etiquetaItemsPago([item("credito")], 100000)).toBe("Crédito");
+  });
+
+  it("con varias formas muestra el monto de cada una", () => {
+    const items = [item("cheque", 50000), item("debito", 30000)];
+    expect(etiquetaItemsPago(items, 80000)).toBe("Cheque $50.000 · Débito $30.000");
+  });
+
+  it("agrega el plazo cuando la forma lo tiene", () => {
+    const con = { forma: "cheque" as const, monto: 100000, plazo_dias: 60 };
+    expect(etiquetaItemsPago([con], 100000)).toBe("Cheque 60d");
+  });
+
+  it("sin total de referencia muestra el monto de la única forma", () => {
+    // Sin con qué comparar no se puede saber si es redundante: se muestra.
+    expect(etiquetaItemsPago([item("credito", 40000)])).toBe("Crédito $40.000");
   });
 });

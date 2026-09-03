@@ -173,10 +173,22 @@ function resumenItem(item: FormaPagoItem, mostrarMonto: boolean): string {
 }
 
 // "Transferencia" con una sola forma; "Cheque $50.000 60d · Débito $30.000"
-// cuando hay varias. El monto se omite con una sola forma porque es el total del
-// documento; el plazo se muestra siempre que exista.
-export function etiquetaItemsPago(items: FormaPagoItem[]): string {
+// cuando hay varias. El plazo se muestra siempre que exista.
+//
+// Con una sola forma el monto se omite solo si coincide con el total del
+// documento: repetirlo al lado de la columna Total es ruido. Si difiere (un
+// pago parcial) sí se muestra, porque si no la celda se comería el dato. Sin
+// `montoTotal` no hay con qué comparar y se muestra igual.
+export function etiquetaItemsPago(
+  items: FormaPagoItem[],
+  montoTotal?: number
+): string {
   if (items.length === 0) return "—";
-  const mostrarMonto = items.length > 1;
-  return items.map((i) => resumenItem(i, mostrarMonto)).join(" · ");
+  return items
+    .map((i) => {
+      const redundante =
+        items.length === 1 && montoTotal !== undefined && i.monto === montoTotal;
+      return resumenItem(i, !redundante);
+    })
+    .join(" · ");
 }
