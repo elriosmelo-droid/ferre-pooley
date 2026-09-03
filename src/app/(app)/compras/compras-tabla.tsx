@@ -11,6 +11,8 @@ import {
   sumaMontos,
   admitePlazo,
   vencimientoDesde,
+  montoDeuda,
+  totalDeuda,
   type FormaPagoCompra,
   type FormaPagoItem,
 } from "@/lib/forma-pago-compra";
@@ -41,6 +43,9 @@ export type CompraRow = {
 // "Sin asignar" es un filtro útil por sí mismo: son las compras que faltan
 // completar. Se distingue de "Todas" con un valor centinela.
 const SIN_ASIGNAR = "__sin__";
+// "Con deuda" cruza varias formas (cheque y crédito), así que tampoco es una
+// forma concreta y necesita su propio centinela.
+const CON_DEUDA = "__deuda__";
 
 function formatFecha(iso: string | null): string {
   if (!iso) return "—";
@@ -127,11 +132,13 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       if (pago) {
         // Con varias formas por compra, filtrar es "incluye ésta": una compra
         // pagada con cheque + débito aparece al filtrar por cualquiera de las dos.
-        const actuales = formasDe(items[c.id] ?? []);
-        const coincide =
-          pago === SIN_ASIGNAR
-            ? actuales.length === 0
-            : actuales.includes(pago as FormaPagoCompra);
+        const propias = items[c.id] ?? [];
+        const actuales = formasDe(propias);
+        let coincide: boolean;
+        if (pago === SIN_ASIGNAR) coincide = actuales.length === 0;
+        else if (pago === CON_DEUDA)
+          coincide = (montoDeuda(propias, c.monto_total) ?? 0) > 0;
+        else coincide = actuales.includes(pago as FormaPagoCompra);
         if (!coincide) return false;
       }
       if (q) {
@@ -145,6 +152,14 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const totNeto = filtradas.reduce((s, c) => s + c.monto_neto, 0);
   const totIva = filtradas.reduce((s, c) => s + c.monto_iva, 0);
   const totTotal = filtradas.reduce((s, c) => s + c.monto_total, 0);
+  // La deuda sale de un dato manual, así que puede estar incompleta: `pendientes`
+  // son las compras sin formas cargadas, que no suman y hay que declarar.
+  const deuda = totalDeuda(
+    filtradas.map((c) => ({
+      items: items[c.id] ?? [],
+      montoTotal: c.monto_total,
+    }))
+  );
   const tipos = Array.from(new Set(compras.map((c) => c.tipo_doc))).sort((a, b) => a - b);
 
   const inputCls =
@@ -187,6 +202,7 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
             {FORMAS_PAGO_COMPRA.map((f) => (
               <option key={f} value={f}>{FORMA_PAGO_COMPRA_LABEL[f]}</option>
             ))}
+            <option value={CON_DEUDA}>Con deuda</option>
             <option value={SIN_ASIGNAR}>Sin asignar</option>
           </select>
         </label>
@@ -213,13 +229,14 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
               <th className="px-4 py-3 text-right">IVA</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3">Forma de pago</th>
+              <th className="px-4 py-3 text-right">Por pagar</th>
               <th className="px-4 py-3 text-center">PDF</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   No hay compras que coincidan con los filtros.
                 </td>
               </tr>
@@ -355,6 +372,47 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                       </button>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    {(() => {
+                      const propias = items[c.id] ?? [];
+                      const porPagar = montoDeuda(propias, c.monto_total);
+                      if (porPagar === null) {
+                        return (
+                          <span
+                            className="text-slate-400"
+                            title="Falta cargar la forma de pago para saber si se debe"
+                          >
+                            —
+                          </span>
+                        );
+                      }
+                      // Con dos o más montos sin escribir el reparto es ambiguo
+                      // y la deuda puede quedar corta: se avisa en la fila.
+                      const ambiguo =
+                        propias.filter((i) => i.monto === null).length > 1;
+                      return (
+                        <>
+                          <span
+                            className={
+                              porPagar > 0
+                                ? "font-semibold text-amber-700"
+                                : "text-slate-400"
+                            }
+                          >
+                            {formatCLP(porPagar)}
+                          </span>
+                          {ambiguo && (
+                            <div
+                              className="text-xs text-amber-600"
+                              title="Hay más de una forma sin monto: no se puede repartir el total"
+                            >
+                              falta asignar
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <a
                       href={`/compras/${c.id}/pdf`}
@@ -378,7 +436,19 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
                 <td className="px-4 py-3 text-right">{formatCLP(totNeto)}</td>
                 <td className="px-4 py-3 text-right">{formatCLP(totIva)}</td>
                 <td className="px-4 py-3 text-right">{formatCLP(totTotal)}</td>
-                <td className="px-4 py-3" colSpan={2} />
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3 text-right">
+                  <span className={deuda.total > 0 ? "text-amber-700" : ""}>
+                    {formatCLP(deuda.total)}
+                  </span>
+                  {deuda.pendientes > 0 && (
+                    <div className="text-xs font-normal text-slate-500">
+                      sin {deuda.pendientes} compra
+                      {deuda.pendientes === 1 ? "" : "s"} por cargar
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           )}

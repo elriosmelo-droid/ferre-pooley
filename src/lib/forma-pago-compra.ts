@@ -1,4 +1,4 @@
-import { formatCLP } from "@/lib/money";
+import { formatCLP } from "./money";
 
 // Formas de pago de una compra. Se cargan a mano (el RCV del SII no las informa)
 // y son opcionales. Una compra puede pagarse con varias a la vez (ej. cheque +
@@ -102,6 +102,59 @@ export function normalizarItemsPago(valor: unknown): FormaPagoItem[] {
 
 export function formasDe(items: FormaPagoItem[]): FormaPagoCompra[] {
   return items.map((i) => i.forma);
+}
+
+// Formas que dejan deuda con el proveedor. Son las mismas que admiten plazo: lo
+// que se paga a plazo es justamente lo que todavía se debe. Contado,
+// transferencia y débito salen de la caja en el acto; "otro" se trata como
+// pagado (si algún día deja deuda, va acá y no en una lista aparte).
+export function esFormaDeuda(forma: FormaPagoCompra): boolean {
+  return admitePlazo(forma);
+}
+
+// Cuánto de esta compra queda por pagar.
+//
+// Devuelve null cuando no hay formas cargadas: no se sabe si se debe o no, y
+// mostrar $0 ahí sería afirmar algo que nadie declaró.
+//
+// Los montos son opcionales, así que la única forma sin monto absorbe lo que
+// falte para llegar al total del documento. Eso cubre el caso normal de una
+// sola forma (donde el monto es el total y no hace falta escribirlo) y el de
+// "débito $30.000 y el resto a crédito". Con dos o más montos sin indicar el
+// reparto es ambiguo y no se inventa: solo suma lo escrito.
+export function montoDeuda(
+  items: FormaPagoItem[],
+  montoTotal: number
+): number | null {
+  if (items.length === 0) return null;
+
+  const sinMonto = items.filter((i) => i.monto === null);
+  const asignado = sumaMontos(items);
+  // El remanente nunca es negativo: si lo escrito ya se pasa del total, no
+  // queda nada que absorber.
+  const remanente =
+    sinMonto.length === 1 ? Math.max(montoTotal - asignado, 0) : 0;
+
+  return items.reduce((deuda, i) => {
+    if (!esFormaDeuda(i.forma)) return deuda;
+    return deuda + (i.monto ?? (sinMonto.length === 1 ? remanente : 0));
+  }, 0);
+}
+
+// Suma de deudas de varias compras, ignorando las que no tienen formas
+// cargadas. `pendientes` cuenta esas: sin ellas el total puede quedar corto y
+// conviene decirlo en pantalla.
+export function totalDeuda(
+  compras: { items: FormaPagoItem[]; montoTotal: number }[]
+): { total: number; pendientes: number } {
+  let total = 0;
+  let pendientes = 0;
+  for (const c of compras) {
+    const deuda = montoDeuda(c.items, c.montoTotal);
+    if (deuda === null) pendientes += 1;
+    else total += deuda;
+  }
+  return { total, pendientes };
 }
 
 // Suma de los montos indicados. Los null no suman: la diferencia con el total
