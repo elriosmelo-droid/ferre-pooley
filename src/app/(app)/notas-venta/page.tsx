@@ -1,6 +1,18 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { calcularMargen } from "@/lib/totals";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
+
+// Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
+// calcular el margen y no viajan al cliente.
+type NotaConItems = Omit<NotaVentaRow, "venta" | "costo"> & {
+  nota_venta_items: {
+    cantidad: number;
+    costo: number;
+    precio: number;
+    descuento: number;
+  }[];
+};
 
 export default async function NotasVentaPage() {
   const supabase = await createClient();
@@ -8,11 +20,19 @@ export default async function NotasVentaPage() {
   const { data, error } = await supabase
     .from("notas_venta")
     .select(
-      "id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio)"
+      `id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio),
+       nota_venta_items(cantidad, costo, precio, descuento)`
     )
     .order("created_at", { ascending: false });
 
-  const notas = (data ?? []) as unknown as NotaVentaRow[];
+  // El margen se reduce acá a dos números por nota: mandar los ítems completos
+  // al cliente solo para sumarlos sería cargar la página de más.
+  const notas: NotaVentaRow[] = (
+    (data ?? []) as unknown as NotaConItems[]
+  ).map(({ nota_venta_items, ...nota }) => {
+    const { venta, costo } = calcularMargen(nota_venta_items ?? []);
+    return { ...nota, venta, costo };
+  });
 
   return (
     <div>

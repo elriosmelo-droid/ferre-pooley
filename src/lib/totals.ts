@@ -64,6 +64,20 @@ export function calcularMargen(items: ItemMargen[]) {
   return { venta, costo, margen, pct, pctSobreCosto };
 }
 
+// Margen de un conjunto de notas ya reducidas a venta y costo. Se usa para
+// totalizar listados: cada nota se calcula con `calcularMargen` (que descuenta
+// el flete) y acá solo se suman, para no arrastrar los ítems hasta el cliente.
+export function agregarMargen(notas: { venta: number; costo: number }[]) {
+  let venta = 0;
+  let costo = 0;
+  for (const n of notas) {
+    venta += n.venta;
+    costo += n.costo;
+  }
+  const margen = venta - costo;
+  return { venta, costo, margen, pct: venta > 0 ? (margen / venta) * 100 : 0 };
+}
+
 // Formatea un porcentaje con un decimal ("34.2%").
 export function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;

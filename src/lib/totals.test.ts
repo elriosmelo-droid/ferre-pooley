@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calcularTotales, calcularMargen, margenPctLinea } from "./totals";
+import {
+  calcularTotales,
+  calcularMargen,
+  margenPctLinea,
+  agregarMargen,
+} from "./totals";
 
 describe("calcularTotales", () => {
   it("suma cantidad por (precio + flete unitario) y aplica IVA 19%", () => {
@@ -81,5 +86,39 @@ describe("margen", () => {
     expect(r.venta).toBe(2500);
     expect(r.margen).toBe(800);
     expect(r.pct).toBeCloseTo((800 / 2500) * 100, 5);
+  });
+});
+
+describe("agregarMargen", () => {
+  it("suma venta y costo de varias notas y saca el margen y su %", () => {
+    const r = agregarMargen([
+      { venta: 100000, costo: 60000 },
+      { venta: 300000, costo: 240000 },
+    ]);
+    expect(r.venta).toBe(400000);
+    expect(r.costo).toBe(300000);
+    expect(r.margen).toBe(100000);
+    expect(r.pct).toBe(25);
+  });
+
+  it("sin notas devuelve todo en cero sin dividir por cero", () => {
+    expect(agregarMargen([])).toEqual({
+      venta: 0,
+      costo: 0,
+      margen: 0,
+      pct: 0,
+    });
+  });
+
+  it("con venta cero el porcentaje es cero, no infinito", () => {
+    const r = agregarMargen([{ venta: 0, costo: 5000 }]);
+    expect(r.margen).toBe(-5000);
+    expect(r.pct).toBe(0);
+  });
+
+  it("un margen negativo se refleja como porcentaje negativo", () => {
+    const r = agregarMargen([{ venta: 100000, costo: 130000 }]);
+    expect(r.margen).toBe(-30000);
+    expect(r.pct).toBe(-30);
   });
 });
