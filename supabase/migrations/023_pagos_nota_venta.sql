@@ -50,45 +50,68 @@ where nv.estado = 'pagada'
     select 1 from pagos_nota_venta p where p.nota_venta_id = nv.id
   );
 
--- Mantiene estado y pagada_at desde los abonos. Vive en la base y no en el
--- server action para que dos personas registrando abonos a la vez no puedan
--- dejar el estado inconsistente: el `for update` serializa por nota.
-create or replace function public.sync_estado_nota_venta()
-returns trigger
+-- Recalcula el estado y pagada_at de una nota específica en base a sus abonos.
+-- Vive en la base y no en el server action para que dos personas registrando
+-- abonos a la vez no puedan dejar el estado inconsistente: el `for update`
+-- serializa por nota.
+create or replace function _recalc_estado_nota_venta(p_nota uuid)
+returns void
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_nota uuid := coalesce(new.nota_venta_id, old.nota_venta_id);
   v_total integer;
   v_estado nota_venta_estado;
   v_cobrado integer;
   v_ultima date;
 begin
   select total, estado into v_total, v_estado
-  from notas_venta where id = v_nota for update;
+  from notas_venta where id = p_nota for update;
   if not found then
-    return null;
+    return;
   end if;
 
   -- Una nota anulada no cambia de estado por abonos.
   if v_estado = 'anulada' then
-    return null;
+    return;
   end if;
 
   select coalesce(sum(monto), 0), max(fecha)
   into v_cobrado, v_ultima
-  from pagos_nota_venta where nota_venta_id = v_nota;
+  from pagos_nota_venta where nota_venta_id = p_nota;
 
   if v_cobrado >= v_total then
     update notas_venta
     set estado = 'pagada', pagada_at = v_ultima::timestamptz
-    where id = v_nota;
+    where id = p_nota;
   else
     update notas_venta
     set estado = 'pendiente', pagada_at = null
-    where id = v_nota;
+    where id = p_nota;
+  end if;
+end $$;
+
+-- Orquesta el recálculo de notas afectadas por cambios en pagos_nota_venta.
+-- Si un UPDATE cambia nota_venta_id (mover un abono de una nota a otra),
+-- ambas quedan obsoletas: la origen sin abonos (pero still 'pagada') y la
+-- destino con abonos nuevos. El trigger recalcula ambas.
+create or replace function public.sync_estado_nota_venta()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Recalcular nota origen (old)
+  if old.nota_venta_id is not null then
+    perform _recalc_estado_nota_venta(old.nota_venta_id);
+  end if;
+
+  -- Recalcular nota destino (new), solo si es distinta de la origen
+  if new.nota_venta_id is not null
+    and new.nota_venta_id is distinct from old.nota_venta_id then
+    perform _recalc_estado_nota_venta(new.nota_venta_id);
   end if;
 
   return null;
