@@ -16,7 +16,56 @@ import {
 } from "@/lib/cobros";
 import { hoyChile } from "@/lib/fecha";
 
-export type NotaFinanzas = NotaCobrable & { folio: string; cliente: string };
+export type NotaFinanzas = NotaCobrable & {
+  folio: string;
+  cliente: string;
+  netoDoc: number;
+};
+
+// Un saldo separado en su parte neta y su IVA.
+export type Desglose = { bruto: number; neto: number; iva: number };
+
+// Card de un monto con su desglose de IVA debajo. El IVA de una cuenta por
+// cobrar no es plata de la empresa (se entera al fisco) y el de una por pagar
+// se recupera como crédito: verlos juntos infla lo que uno cree que tiene.
+function CardIva({
+  label,
+  d,
+  detalle,
+  aviso,
+  tono,
+}: {
+  label: string;
+  d: Desglose;
+  detalle: string;
+  aviso?: string;
+  tono: "cobrar" | "pagar";
+}) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-5">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p
+        className={`mt-2 text-2xl font-bold tracking-tight sm:text-3xl ${
+          tono === "pagar" ? "text-red-700" : "text-slate-900"
+        }`}
+      >
+        {formatCLP(d.bruto)}
+      </p>
+      <dl className="mt-2 space-y-0.5 text-xs text-slate-600">
+        <div className="flex justify-between">
+          <dt>Neto</dt>
+          <dd className="font-medium">{formatCLP(d.neto)}</dd>
+        </div>
+        <div className="flex justify-between text-slate-400">
+          <dt>IVA</dt>
+          <dd>{formatCLP(d.iva)}</dd>
+        </div>
+      </dl>
+      <p className="mt-1.5 text-xs text-slate-500">{detalle}</p>
+      {aviso && <p className="mt-1 text-xs text-amber-700">{aviso}</p>}
+    </div>
+  );
+}
 
 const LENTES = [
   {
@@ -67,9 +116,15 @@ function Kpi({
 export function FinanzasVista({
   notas,
   sinNota,
+  porCobrar,
+  porPagar,
+  pagarPendiente,
 }: {
   notas: NotaFinanzas[];
   sinNota: { cantidad: number; monto: number };
+  porCobrar: Desglose;
+  porPagar: Desglose;
+  pagarPendiente: { cantidad: number; monto: number };
 }) {
   const hoy = hoyChile();
   const [lente, setLente] = useState<string>("venta");
@@ -176,6 +231,65 @@ export function FinanzasVista({
 
   return (
     <div className="flex flex-col gap-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-900">Situación</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Las dos primeras son del período filtrado. Las cuentas por cobrar y
+          por pagar son el saldo a hoy: no se filtran por fecha.
+        </p>
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl bg-slate-50 p-5">
+            <p className="text-sm font-medium text-slate-500">
+              Utilidad percibida
+            </p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-green-700 sm:text-3xl">
+              {formatCLP(datos.venta.utilidadPercibida)}
+            </p>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Ya está en caja · neta, sin flete
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-5">
+            <p className="text-sm font-medium text-slate-500">
+              Utilidad por percibir
+            </p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-amber-700 sm:text-3xl">
+              {formatCLP(
+                datos.venta.utilidad - datos.venta.utilidadPercibida
+              )}
+            </p>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Falta cobrarla · de {formatCLP(datos.venta.utilidad)} generados
+            </p>
+          </div>
+
+          <CardIva
+            label="Cuentas por cobrar"
+            d={porCobrar}
+            detalle="Saldo de las notas activas, a hoy"
+            tono="cobrar"
+          />
+
+          <CardIva
+            label="Cuentas por pagar"
+            d={porPagar}
+            detalle="Compras a crédito y cheque, a hoy"
+            tono="pagar"
+            aviso={
+              pagarPendiente.cantidad > 0
+                ? `${pagarPendiente.cantidad} compras por ${formatCLP(pagarPendiente.monto)} sin forma de pago cargada: no suman acá`
+                : undefined
+            }
+          />
+        </div>
+        <p className="mt-4 text-xs text-slate-400">
+          El IVA no es utilidad: en lo que te deben lo cobras para enterarlo al
+          fisco, y en lo que debes lo recuperas como crédito. La utilidad ya
+          está neta, por eso no lleva desglose.
+        </p>
+      </section>
+
       {sinNota.cantidad > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
           <strong>{sinNota.cantidad} facturas</strong> por{" "}

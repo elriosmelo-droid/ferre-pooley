@@ -212,6 +212,47 @@ export function pctUtilidad(resumen: ResumenVenta): number {
   return resumen.venta > 0 ? (resumen.utilidad / resumen.venta) * 100 : 0;
 }
 
+// Un saldo pendiente junto al documento del que sale, para poder separar qué
+// parte de ese saldo es IVA.
+export type SaldoConDocumento = {
+  monto: number; // parte del documento que está pendiente
+  netoDoc: number; // neto del documento completo
+  totalDoc: number; // total bruto del documento completo
+};
+
+export type DesgloseIva = {
+  bruto: number;
+  neto: number;
+  iva: number;
+};
+
+// Separa un conjunto de saldos en su parte neta y su IVA.
+//
+// El IVA de una cuenta por cobrar no es plata de la empresa: se cobra al
+// cliente y se entera al fisco. Lo mismo al revés en las cuentas por pagar,
+// donde el IVA se recupera como crédito. Verlos juntos infla lo que uno cree
+// que tiene o que debe.
+//
+// El reparto es proporcional al documento porque un saldo parcial no viene
+// etiquetado: si se debe la mitad de una factura, se debe la mitad de su IVA.
+// Documentos exentos no aportan IVA porque su neto es igual a su total.
+//
+// El IVA se calcula como resta y no como su propio redondeo, para que neto más
+// IVA sea exactamente el bruto y no se pierda un peso por fila.
+export function desglosarIva(saldos: SaldoConDocumento[]): DesgloseIva {
+  const r: DesgloseIva = { bruto: 0, neto: 0, iva: 0 };
+  for (const s of saldos) {
+    // Sin total conocido no hay proporción que aplicar: se trata todo como
+    // neto en vez de inventar un IVA.
+    const neto =
+      s.totalDoc > 0 ? Math.round((s.monto * s.netoDoc) / s.totalDoc) : s.monto;
+    r.bruto += s.monto;
+    r.neto += neto;
+    r.iva += s.monto - neto;
+  }
+  return r;
+}
+
 // Fila del listado de notas reducida a lo que entra en los totales del pie.
 export type FilaListado = {
   total: number; // bruto, con IVA y flete

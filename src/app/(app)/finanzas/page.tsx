@@ -2,13 +2,23 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularMargen } from "@/lib/totals";
 import { vencimientoEfectivo } from "@/lib/estado-cuenta";
 import { esNotaCredito } from "@/lib/dte-doc";
-import { fechaVentaNota, type NotaCobrable } from "@/lib/cobros";
+import {
+  fechaVentaNota,
+  desglosarIva,
+  type NotaCobrable,
+} from "@/lib/cobros";
+import {
+  normalizarItemsPago,
+  montoDeuda,
+} from "@/lib/forma-pago-compra";
+import { signoDte } from "@/lib/dte-doc";
 import { FinanzasVista } from "./finanzas-vista";
 
 type NotaQuery = {
   id: string;
   folio: string;
   total: number;
+  subtotal_neto: number;
   estado: string;
   created_at: string;
   clientes: { nombre: string } | null;
@@ -48,11 +58,12 @@ function fechaChile(iso: string): string {
 export default async function FinanzasPage() {
   const supabase = await createClient();
 
-  const [{ data: notasData, error }, { data: ventasData }] = await Promise.all([
+  const [{ data: notasData, error }, { data: ventasData }, { data: comprasData }] =
+    await Promise.all([
     supabase
       .from("notas_venta")
       .select(
-        `id, folio, total, estado, created_at, clientes(nombre),
+        `id, folio, total, subtotal_neto, estado, created_at, clientes(nombre),
          nota_venta_items(cantidad, costo, precio, descuento),
          pagos_nota_venta(id, monto, fecha, medio_pago, observacion)`
       )
@@ -62,6 +73,11 @@ export default async function FinanzasPage() {
       .select(
         "nota_venta_id, tipo_doc, monto_total, fecha_emision, forma_pago, term_pago_dias, fecha_vencimiento_manual"
       ),
+    // Para las cuentas por pagar: la deuda con proveedores sale de la forma de
+    // pago cargada a mano en cada compra, no del RCV.
+    supabase
+      .from("compras_sii")
+      .select("tipo_doc, monto_total, monto_neto, formas_pago"),
   ]);
 
   const ventas = (ventasData ?? []) as VentaQuery[];
@@ -92,7 +108,12 @@ export default async function FinanzasPage() {
     if (!actual || venc < actual) vencePorNota.set(v.nota_venta_id, venc);
   }
 
-  const notas: (NotaCobrable & { folio: string; cliente: string })[] = (
+  const notas: (NotaCobrable & {
+    folio: string;
+    cliente: string;
+    // Neto del documento, para poder separar qué parte de un saldo es IVA.
+    netoDoc: number;
+  })[] = (
     (notasData ?? []) as unknown as NotaQuery[]
   ).map((n) => {
     const { venta, margen } = calcularMargen(n.nota_venta_items ?? []);
@@ -101,6 +122,7 @@ export default async function FinanzasPage() {
       folio: n.folio,
       cliente: n.clientes?.nombre ?? "—",
       total: n.total,
+      netoDoc: n.subtotal_neto ?? 0,
       venta,
       margen,
       anulada: n.estado === "anulada",
@@ -125,6 +147,52 @@ export default async function FinanzasPage() {
     monto: sueltas.reduce((s, v) => s + (v.monto_total ?? 0), 0),
   };
 
+  // Cuentas por cobrar: saldo de todas las notas activas, no del período. Es
+  // un saldo a hoy, no un flujo del mes.
+  const porCobrar = desglosarIva(
+    notas
+      .filter((n) => !n.anulada)
+      .map((n) => ({
+        monto: n.total - n.cobros.reduce((s, c) => s + c.monto, 0),
+        netoDoc: n.netoDoc,
+        totalDoc: n.total,
+      }))
+      .filter((x) => x.monto > 0)
+  );
+
+  // Cuentas por pagar: lo asignado a cheque y crédito en cada compra. Las
+  // notas de crédito del proveedor restan.
+  const compras = (comprasData ?? []) as {
+    tipo_doc: number;
+    monto_total: number;
+    monto_neto: number;
+    formas_pago: unknown;
+  }[];
+  const conFormas = compras.filter(
+    (c) => normalizarItemsPago(c.formas_pago).length > 0
+  );
+  const porPagar = desglosarIva(
+    conFormas.map((c) => ({
+      monto:
+        signoDte(c.tipo_doc) *
+        (montoDeuda(normalizarItemsPago(c.formas_pago), c.monto_total) ?? 0),
+      netoDoc: c.monto_neto ?? 0,
+      totalDoc: c.monto_total ?? 0,
+    }))
+  );
+  // Las compras sin forma de pago cargada no se sabe si se deben: no suman, y
+  // se declaran para que el número no se lea como completo.
+  const comprasSinCargar = compras.filter(
+    (c) => normalizarItemsPago(c.formas_pago).length === 0
+  );
+  const pagarPendiente = {
+    cantidad: comprasSinCargar.length,
+    monto: comprasSinCargar.reduce(
+      (s, c) => s + signoDte(c.tipo_doc) * (c.monto_total ?? 0),
+      0
+    ),
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -140,7 +208,13 @@ export default async function FinanzasPage() {
           No se pudieron cargar los datos. Intenta nuevamente.
         </p>
       ) : (
-        <FinanzasVista notas={notas} sinNota={sinNota} />
+        <FinanzasVista
+          notas={notas}
+          sinNota={sinNota}
+          porCobrar={porCobrar}
+          porPagar={porPagar}
+          pagarPendiente={pagarPendiente}
+        />
       )}
     </div>
   );

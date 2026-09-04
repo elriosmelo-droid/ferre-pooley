@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fechaVentaNota,
+  desglosarIva,
   totalesListadoNotas,
   type FilaListado,
   cobrado,
@@ -447,5 +448,53 @@ describe("totalesListadoNotas", () => {
     expect(r.anuladas).toBe(1);
     expect(r.total).toBe(0);
     expect(r.pctMargen).toBe(0);
+  });
+});
+
+describe("desglosarIva", () => {
+  it("reparte un saldo entre neto e IVA según la proporción del documento", () => {
+    // Documento de $119.000 = $100.000 neto + $19.000 IVA. Si se debe la
+    // mitad, la mitad de esa deuda es IVA que habrá que enterar al fisco.
+    const r = desglosarIva([
+      { monto: 59500, netoDoc: 100000, totalDoc: 119000 },
+    ]);
+    expect(r.bruto).toBe(59500);
+    expect(r.neto).toBe(50000);
+    expect(r.iva).toBe(9500);
+  });
+
+  it("el neto y el IVA siempre suman el bruto, sin perder pesos al redondear", () => {
+    const r = desglosarIva([
+      { monto: 33333, netoDoc: 100000, totalDoc: 119000 },
+      { monto: 7, netoDoc: 3, totalDoc: 4 },
+    ]);
+    expect(r.neto + r.iva).toBe(r.bruto);
+  });
+
+  it("suma varios documentos con proporciones distintas", () => {
+    const r = desglosarIva([
+      { monto: 119000, netoDoc: 100000, totalDoc: 119000 }, // afecto
+      { monto: 50000, netoDoc: 50000, totalDoc: 50000 }, // exento, sin IVA
+    ]);
+    expect(r.bruto).toBe(169000);
+    expect(r.neto).toBe(150000);
+    expect(r.iva).toBe(19000);
+  });
+
+  it("un documento exento no aporta IVA", () => {
+    const r = desglosarIva([{ monto: 50000, netoDoc: 50000, totalDoc: 50000 }]);
+    expect(r.iva).toBe(0);
+    expect(r.neto).toBe(50000);
+  });
+
+  it("con total del documento en cero no divide por cero", () => {
+    const r = desglosarIva([{ monto: 1000, netoDoc: 0, totalDoc: 0 }]);
+    expect(r.bruto).toBe(1000);
+    expect(r.neto).toBe(1000); // sin proporción conocida, todo se trata como neto
+    expect(r.iva).toBe(0);
+  });
+
+  it("sin filas devuelve todo en cero", () => {
+    expect(desglosarIva([])).toEqual({ bruto: 0, neto: 0, iva: 0 });
   });
 });
