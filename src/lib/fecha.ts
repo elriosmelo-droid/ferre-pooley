@@ -54,3 +54,15 @@ export function ultimosMeses(hoy: string, n: number): Mes[] {
   }
   return meses;
 }
+
+// Días entre dos fechas 'AAAA-MM-DD'. Negativo si `hasta` ya pasó.
+//
+// Se calcula en UTC a propósito: en los cambios de horario de verano hay días
+// de 23 y 25 horas, y dividir milisegundos locales por 86.400.000 devolvería
+// 2,96 o 3,04 días en vez de 3.
+export function diasEntre(desde: string, hasta: string): number {
+  const [a1, m1, d1] = desde.slice(0, 10).split("-").map(Number);
+  const [a2, m2, d2] = hasta.slice(0, 10).split("-").map(Number);
+  const ms = Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1);
+  return Math.round(ms / 86400000);
+}

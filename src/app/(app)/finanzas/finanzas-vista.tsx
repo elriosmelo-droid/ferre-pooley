@@ -6,6 +6,7 @@ import { formatCLP } from "@/lib/money";
 import { formatPct } from "@/lib/totals";
 import {
   cobrado,
+  saldo,
   resumenPorVenta,
   resumenPorCaja,
   abonosEnRango,
@@ -14,12 +15,15 @@ import {
   pctUtilidad,
   type NotaCobrable,
 } from "@/lib/cobros";
-import { hoyChile, ultimosMeses } from "@/lib/fecha";
+import { hoyChile, ultimosMeses, diasEntre } from "@/lib/fecha";
 
 export type NotaFinanzas = NotaCobrable & {
   folio: string;
   cliente: string;
   netoDoc: number;
+  // Folios de las facturas del SII de esta nota. Puede venir vacío: una nota
+  // recién creada todavía no se factura.
+  facturas: string[];
 };
 
 // Un saldo separado en su parte neta y su IVA.
@@ -151,6 +155,80 @@ export function FinanzasVista({
       setHastaSit(m.hasta);
     }
   }
+
+  // Notas del período elegido arriba, sin anuladas. Es la base de las tres
+  // secciones de Situación: los totales y los dos detalles.
+  const notasSit = useMemo(
+    () =>
+      notas.filter(
+        (n) =>
+          !n.anulada &&
+          (!desdeSit || n.fechaVenta >= desdeSit) &&
+          (!hastaSit || n.fechaVenta <= hastaSit)
+      ),
+    [notas, desdeSit, hastaSit]
+  );
+
+  // Detalle de lo percibido: una fila por nota con algo cobrado, ordenada por
+  // lo que más utilidad trajo.
+  const percibidas = useMemo(
+    () =>
+      notasSit
+        .map((n) => {
+          const cob = cobrado(n.cobros);
+          return {
+            n,
+            cobrado: cob,
+            utilidad: utilidadPercibida(n),
+            // Último abono: es "cuándo se pagó" para quien mira la fila.
+            ultimoPago: n.cobros
+              .map((c) => c.fecha)
+              .sort()
+              .at(-1),
+            pctCobrado: n.total > 0 ? (cob / n.total) * 100 : 0,
+          };
+        })
+        .filter((f) => f.cobrado > 0)
+        .sort((a, b) => b.utilidad - a.utilidad),
+    [notasSit]
+  );
+
+  // Detalle de lo que falta cobrar, ordenado por vencimiento: lo que vence
+  // antes va primero, y lo sin fecha al final.
+  const porPercibir = useMemo(
+    () =>
+      notasSit
+        .map((n) => {
+          const saldoPend = saldo(n.total, n.cobros);
+          return {
+            n,
+            saldo: saldoPend,
+            // La utilidad que falta es la total menos la ya percibida.
+            utilidad: n.margen - utilidadPercibida(n),
+            dias: n.vencimiento ? diasEntre(hoy, n.vencimiento) : null,
+          };
+        })
+        .filter((f) => f.saldo > 0)
+        .sort((a, b) => {
+          if (a.dias === null) return 1;
+          if (b.dias === null) return -1;
+          return a.dias - b.dias;
+        }),
+    [notasSit, hoy]
+  );
+
+  const totPercibidas = {
+    utilidad: percibidas.reduce((s, f) => s + f.utilidad, 0),
+    cobrado: percibidas.reduce((s, f) => s + f.cobrado, 0),
+  };
+  const totPorPercibir = {
+    utilidad: porPercibir.reduce((s, f) => s + f.utilidad, 0),
+    saldo: porPercibir.reduce((s, f) => s + f.saldo, 0),
+    vencido: porPercibir
+      .filter((f) => f.dias !== null && f.dias < 0)
+      .reduce((s, f) => s + f.saldo, 0),
+    sinFecha: porPercibir.filter((f) => f.dias === null).length,
+  };
 
   // Utilidad del período elegido arriba. Las anuladas quedan fuera vía
   // resumenPorVenta.
@@ -374,6 +452,196 @@ export function FinanzasVista({
           fisco, y en lo que debes lo recuperas como crédito. La utilidad ya
           está neta, por eso no lleva desglose.
         </p>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Utilidades percibidas
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Facturas del período cuya venta ya se cobró, total o en parte.
+            </p>
+          </div>
+          <div className="flex gap-6 text-right">
+            <div>
+              <p className="text-xs text-slate-500">Cobrado</p>
+              <p className="text-xl font-bold text-slate-900">
+                {formatCLP(totPercibidas.cobrado)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Utilidad percibida</p>
+              <p className="text-xl font-bold text-green-700">
+                {formatCLP(totPercibidas.utilidad)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Factura</th>
+                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Último pago</th>
+                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3 text-right">Cobrado</th>
+                <th className="px-4 py-3 text-right">Utilidad percibida</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {percibidas.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                    No se ha cobrado nada de las ventas del período.
+                  </td>
+                </tr>
+              ) : (
+                percibidas.map((f) => (
+                  <tr key={f.n.id} className="text-slate-700">
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {f.n.facturas.length > 0 ? (
+                        f.n.facturas.join(", ")
+                      ) : (
+                        <span
+                          className="text-amber-700"
+                          title="Esta nota todavía no tiene factura emitida"
+                        >
+                          sin factura
+                        </span>
+                      )}
+                      <div className="text-xs font-normal text-slate-400">
+                        {f.n.folio}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">{f.n.cliente}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {formatFecha(f.ultimoPago ?? null)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {formatCLP(f.n.total)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {formatCLP(f.cobrado)}
+                      <div className="text-xs text-slate-400">
+                        {formatPct(f.pctCobrado)} del total
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-green-700">
+                      {formatCLP(f.utilidad)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Utilidades por percibir
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Lo que falta cobrar de las ventas del período, y cuándo debería
+              entrar según el plazo de cada factura.
+            </p>
+          </div>
+          <div className="flex gap-6 text-right">
+            <div>
+              <p className="text-xs text-slate-500">Por cobrar</p>
+              <p className="text-xl font-bold text-slate-900">
+                {formatCLP(totPorPercibir.saldo)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Utilidad por percibir</p>
+              <p className="text-xl font-bold text-amber-700">
+                {formatCLP(totPorPercibir.utilidad)}
+              </p>
+            </div>
+          </div>
+        </div>
+        {(totPorPercibir.vencido > 0 || totPorPercibir.sinFecha > 0) && (
+          <div className="border-b border-slate-100 px-6 py-3 text-xs">
+            {totPorPercibir.vencido > 0 && (
+              <span className="mr-4 font-medium text-red-600">
+                {formatCLP(totPorPercibir.vencido)} ya vencido
+              </span>
+            )}
+            {totPorPercibir.sinFecha > 0 && (
+              <span className="text-slate-500">
+                {totPorPercibir.sinFecha} sin fecha: no tienen factura emitida,
+                así que no hay plazo desde el cual contar
+              </span>
+            )}
+          </div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Factura</th>
+                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Vence</th>
+                <th className="px-4 py-3">Cuándo</th>
+                <th className="px-4 py-3 text-right">Por cobrar</th>
+                <th className="px-4 py-3 text-right">Utilidad por percibir</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {porPercibir.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                    No queda nada por cobrar de las ventas del período.
+                  </td>
+                </tr>
+              ) : (
+                porPercibir.map((f) => (
+                  <tr key={f.n.id} className="text-slate-700">
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {f.n.facturas.length > 0 ? (
+                        f.n.facturas.join(", ")
+                      ) : (
+                        <span className="text-amber-700">sin factura</span>
+                      )}
+                      <div className="text-xs font-normal text-slate-400">
+                        {f.n.folio}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">{f.n.cliente}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {formatFecha(f.n.vencimiento)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {f.dias === null ? (
+                        <span className="text-slate-400">—</span>
+                      ) : f.dias < 0 ? (
+                        <span className="font-medium text-red-600">
+                          vencida hace {Math.abs(f.dias)} d
+                        </span>
+                      ) : f.dias === 0 ? (
+                        <span className="font-medium text-amber-700">hoy</span>
+                      ) : (
+                        <span className="text-slate-600">en {f.dias} d</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {formatCLP(f.saldo)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-amber-700">
+                      {formatCLP(f.utilidad)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {sinNota.cantidad > 0 && (

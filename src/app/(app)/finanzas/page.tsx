@@ -39,6 +39,7 @@ type NotaQuery = {
 
 type VentaQuery = {
   nota_venta_id: string | null;
+  folio: string;
   tipo_doc: number;
   monto_total: number;
   fecha_emision: string | null;
@@ -71,7 +72,7 @@ export default async function FinanzasPage() {
     supabase
       .from("ventas_sii")
       .select(
-        "nota_venta_id, tipo_doc, monto_total, fecha_emision, forma_pago, term_pago_dias, fecha_vencimiento_manual"
+        "nota_venta_id, folio, tipo_doc, monto_total, fecha_emision, forma_pago, term_pago_dias, fecha_vencimiento_manual"
       ),
     // Para las cuentas por pagar: la deuda con proveedores sale de la forma de
     // pago cargada a mano en cada compra, no del RCV.
@@ -113,6 +114,7 @@ export default async function FinanzasPage() {
     cliente: string;
     // Neto del documento, para poder separar qué parte de un saldo es IVA.
     netoDoc: number;
+    facturas: string[];
   })[] = (
     (notasData ?? []) as unknown as NotaQuery[]
   ).map((n) => {
@@ -123,6 +125,12 @@ export default async function FinanzasPage() {
       cliente: n.clientes?.nombre ?? "—",
       total: n.total,
       netoDoc: n.subtotal_neto ?? 0,
+      // Folios de las facturas (33/34) de esta nota: es lo que el usuario
+      // reconoce, la nota es un documento interno.
+      facturas: (facturasPorNota.get(n.id) ?? [])
+        .filter((v) => !esNotaCredito(v.tipo_doc))
+        .map((v) => v.folio)
+        .sort(),
       venta,
       margen,
       anulada: n.estado === "anulada",

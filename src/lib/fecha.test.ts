@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ultimosMeses } from "./fecha";
+import { ultimosMeses, diasEntre } from "./fecha";
 
 describe("ultimosMeses", () => {
   it("devuelve el mes en curso y los anteriores, del más reciente al más viejo", () => {
@@ -39,5 +39,30 @@ describe("ultimosMeses", () => {
 
   it("pedir cero meses devuelve lista vacía", () => {
     expect(ultimosMeses("2026-09-03", 0)).toEqual([]);
+  });
+});
+
+describe("diasEntre", () => {
+  it("cuenta los días entre dos fechas", () => {
+    expect(diasEntre("2026-09-03", "2026-09-13")).toBe(10);
+  });
+
+  it("es negativo si la fecha ya pasó", () => {
+    expect(diasEntre("2026-09-13", "2026-09-03")).toBe(-10);
+  });
+
+  it("el mismo día son cero días", () => {
+    expect(diasEntre("2026-09-03", "2026-09-03")).toBe(0);
+  });
+
+  it("cruza el cambio de mes y de año sin errores", () => {
+    expect(diasEntre("2026-12-28", "2027-01-04")).toBe(7);
+  });
+
+  it("no se descuadra en el cambio de horario de verano de Chile", () => {
+    // Si se calculara con horas locales, un día de 23 o 25 horas rompería la
+    // división. Se calcula en UTC justamente para eso.
+    expect(diasEntre("2026-09-05", "2026-09-08")).toBe(3);
+    expect(diasEntre("2026-04-03", "2026-04-06")).toBe(3);
   });
 });
