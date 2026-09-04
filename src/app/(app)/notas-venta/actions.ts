@@ -78,14 +78,22 @@ export async function eliminarCobro(
 ): Promise<NotaVentaActionResult> {
   const supabase = await createClient();
 
-  const { error } = await supabase
+  // El .eq("nota_venta_id") evita borrar (y revalidar) la nota equivocada si
+  // llega un id válido con un notaVentaId que no le corresponde (estado
+  // viejo en el navegador): en ese caso el delete no afecta filas.
+  const { data, error } = await supabase
     .from("pagos_nota_venta")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("nota_venta_id", notaVentaId)
+    .select("id");
 
   if (error) {
     console.error("Error al eliminar cobro:", error.message);
     return { error: "No se pudo eliminar el cobro. Intenta nuevamente." };
+  }
+  if (!data?.length) {
+    return { error: "El cobro ya no existe" };
   }
 
   revalidatePath("/notas-venta");

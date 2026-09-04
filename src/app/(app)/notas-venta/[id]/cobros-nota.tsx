@@ -31,6 +31,19 @@ export function CobrosNota({
   const [monto, setMonto] = useState(() =>
     pendiente > 0 ? String(pendiente) : ""
   );
+  // registrarCobro/eliminarCobro revalidan la ruta: cuando la transición
+  // termina, este componente vuelve a recibir `total`/`cobros` frescos del
+  // servidor y `pendiente` cambia. Re-prellenamos con ese saldo nuevo (no
+  // con "saldo anterior menos lo que se acaba de tipear", que podría no
+  // coincidir si el trigger o un cobro concurrente movió el número). Se
+  // ajusta durante el render, no en un efecto: es el patrón que React
+  // recomienda para sincronizar estado con un prop que cambió, y evita el
+  // repintado extra de un setState dentro de useEffect.
+  const [pendienteVisto, setPendienteVisto] = useState(pendiente);
+  if (pendiente !== pendienteVisto) {
+    setPendienteVisto(pendiente);
+    setMonto(pendiente > 0 ? String(pendiente) : "");
+  }
   const [fecha, setFecha] = useState(hoyChile);
   const [medio, setMedio] = useState("");
   const [observacion, setObservacion] = useState("");
@@ -52,7 +65,8 @@ export function CobrosNota({
         return;
       }
       setObservacion("");
-      setMonto("");
+      // El monto no se limpia acá: el efecto de arriba lo re-prellena con el
+      // saldo que devuelva el servidor una vez la revalidación llegue.
     });
   }
 
