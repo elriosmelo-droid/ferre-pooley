@@ -6,7 +6,6 @@ import { formatCLP } from "@/lib/money";
 import { formatPct } from "@/lib/totals";
 import {
   cobrado,
-  hoyChile,
   resumenPorVenta,
   resumenPorCaja,
   abonosEnRango,
@@ -15,6 +14,7 @@ import {
   pctUtilidad,
   type NotaCobrable,
 } from "@/lib/cobros";
+import { hoyChile } from "@/lib/fecha";
 
 export type NotaFinanzas = NotaCobrable & { folio: string; cliente: string };
 

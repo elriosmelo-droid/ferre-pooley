@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { formatCLP } from "@/lib/money";
-import { cobrado, saldo, hoyChile, type Cobro } from "@/lib/cobros";
+import { cobrado, saldo, type Cobro } from "@/lib/cobros";
+import { hoyChile } from "@/lib/fecha";
 import { MEDIOS_PAGO, etiquetaMedioPago } from "@/lib/medio-pago";
 import { registrarCobro, eliminarCobro } from "../actions";
 

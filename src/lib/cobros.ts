@@ -267,10 +267,3 @@ export function totalesListadoNotas(filas: FilaListado[]): TotalesListado {
   return r;
 }
 
-// Hoy en Chile como 'AAAA-MM-DD'. El servidor corre en UTC, así que usar
-// `new Date()` directo corre el día durante la noche chilena.
-export function hoyChile(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Santiago",
-  }).format(new Date());
-}

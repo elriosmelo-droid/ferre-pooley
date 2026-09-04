@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { formatPct } from "@/lib/totals";
 import { totalesListadoNotas } from "@/lib/cobros";
+import { diaChile, hoyChile, ultimosMeses } from "@/lib/fecha";
 import { NotaEstadoBadge, type NotaVentaEstado } from "./nota-estado-badge";
 
 const ESTADO_LABEL: Record<NotaVentaEstado, string> = {
@@ -38,18 +39,25 @@ function formatFecha(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-// Día en hora de Chile a partir de un timestamptz.
-function diaChile(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Santiago",
-  }).format(new Date(iso));
-}
-
 export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("");
+  // Atajos por mes: el mes en curso y los dos anteriores. Setean desde/hasta,
+  // así que no son un filtro aparte y se pueden ajustar a mano después.
+  const meses = useMemo(() => ultimosMeses(hoyChile(), 3), []);
+  const mesActivo = meses.find((m) => m.desde === desde && m.hasta === hasta);
+
+  function alternarMes(m: (typeof meses)[number]) {
+    if (mesActivo?.clave === m.clave) {
+      setDesde("");
+      setHasta("");
+    } else {
+      setDesde(m.desde);
+      setHasta(m.hasta);
+    }
+  }
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -148,6 +156,33 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
             Limpiar
           </button>
         )}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-slate-500">Mes:</span>
+        {meses.map((m) => {
+          const activo = mesActivo?.clave === m.clave;
+          return (
+            <button
+              key={m.clave}
+              type="button"
+              onClick={() => alternarMes(m)}
+              aria-pressed={activo}
+              title={
+                activo
+                  ? "Quitar el filtro de mes"
+                  : `Ver las ventas de ${m.etiqueta}`
+              }
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                activo
+                  ? "bg-brand-600 text-white"
+                  : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {m.etiqueta}
+            </button>
+          );
+        })}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
