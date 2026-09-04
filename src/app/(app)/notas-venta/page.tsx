@@ -5,13 +5,14 @@ import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
-type NotaConItems = Omit<NotaVentaRow, "venta" | "costo"> & {
+type NotaConItems = Omit<NotaVentaRow, "venta" | "costo" | "cobrado"> & {
   nota_venta_items: {
     cantidad: number;
     costo: number;
     precio: number;
     descuento: number;
   }[];
+  pagos_nota_venta: { monto: number }[];
 };
 
 export default async function NotasVentaPage() {
@@ -21,7 +22,7 @@ export default async function NotasVentaPage() {
     .from("notas_venta")
     .select(
       `id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio),
-       nota_venta_items(cantidad, costo, precio, descuento)`
+       nota_venta_items(cantidad, costo, precio, descuento), pagos_nota_venta(monto)`
     )
     .order("created_at", { ascending: false });
 
@@ -29,9 +30,14 @@ export default async function NotasVentaPage() {
   // al cliente solo para sumarlos sería cargar la página de más.
   const notas: NotaVentaRow[] = (
     (data ?? []) as unknown as NotaConItems[]
-  ).map(({ nota_venta_items, ...nota }) => {
+  ).map(({ nota_venta_items, pagos_nota_venta, ...nota }) => {
     const { venta, costo } = calcularMargen(nota_venta_items ?? []);
-    return { ...nota, venta, costo };
+    return {
+      ...nota,
+      venta,
+      costo,
+      cobrado: (pagos_nota_venta ?? []).reduce((s, p) => s + p.monto, 0),
+    };
   });
 
   return (

@@ -24,6 +24,8 @@ export type NotaVentaRow = {
   // flete. La resta entre ambos es el margen interno de la nota.
   venta: number;
   costo: number;
+  // Suma de los abonos registrados. El saldo es total − cobrado.
+  cobrado: number;
 };
 
 export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
@@ -129,6 +131,7 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
               <th className="px-4 py-3">Cotización</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Saldo</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -136,7 +139,7 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No hay notas de venta que coincidan con los filtros.
                 </td>
               </tr>
@@ -167,6 +170,24 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
                   <td className="px-4 py-3 text-right font-medium text-slate-900">
                     {formatCLP(nota.total)}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    {(() => {
+                      const pendiente = nota.total - nota.cobrado;
+                      if (pendiente === 0)
+                        return <span className="text-slate-400">—</span>;
+                      return (
+                        <span
+                          className={
+                            pendiente > 0
+                              ? "font-medium text-amber-700"
+                              : "font-medium text-red-600"
+                          }
+                        >
+                          {formatCLP(pendiente)}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-4 py-3">
                     <NotaEstadoBadge estado={nota.estado} />
                   </td>
@@ -190,6 +211,11 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
                   venta
                 </td>
                 <td className="px-4 py-3 text-right">{formatCLP(total)}</td>
+                <td className="px-4 py-3 text-right">
+                  {formatCLP(
+                    filtradas.reduce((s, n) => s + (n.total - n.cobrado), 0)
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right" colSpan={2}>
                   <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
                     Margen interno
