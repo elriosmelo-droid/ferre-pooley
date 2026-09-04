@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fechaVentaNota,
   desglosarIva,
+  parteNeta,
   totalesListadoNotas,
   type FilaListado,
   cobrado,
@@ -28,6 +29,7 @@ function nota(over: Partial<NotaCobrable> = {}): NotaCobrable {
   return {
     id: "n1",
     total: 100000,
+    netoDoc: 84034, // 100.000 brutos = 84.034 netos + IVA
     venta: 84000,
     margen: 20000,
     anulada: false,
@@ -193,6 +195,10 @@ describe("resumenPorVenta", () => {
       utilidadPercibida: 0,
       porCobrar: 0,
       porCobrarVencido: 0,
+      vendidoNeto: 0,
+      cobradoNeto: 0,
+      porCobrarNeto: 0,
+      porCobrarVencidoNeto: 0,
     });
   });
 });
@@ -216,12 +222,12 @@ describe("abonosEnRango y resumenPorCaja", () => {
     const n = nota({
       cobros: [cobro("2026-06-10", 30000), cobro("2026-07-05", 70000)],
     });
-    expect(resumenPorCaja([n], "2026-06-01", "2026-06-30")).toEqual({
+    expect(resumenPorCaja([n], "2026-06-01", "2026-06-30")).toMatchObject({
       abonos: 1,
       cobrado: 30000,
       utilidadPercibida: 6000,
     });
-    expect(resumenPorCaja([n], "2026-07-01", "2026-07-31")).toEqual({
+    expect(resumenPorCaja([n], "2026-07-01", "2026-07-31")).toMatchObject({
       abonos: 1,
       cobrado: 70000,
       utilidadPercibida: 14000,
@@ -230,7 +236,7 @@ describe("abonosEnRango y resumenPorCaja", () => {
 
   it("ignora los abonos de notas anuladas", () => {
     const n = nota({ anulada: true, cobros: [cobro("2026-06-10", 30000)] });
-    expect(resumenPorCaja([n], "2026-06-01", "2026-06-30")).toEqual({
+    expect(resumenPorCaja([n], "2026-06-01", "2026-06-30")).toMatchObject({
       abonos: 0,
       cobrado: 0,
       utilidadPercibida: 0,
@@ -239,7 +245,7 @@ describe("abonosEnRango y resumenPorCaja", () => {
 
   it("un rango sin abonos devuelve todo en cero", () => {
     const n = nota({ cobros: [cobro("2026-06-10", 30000)] });
-    expect(resumenPorCaja([n], "2026-01-01", "2026-01-31")).toEqual({
+    expect(resumenPorCaja([n], "2026-01-01", "2026-01-31")).toMatchObject({
       abonos: 0,
       cobrado: 0,
       utilidadPercibida: 0,
@@ -255,7 +261,7 @@ describe("pctUtilidad", () => {
   });
 
   it("sin venta devuelve 0 en vez de dividir por cero", () => {
-    expect(pctUtilidad({ notas: 0, vendido: 0, venta: 0, utilidad: 0, cobrado: 0, utilidadPercibida: 0, porCobrar: 0, porCobrarVencido: 0 })).toBe(0);
+    expect(pctUtilidad({ notas: 0, vendido: 0, venta: 0, utilidad: 0, cobrado: 0, utilidadPercibida: 0, porCobrar: 0, porCobrarVencido: 0, vendidoNeto: 0, cobradoNeto: 0, porCobrarNeto: 0, porCobrarVencidoNeto: 0 })).toBe(0);
   });
 
   // Regresión: el % de utilidad debe ir sobre `venta` (neta, sin flete ni
@@ -275,6 +281,10 @@ describe("pctUtilidad", () => {
       utilidadPercibida: 0,
       porCobrar: 0,
       porCobrarVencido: 0,
+      vendidoNeto: 1000000,
+      cobradoNeto: 0,
+      porCobrarNeto: 0,
+      porCobrarVencidoNeto: 0,
     };
     expect(pctUtilidad(r)).toBe(20); // 200.000 / 1.000.000 (venta), no / 1.190.000 (vendido)
   });
@@ -496,5 +506,70 @@ describe("desglosarIva", () => {
 
   it("sin filas devuelve todo en cero", () => {
     expect(desglosarIva([])).toEqual({ bruto: 0, neto: 0, iva: 0 });
+  });
+});
+
+describe("parteNeta", () => {
+  it("saca la parte neta de un monto según la proporción del documento", () => {
+    expect(parteNeta(119000, 100000, 119000)).toBe(100000);
+    expect(parteNeta(59500, 100000, 119000)).toBe(50000);
+  });
+
+  it("un documento exento devuelve el monto completo", () => {
+    expect(parteNeta(50000, 50000, 50000)).toBe(50000);
+  });
+
+  it("con total en cero devuelve el monto sin inventar IVA", () => {
+    expect(parteNeta(1000, 0, 0)).toBe(1000);
+  });
+
+  it("redondea al peso", () => {
+    expect(parteNeta(1000, 100000, 119000)).toBe(840); // 840,3
+  });
+});
+
+describe("resumenPorVenta en versión neta", () => {
+  const nota = (over: Partial<NotaCobrable> = {}): NotaCobrable => ({
+    id: "n1",
+    total: 119000,
+    netoDoc: 100000,
+    venta: 100000,
+    margen: 20000,
+    anulada: false,
+    fechaVenta: "2026-06-01",
+    vencimiento: "2026-07-01",
+    cobros: [],
+    ...over,
+  });
+
+  it("acumula vendido, cobrado y por cobrar también sin IVA", () => {
+    const r = resumenPorVenta(
+      [
+        nota({
+          cobros: [
+            {
+              id: "a",
+              fecha: "2026-06-10",
+              monto: 59500,
+              medio_pago: null,
+              observacion: null,
+            },
+          ],
+        }),
+      ],
+      "2026-06-15"
+    );
+    expect(r.vendido).toBe(119000);
+    expect(r.vendidoNeto).toBe(100000);
+    expect(r.cobrado).toBe(59500);
+    expect(r.cobradoNeto).toBe(50000);
+    expect(r.porCobrar).toBe(59500);
+    expect(r.porCobrarNeto).toBe(50000);
+  });
+
+  it("las anuladas tampoco suman a las versiones netas", () => {
+    const r = resumenPorVenta([nota({ anulada: true })], "2026-06-15");
+    expect(r.vendidoNeto).toBe(0);
+    expect(r.porCobrarNeto).toBe(0);
   });
 });

@@ -57,6 +57,9 @@ export function fechaVentaNota(
 export type NotaCobrable = {
   id: string;
   total: number; // bruto, con IVA y flete
+  // Neto del documento (con flete, sin IVA). Es la base para mostrar cualquier
+  // monto "sin IVA": el IVA se cobra y se entera al fisco, no es de la empresa.
+  netoDoc: number;
   venta: number; // neto, sin flete ni IVA (sale de calcularMargen)
   margen: number; // neto, sin flete
   anulada: boolean;
@@ -111,6 +114,12 @@ export type ResumenVenta = {
   utilidadPercibida: number;
   porCobrar: number;
   porCobrarVencido: number;
+  // Las mismas cifras de plata sin su IVA, para la vista "Sin IVA". La
+  // utilidad no lleva versión: ya es neta.
+  vendidoNeto: number;
+  cobradoNeto: number;
+  porCobrarNeto: number;
+  porCobrarVencidoNeto: number;
 };
 
 // Lente "por venta": de lo vendido en el período, cuánto se ha cobrado. Las
@@ -129,6 +138,10 @@ export function resumenPorVenta(
     utilidadPercibida: 0,
     porCobrar: 0,
     porCobrarVencido: 0,
+    vendidoNeto: 0,
+    cobradoNeto: 0,
+    porCobrarNeto: 0,
+    porCobrarVencidoNeto: 0,
   };
   for (const n of notas) {
     if (n.anulada) continue;
@@ -136,14 +149,21 @@ export function resumenPorVenta(
     const pendiente = n.total - pagado;
     r.notas += 1;
     r.vendido += n.total;
+    r.vendidoNeto += n.netoDoc;
     r.venta += n.venta;
     r.utilidad += n.margen;
     r.cobrado += pagado;
+    r.cobradoNeto += parteNeta(pagado, n.netoDoc, n.total);
     r.utilidadPercibida += utilidadPercibida(n);
     // Un saldo negativo no es plata por cobrar: no suma al pendiente.
     if (pendiente > 0) {
+      const pendienteNeto = parteNeta(pendiente, n.netoDoc, n.total);
       r.porCobrar += pendiente;
-      if (estaVencida(n, hoy)) r.porCobrarVencido += pendiente;
+      r.porCobrarNeto += pendienteNeto;
+      if (estaVencida(n, hoy)) {
+        r.porCobrarVencido += pendiente;
+        r.porCobrarVencidoNeto += pendienteNeto;
+      }
     }
   }
   return r;
@@ -184,6 +204,7 @@ export function abonosEnRango<T extends NotaCobrable>(
 export type ResumenCaja = {
   abonos: number;
   cobrado: number;
+  cobradoNeto: number;
   utilidadPercibida: number;
 };
 
@@ -198,6 +219,10 @@ export function resumenPorCaja(
   return {
     abonos: dentro.length,
     cobrado: dentro.reduce((s, a) => s + a.cobro.monto, 0),
+    cobradoNeto: dentro.reduce(
+      (s, a) => s + parteNeta(a.cobro.monto, a.nota.netoDoc, a.nota.total),
+      0
+    ),
     utilidadPercibida: dentro.reduce((s, a) => s + a.utilidad, 0),
   };
 }
@@ -239,13 +264,23 @@ export type DesgloseIva = {
 //
 // El IVA se calcula como resta y no como su propio redondeo, para que neto más
 // IVA sea exactamente el bruto y no se pierda un peso por fila.
+// Parte neta de un monto, en proporción a la del documento del que sale. Un
+// saldo parcial no viene etiquetado: si se debe la mitad de una factura, se
+// debe la mitad de su IVA. Sin total conocido devuelve el monto entero en vez
+// de inventar un IVA.
+export function parteNeta(
+  monto: number,
+  netoDoc: number,
+  totalDoc: number
+): number {
+  if (totalDoc <= 0) return monto;
+  return Math.round((monto * netoDoc) / totalDoc);
+}
+
 export function desglosarIva(saldos: SaldoConDocumento[]): DesgloseIva {
   const r: DesgloseIva = { bruto: 0, neto: 0, iva: 0 };
   for (const s of saldos) {
-    // Sin total conocido no hay proporción que aplicar: se trata todo como
-    // neto en vez de inventar un IVA.
-    const neto =
-      s.totalDoc > 0 ? Math.round((s.monto * s.netoDoc) / s.totalDoc) : s.monto;
+    const neto = parteNeta(s.monto, s.netoDoc, s.totalDoc);
     r.bruto += s.monto;
     r.neto += neto;
     r.iva += s.monto - neto;

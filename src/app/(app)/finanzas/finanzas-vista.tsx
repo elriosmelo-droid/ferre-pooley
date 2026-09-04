@@ -7,6 +7,7 @@ import { formatPct } from "@/lib/totals";
 import {
   cobrado,
   saldo,
+  parteNeta,
   resumenPorVenta,
   resumenPorCaja,
   abonosEnRango,
@@ -20,7 +21,6 @@ import { hoyChile, ultimosMeses, diasEntre } from "@/lib/fecha";
 export type NotaFinanzas = NotaCobrable & {
   folio: string;
   cliente: string;
-  netoDoc: number;
   // Folios de las facturas del SII de esta nota. Puede venir vacío: una nota
   // recién creada todavía no se factura.
   facturas: string[];
@@ -28,48 +28,6 @@ export type NotaFinanzas = NotaCobrable & {
 
 // Un saldo separado en su parte neta y su IVA.
 export type Desglose = { bruto: number; neto: number; iva: number };
-
-// Card de un monto con su desglose de IVA debajo. El IVA de una cuenta por
-// cobrar no es plata de la empresa (se entera al fisco) y el de una por pagar
-// se recupera como crédito: verlos juntos infla lo que uno cree que tiene.
-function CardIva({
-  label,
-  d,
-  detalle,
-  aviso,
-  tono,
-}: {
-  label: string;
-  d: Desglose;
-  detalle: string;
-  aviso?: string;
-  tono: "cobrar" | "pagar";
-}) {
-  return (
-    <div className="rounded-xl bg-slate-50 p-5">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p
-        className={`mt-2 text-2xl font-bold tracking-tight sm:text-3xl ${
-          tono === "pagar" ? "text-red-700" : "text-slate-900"
-        }`}
-      >
-        {formatCLP(d.bruto)}
-      </p>
-      <dl className="mt-2 space-y-0.5 text-xs text-slate-600">
-        <div className="flex justify-between">
-          <dt>Neto</dt>
-          <dd className="font-medium">{formatCLP(d.neto)}</dd>
-        </div>
-        <div className="flex justify-between text-slate-400">
-          <dt>IVA</dt>
-          <dd>{formatCLP(d.iva)}</dd>
-        </div>
-      </dl>
-      <p className="mt-1.5 text-xs text-slate-500">{detalle}</p>
-      {aviso && <p className="mt-1 text-xs text-amber-700">{aviso}</p>}
-    </div>
-  );
-}
 
 const LENTES = [
   {
@@ -117,6 +75,40 @@ function Kpi({
   );
 }
 
+// Card de un monto, con una nota al pie cuando hay algo que aclarar (el IVA
+// que lleva incluido, o lo que quedó fuera del cálculo).
+function CardMonto({
+  label,
+  monto,
+  detalle,
+  nota,
+  aviso,
+  tono,
+}: {
+  label: string;
+  monto: number;
+  detalle: string;
+  nota?: string;
+  aviso?: string;
+  tono: "cobrar" | "pagar";
+}) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-5">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p
+        className={`mt-2 text-2xl font-bold tracking-tight sm:text-3xl ${
+          tono === "pagar" ? "text-red-700" : "text-slate-900"
+        }`}
+      >
+        {formatCLP(monto)}
+      </p>
+      <p className="mt-1.5 text-xs text-slate-500">{detalle}</p>
+      {nota && <p className="mt-1 text-xs text-slate-400">{nota}</p>}
+      {aviso && <p className="mt-1 text-xs text-amber-700">{aviso}</p>}
+    </div>
+  );
+}
+
 export function FinanzasVista({
   notas,
   sinNota,
@@ -135,6 +127,18 @@ export function FinanzasVista({
   const [desde, setDesde] = useState(() => `${hoy.slice(0, 7)}-01`);
   const [hasta, setHasta] = useState(hoy);
   const [busqueda, setBusqueda] = useState("");
+
+  // Con IVA / Sin IVA para TODA la página. El IVA no es de la empresa: se
+  // cobra al cliente para enterarlo al fisco, y en las compras se recupera
+  // como crédito. Verlo aparte cambia el tamaño de lo que uno cree que tiene.
+  // La utilidad no cambia con el switch: ya se calcula sobre montos netos.
+  const [conIva, setConIva] = useState(true);
+
+  // Convierte un monto bruto a la base elegida, en proporción a su documento.
+  const base = (
+    monto: number,
+    doc: { netoDoc: number; total: number }
+  ): number => (conIva ? monto : parteNeta(monto, doc.netoDoc, doc.total));
 
   // La sección "Situación" tiene su propio período, independiente del de las
   // lentes de abajo: son dos preguntas distintas y compartir un filtro hacía
@@ -219,14 +223,14 @@ export function FinanzasVista({
 
   const totPercibidas = {
     utilidad: percibidas.reduce((s, f) => s + f.utilidad, 0),
-    cobrado: percibidas.reduce((s, f) => s + f.cobrado, 0),
+    cobrado: percibidas.reduce((s, f) => s + base(f.cobrado, f.n), 0),
   };
   const totPorPercibir = {
     utilidad: porPercibir.reduce((s, f) => s + f.utilidad, 0),
-    saldo: porPercibir.reduce((s, f) => s + f.saldo, 0),
+    saldo: porPercibir.reduce((s, f) => s + base(f.saldo, f.n), 0),
     vencido: porPercibir
       .filter((f) => f.dias !== null && f.dias < 0)
-      .reduce((s, f) => s + f.saldo, 0),
+      .reduce((s, f) => s + base(f.saldo, f.n), 0),
     sinFecha: porPercibir.filter((f) => f.dias === null).length,
   };
 
@@ -284,8 +288,10 @@ export function FinanzasVista({
     ? [
         {
           label: "Vendido",
-          value: formatCLP(r.vendido),
-          detail: `${r.notas} nota${r.notas === 1 ? "" : "s"} · bruto, con IVA`,
+          value: formatCLP(conIva ? r.vendido : r.vendidoNeto),
+          detail: `${r.notas} nota${r.notas === 1 ? "" : "s"} · ${
+            conIva ? "bruto, con IVA" : "neto, sin IVA"
+          }`,
         },
         {
           label: "Utilidad generada",
@@ -298,7 +304,7 @@ export function FinanzasVista({
         },
         {
           label: "Cobrado a hoy",
-          value: `${formatCLP(r.cobrado)} (${formatPct(
+          value: `${formatCLP(conIva ? r.cobrado : r.cobradoNeto)} (${formatPct(
             r.vendido > 0 ? (r.cobrado / r.vendido) * 100 : 0
           )})`,
           detail: "Abonos recibidos, en cualquier fecha",
@@ -310,15 +316,19 @@ export function FinanzasVista({
         },
         {
           label: "Por cobrar",
-          value: formatCLP(r.porCobrar),
-          detail: `${formatCLP(r.porCobrarVencido)} vencido`,
+          value: formatCLP(conIva ? r.porCobrar : r.porCobrarNeto),
+          detail: `${formatCLP(
+            conIva ? r.porCobrarVencido : r.porCobrarVencidoNeto
+          )} vencido`,
           alerta: r.porCobrarVencido > 0,
         },
       ]
     : [
         {
           label: "Entró a caja",
-          value: formatCLP(datos.caja.cobrado),
+          value: formatCLP(
+            conIva ? datos.caja.cobrado : datos.caja.cobradoNeto
+          ),
           detail: `${datos.caja.abonos} abono${
             datos.caja.abonos === 1 ? "" : "s"
           } en el período`,
@@ -334,9 +344,9 @@ export function FinanzasVista({
           // filtra los abonos, no las notas), pero sí respeta la búsqueda.
           // El número NO es "todas las notas" si hay texto en el buscador.
           label: "Por cobrar",
-          value: formatCLP(r.porCobrar),
+          value: formatCLP(conIva ? r.porCobrar : r.porCobrarNeto),
           detail: `${formatCLP(
-            r.porCobrarVencido
+            conIva ? r.porCobrarVencido : r.porCobrarVencidoNeto
           )} vencido · no se filtra por fecha`,
           alerta: r.porCobrarVencido > 0,
         },
@@ -353,6 +363,31 @@ export function FinanzasVista({
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
+            <div className="flex overflow-hidden rounded-lg border border-slate-300">
+              {[
+                { id: true, label: "Con IVA" },
+                { id: false, label: "Sin IVA" },
+              ].map((o) => (
+                <button
+                  key={String(o.id)}
+                  type="button"
+                  onClick={() => setConIva(o.id)}
+                  aria-pressed={conIva === o.id}
+                  title={
+                    o.id
+                      ? "Montos brutos, como se facturan y se cobran"
+                      : "Montos netos: descuenta el IVA, que no es de la empresa"
+                  }
+                  className={`px-3 py-2 text-xs font-semibold transition-colors ${
+                    conIva === o.id
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
             {meses.map((m) => {
               const activo = mesSit?.clave === m.clave;
               return (
@@ -428,17 +463,23 @@ export function FinanzasVista({
             </p>
           </div>
 
-          <CardIva
+          <CardMonto
             label="Cuentas por cobrar"
-            d={porCobrar}
+            monto={conIva ? porCobrar.bruto : porCobrar.neto}
             detalle="Saldo total a hoy · NO sigue el filtro"
+            nota={conIva ? `Incluye ${formatCLP(porCobrar.iva)} de IVA` : undefined}
             tono="cobrar"
           />
 
-          <CardIva
+          <CardMonto
             label="Cuentas por pagar"
-            d={porPagar}
+            monto={conIva ? porPagar.bruto : porPagar.neto}
             detalle="Deuda total a hoy · NO sigue el filtro"
+            nota={
+              conIva
+                ? `Incluye ${formatCLP(porPagar.iva)} de IVA recuperable`
+                : undefined
+            }
             tono="pagar"
             aviso={
               pagarPendiente.cantidad > 0
@@ -521,10 +562,10 @@ export function FinanzasVista({
                       {formatFecha(f.ultimoPago ?? null)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatCLP(f.n.total)}
+                      {formatCLP(base(f.n.total, f.n))}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatCLP(f.cobrado)}
+                      {formatCLP(base(f.cobrado, f.n))}
                       <div className="text-xs text-slate-400">
                         {formatPct(f.pctCobrado)} del total
                       </div>
@@ -631,7 +672,7 @@ export function FinanzasVista({
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatCLP(f.saldo)}
+                      {formatCLP(base(f.saldo, f.n))}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-amber-700">
                       {formatCLP(f.utilidad)}
