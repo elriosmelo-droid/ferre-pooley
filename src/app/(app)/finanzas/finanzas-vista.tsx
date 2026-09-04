@@ -14,7 +14,7 @@ import {
   pctUtilidad,
   type NotaCobrable,
 } from "@/lib/cobros";
-import { hoyChile } from "@/lib/fecha";
+import { hoyChile, ultimosMeses } from "@/lib/fecha";
 
 export type NotaFinanzas = NotaCobrable & {
   folio: string;
@@ -132,6 +132,41 @@ export function FinanzasVista({
   const [hasta, setHasta] = useState(hoy);
   const [busqueda, setBusqueda] = useState("");
 
+  // La sección "Situación" tiene su propio período, independiente del de las
+  // lentes de abajo: son dos preguntas distintas y compartir un filtro hacía
+  // imposible saber qué mandaba sobre qué.
+  const meses = useMemo(() => ultimosMeses(hoy, 3), [hoy]);
+  const [desdeSit, setDesdeSit] = useState(() => `${hoy.slice(0, 7)}-01`);
+  const [hastaSit, setHastaSit] = useState(hoy);
+  const mesSit = meses.find(
+    (m) => m.desde === desdeSit && m.hasta === hastaSit
+  );
+
+  function alternarMesSit(m: (typeof meses)[number]) {
+    if (mesSit?.clave === m.clave) {
+      setDesdeSit("");
+      setHastaSit("");
+    } else {
+      setDesdeSit(m.desde);
+      setHastaSit(m.hasta);
+    }
+  }
+
+  // Utilidad del período elegido arriba. Las anuladas quedan fuera vía
+  // resumenPorVenta.
+  const situacion = useMemo(
+    () =>
+      resumenPorVenta(
+        notas.filter(
+          (n) =>
+            (!desdeSit || n.fechaVenta >= desdeSit) &&
+            (!hastaSit || n.fechaVenta <= hastaSit)
+        ),
+        hoy
+      ),
+    [notas, desdeSit, hastaSit, hoy]
+  );
+
   const porVenta = lente === "venta";
 
   const datos = useMemo(() => {
@@ -232,21 +267,74 @@ export function FinanzasVista({
   return (
     <div className="flex flex-col gap-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900">Situación</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Las dos primeras son del período filtrado. Las cuentas por cobrar y
-          por pagar son el saldo a hoy: no se filtran por fecha.
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Situación</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Filtro propio, independiente de las lentes de más abajo.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            {meses.map((m) => {
+              const activo = mesSit?.clave === m.clave;
+              return (
+                <button
+                  key={m.clave}
+                  type="button"
+                  onClick={() => alternarMesSit(m)}
+                  aria-pressed={activo}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    activo
+                      ? "bg-brand-600 text-white"
+                      : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {m.etiqueta}
+                </button>
+              );
+            })}
+            <label className="flex flex-col gap-1 text-xs text-slate-500">
+              Desde
+              <input
+                type="date"
+                value={desdeSit}
+                onChange={(e) => setDesdeSit(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-500">
+              Hasta
+              <input
+                type="date"
+                value={hastaSit}
+                onChange={(e) => setHastaSit(e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            {(desdeSit || hastaSit) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDesdeSit("");
+                  setHastaSit("");
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Todo
+              </button>
+            )}
+          </div>
+        </div>
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl bg-slate-50 p-5">
             <p className="text-sm font-medium text-slate-500">
               Utilidad percibida
             </p>
             <p className="mt-2 text-2xl font-bold tracking-tight text-green-700 sm:text-3xl">
-              {formatCLP(datos.venta.utilidadPercibida)}
+              {formatCLP(situacion.utilidadPercibida)}
             </p>
             <p className="mt-1.5 text-xs text-slate-500">
-              Ya está en caja · neta, sin flete
+              Ya está en caja · del período · neta, sin flete
             </p>
           </div>
 
@@ -255,26 +343,24 @@ export function FinanzasVista({
               Utilidad por percibir
             </p>
             <p className="mt-2 text-2xl font-bold tracking-tight text-amber-700 sm:text-3xl">
-              {formatCLP(
-                datos.venta.utilidad - datos.venta.utilidadPercibida
-              )}
+              {formatCLP(situacion.utilidad - situacion.utilidadPercibida)}
             </p>
             <p className="mt-1.5 text-xs text-slate-500">
-              Falta cobrarla · de {formatCLP(datos.venta.utilidad)} generados
+              Falta cobrarla · de {formatCLP(situacion.utilidad)} generados
             </p>
           </div>
 
           <CardIva
             label="Cuentas por cobrar"
             d={porCobrar}
-            detalle="Saldo de las notas activas, a hoy"
+            detalle="Saldo total a hoy · NO sigue el filtro"
             tono="cobrar"
           />
 
           <CardIva
             label="Cuentas por pagar"
             d={porPagar}
-            detalle="Compras a crédito y cheque, a hoy"
+            detalle="Deuda total a hoy · NO sigue el filtro"
             tono="pagar"
             aviso={
               pagarPendiente.cantidad > 0
