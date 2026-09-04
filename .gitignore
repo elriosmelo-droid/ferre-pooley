@@ -42,3 +42,6 @@ next-env.d.ts
 
 # brainstorming mockups
 .superpowers/
+
+# worktrees de sesiones de Claude Code (copias del repo, no versionar)
+.claude/worktrees/
