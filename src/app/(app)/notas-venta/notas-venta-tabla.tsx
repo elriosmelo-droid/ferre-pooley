@@ -26,7 +26,23 @@ export type NotaVentaRow = {
   costo: number;
   // Suma de los abonos registrados. El saldo es total − cobrado.
   cobrado: number;
+  // Fecha en que ocurrió la venta: emisión de su factura del SII, o el día en
+  // que se cargó la nota si todavía no se factura. NO es created_at.
+  fechaVenta: string;
 };
+
+// 'AAAA-MM-DD' a 'DD/MM/AAAA'.
+function formatFecha(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// Día en hora de Chile a partir de un timestamptz.
+function diaChile(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago",
+  }).format(new Date(iso));
+}
 
 export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
   const [desde, setDesde] = useState("");
@@ -37,7 +53,9 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return notas.filter((n) => {
-      const fecha = n.created_at.slice(0, 10);
+      // Se filtra por la fecha de la venta (emisión de la factura), no por la
+      // de digitación: es la que usa el SII y con la que cuadra el contador.
+      const fecha = n.fechaVenta;
       if (desde && fecha < desde) return false;
       if (hasta && fecha > hasta) return false;
       if (estado && n.estado !== estado) return false;
@@ -129,7 +147,7 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
               <th className="px-4 py-3">Folio</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Cotización</th>
-              <th className="px-4 py-3">Fecha</th>
+              <th className="px-4 py-3">Fecha venta</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-right">Saldo</th>
               <th className="px-4 py-3">Estado</th>
@@ -162,10 +180,16 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
                       "—"
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    {new Date(nota.created_at).toLocaleDateString("es-CL", {
-                      timeZone: "America/Santiago",
-                    })}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {formatFecha(nota.fechaVenta)}
+                    {nota.fechaVenta !== diaChile(nota.created_at) && (
+                      <div
+                        className="text-xs text-slate-400"
+                        title={`La nota se cargó el ${formatFecha(diaChile(nota.created_at))}; la venta se fecha por la emisión de su factura`}
+                      >
+                        cargada {formatFecha(diaChile(nota.created_at))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">
                     {formatCLP(nota.total)}

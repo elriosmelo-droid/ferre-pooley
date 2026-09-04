@@ -17,6 +17,43 @@ export type Cobro = {
   observacion: string | null;
 };
 
+// Tipos de DTE que fechan una venta: factura electrónica y factura exenta. Las
+// notas de crédito y débito corrigen una venta anterior, no la constituyen, así
+// que no deben arrastrarla a su propio mes.
+const TIPOS_QUE_FECHAN = [33, 34];
+
+export type FacturaFechable = {
+  tipo_doc: number;
+  fecha_emision: string | null;
+};
+
+// Fecha en que ocurrió la venta: la EMISIÓN de su factura más temprana, no el
+// día en que se digitó la nota.
+//
+// La distinción no es cosmética. Cuando alguien se pone al día con la carga
+// —en julio de 2026 se digitaron once notas de facturas emitidas en mayo y
+// junio— fechar por la creación mete $112 millones en el mes equivocado y el
+// sistema deja de cuadrar con el SII, que es lo que ve el contador.
+//
+// `creadaEnChile` (AAAA-MM-DD) es el respaldo para una nota que todavía no se
+// factura: se cuenta el día que se cargó, y se mueve sola al mes de la factura
+// cuando esta se emita.
+//
+// Misma regla que ya usan el dashboard y /conciliación; vive acá para que las
+// cuatro pantallas compartan una definición en vez de tres parecidas.
+export function fechaVentaNota(
+  facturas: FacturaFechable[],
+  creadaEnChile: string
+): string {
+  let temprana: string | null = null;
+  for (const f of facturas) {
+    if (!TIPOS_QUE_FECHAN.includes(f.tipo_doc) || !f.fecha_emision) continue;
+    const dia = f.fecha_emision.slice(0, 10);
+    if (!temprana || dia < temprana) temprana = dia;
+  }
+  return temprana ?? creadaEnChile;
+}
+
 export type NotaCobrable = {
   id: string;
   total: number; // bruto, con IVA y flete

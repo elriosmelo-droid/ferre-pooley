@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  fechaVentaNota,
   cobrado,
   saldo,
   utilidadDeAbono,
@@ -291,5 +292,80 @@ describe("pctUtilidad", () => {
     );
 
     expect(pctUtilidad(r)).toBeCloseTo(margenTotales.pct);
+  });
+});
+
+describe("fechaVentaNota", () => {
+  const creada = "2026-07-20"; // día en que se digitó la nota
+
+  it("usa la emisión de la factura, no la fecha en que se cargó la nota", () => {
+    // El caso que motivó esto: notas digitadas en julio para poner al día
+    // facturas emitidas en junio. La venta es de junio.
+    expect(
+      fechaVentaNota([{ tipo_doc: 33, fecha_emision: "2026-06-15" }], creada)
+    ).toBe("2026-06-15");
+  });
+
+  it("con varias facturas toma la más temprana", () => {
+    expect(
+      fechaVentaNota(
+        [
+          { tipo_doc: 33, fecha_emision: "2026-06-20" },
+          { tipo_doc: 33, fecha_emision: "2026-06-15" },
+          { tipo_doc: 34, fecha_emision: "2026-06-18" },
+        ],
+        creada
+      )
+    ).toBe("2026-06-15");
+  });
+
+  it("las notas de crédito no fechan la venta", () => {
+    // Una NC anterior a la factura no debe arrastrar la venta a su mes.
+    expect(
+      fechaVentaNota(
+        [
+          { tipo_doc: 61, fecha_emision: "2026-05-01" },
+          { tipo_doc: 33, fecha_emision: "2026-06-15" },
+        ],
+        creada
+      )
+    ).toBe("2026-06-15");
+  });
+
+  it("las notas de débito tampoco fechan la venta", () => {
+    expect(
+      fechaVentaNota([{ tipo_doc: 56, fecha_emision: "2026-05-01" }], creada)
+    ).toBe(creada);
+  });
+
+  it("sin facturas cae a la fecha en que se cargó la nota", () => {
+    expect(fechaVentaNota([], creada)).toBe(creada);
+  });
+
+  it("ignora facturas sin fecha de emisión", () => {
+    expect(
+      fechaVentaNota(
+        [
+          { tipo_doc: 33, fecha_emision: null },
+          { tipo_doc: 33, fecha_emision: "2026-06-15" },
+        ],
+        creada
+      )
+    ).toBe("2026-06-15");
+  });
+
+  it("con solo facturas sin fecha cae a la fecha de carga", () => {
+    expect(
+      fechaVentaNota([{ tipo_doc: 33, fecha_emision: null }], creada)
+    ).toBe(creada);
+  });
+
+  it("recorta la fecha de emisión a AAAA-MM-DD si viene con hora", () => {
+    expect(
+      fechaVentaNota(
+        [{ tipo_doc: 33, fecha_emision: "2026-06-15T00:00:00Z" }],
+        creada
+      )
+    ).toBe("2026-06-15");
   });
 });

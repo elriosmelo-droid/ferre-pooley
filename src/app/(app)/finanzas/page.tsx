@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularMargen } from "@/lib/totals";
 import { vencimientoEfectivo } from "@/lib/estado-cuenta";
 import { esNotaCredito } from "@/lib/dte-doc";
-import type { NotaCobrable } from "@/lib/cobros";
+import { fechaVentaNota, type NotaCobrable } from "@/lib/cobros";
 import { FinanzasVista } from "./finanzas-vista";
 
 type NotaQuery = {
@@ -66,6 +66,16 @@ export default async function FinanzasPage() {
 
   const ventas = (ventasData ?? []) as VentaQuery[];
 
+  // Facturas de cada nota, para fecharla por su emisión y no por el día en que
+  // se digitó.
+  const facturasPorNota = new Map<string, VentaQuery[]>();
+  for (const v of ventas) {
+    if (!v.nota_venta_id) continue;
+    const lista = facturasPorNota.get(v.nota_venta_id) ?? [];
+    lista.push(v);
+    facturasPorNota.set(v.nota_venta_id, lista);
+  }
+
   // Vencimiento de cada nota = el más temprano de sus facturas. Las notas de
   // crédito no vencen, así que no entran.
   const vencePorNota = new Map<string, string>();
@@ -94,7 +104,12 @@ export default async function FinanzasPage() {
       venta,
       margen,
       anulada: n.estado === "anulada",
-      fechaVenta: fechaChile(n.created_at),
+      // La venta ocurrió cuando se emitió la factura, no cuando se cargó la
+      // nota. Sin factura todavía, se cuenta el día que se cargó.
+      fechaVenta: fechaVentaNota(
+        facturasPorNota.get(n.id) ?? [],
+        fechaChile(n.created_at)
+      ),
       vencimiento: vencePorNota.get(n.id) ?? null,
       cobros: n.pagos_nota_venta ?? [],
     };

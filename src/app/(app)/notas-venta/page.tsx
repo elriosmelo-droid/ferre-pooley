@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { calcularMargen } from "@/lib/totals";
+import { fechaVentaNota } from "@/lib/cobros";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
-type NotaConItems = Omit<NotaVentaRow, "venta" | "costo" | "cobrado"> & {
+type NotaConItems = Omit<
+  NotaVentaRow,
+  "venta" | "costo" | "cobrado" | "fechaVenta"
+> & {
   nota_venta_items: {
     cantidad: number;
     costo: number;
@@ -13,7 +17,16 @@ type NotaConItems = Omit<NotaVentaRow, "venta" | "costo" | "cobrado"> & {
     descuento: number;
   }[];
   pagos_nota_venta: { monto: number }[];
+  ventas_sii: { tipo_doc: number; fecha_emision: string | null }[];
 };
+
+// Día en hora de Chile: created_at es timestamptz y el servidor corre en UTC,
+// así que cortar el ISO directo corre el día durante la noche.
+function diaChile(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago",
+  }).format(new Date(iso));
+}
 
 export default async function NotasVentaPage() {
   const supabase = await createClient();
@@ -22,7 +35,8 @@ export default async function NotasVentaPage() {
     .from("notas_venta")
     .select(
       `id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio),
-       nota_venta_items(cantidad, costo, precio, descuento), pagos_nota_venta(monto)`
+       nota_venta_items(cantidad, costo, precio, descuento), pagos_nota_venta(monto),
+       ventas_sii(tipo_doc, fecha_emision)`
     )
     .order("created_at", { ascending: false });
 
@@ -30,13 +44,17 @@ export default async function NotasVentaPage() {
   // al cliente solo para sumarlos sería cargar la página de más.
   const notas: NotaVentaRow[] = (
     (data ?? []) as unknown as NotaConItems[]
-  ).map(({ nota_venta_items, pagos_nota_venta, ...nota }) => {
+  ).map(({ nota_venta_items, pagos_nota_venta, ventas_sii, ...nota }) => {
     const { venta, costo } = calcularMargen(nota_venta_items ?? []);
     return {
       ...nota,
       venta,
       costo,
       cobrado: (pagos_nota_venta ?? []).reduce((s, p) => s + p.monto, 0),
+      // La venta se fecha por la emisión de su factura, no por el día en que
+      // se digitó la nota: si no, una puesta al día de la carga mete las
+      // ventas en el mes equivocado y el listado deja de cuadrar con el SII.
+      fechaVenta: fechaVentaNota(ventas_sii ?? [], diaChile(nota.created_at)),
     };
   });
 
