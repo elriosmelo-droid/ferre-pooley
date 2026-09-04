@@ -24,6 +24,17 @@ Es una conciliación del crédito otorgado a los clientes.
   de pasar a ser un campo derivado en el código. Así el dashboard,
   `/estados-cuenta`, `/conciliacion` y el badge del listado siguen funcionando
   sin tocarse.
+
+  Corrección posterior a la revisión final: siguen funcionando, pero no todos
+  siguen **concordando**. El dashboard calcula "cobrado del mes" y "utilidad
+  cobrada" contando solo las notas en estado `pagada`, así que una nota cobrada
+  al 90% aporta cero mientras `/finanzas` reporta ese 90% y su utilidad
+  proporcional. Las bases además difieren: el dashboard suma el neto de la
+  factura del SII y `/finanzas` el bruto de la nota, así que los dos "cobrado"
+  se separan por el IVA aun sin abonos parciales. No es una regresión —el
+  dashboard hace hoy lo mismo que antes—, pero antes no existía una pantalla
+  que dijera otra cosa. Queda declarado y va con la misma segunda pasada que
+  `/estados-cuenta`.
 - La utilidad percibida se atribuye **proporcional** al cobro.
 
 ## Estado de los datos al momento de diseñar

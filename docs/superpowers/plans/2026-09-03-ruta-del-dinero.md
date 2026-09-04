@@ -1788,7 +1788,39 @@ vercel inspect "$URL" 2>&1 | grep status
 
 Expected: `● Ready`
 
-- [ ] **Step 6: Verificación en producción**
+- [ ] **Step 6: Re-correr el backfill (cierra la ventana entre migración y deploy)**
+
+Entre aplicar la migración y que el deploy quede arriba, el código VIEJO sigue
+vivo en Vercel, y su botón "Marcar pagada" sigue funcionando: hace un `update
+notas_venta` y no sabe nada de la tabla nueva. Una nota marcada pagada en esa
+ventana queda con `estado = 'pagada'` y cero abonos, y el backfill del Step 1 ya
+pasó. Esa nota quedaría invisible como cobrada en `/finanzas` para siempre,
+mostrando a la vez el badge "Pagada" y su total completo en la columna Saldo.
+
+El bloque del backfill es idempotente (está guardado con `not exists`), así que
+volver a correrlo después del deploy solo recoge lo que haya caído en la ventana:
+
+```bash
+node -e "
+const { Client } = require('pg');
+const c = new Client({ host: 'aws-1-sa-east-1.pooler.supabase.com', port: 5432, user: 'postgres.iiqfbedwoogadtrmrqfq', password: process.env.DB_PASSWORD, database: 'postgres', ssl: { rejectUnauthorized: false } });
+c.connect()
+  .then(() => c.query(\`
+    insert into pagos_nota_venta (nota_venta_id, monto, fecha, observacion)
+    select nv.id, nv.total, nv.pagada_at::date, 'Migrado del estado anterior'
+    from notas_venta nv
+    where nv.estado = 'pagada' and nv.pagada_at is not null and nv.total > 0
+      and not exists (select 1 from pagos_nota_venta p where p.nota_venta_id = nv.id)
+    returning id
+  \`))
+  .then((r) => { console.log('recogidas en la ventana:', r.rowCount); return c.end(); });
+"
+```
+
+Expected: `recogidas en la ventana: 0` si nadie alcanzó a marcar una nota pagada.
+Cualquier número mayor también está bien: son las que se rescataron.
+
+- [ ] **Step 7: Verificación en producción**
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" -L https://www.tulbless.cl/finanzas
