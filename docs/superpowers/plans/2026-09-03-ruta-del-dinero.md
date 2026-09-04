@@ -580,7 +580,7 @@ export function hoyChile(): string {
 - [ ] **Step 4: Correr los tests para verificar que pasan**
 
 Run: `npx vitest run src/lib/cobros.test.ts`
-Expected: PASS, 20 tests.
+Expected: PASS, 22 tests.
 
 - [ ] **Step 5: Verificación completa**
 
