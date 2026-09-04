@@ -15,32 +15,90 @@ export type NotaVentaActionResult = {
   success?: boolean;
 };
 
-export async function marcarPagada(
-  id: string
+const cobroSchema = z.object({
+  nota_venta_id: z.uuid(),
+  monto: z.coerce.number().int().positive("El monto debe ser mayor que cero"),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha del pago es obligatoria"),
+  medio_pago: z.enum(MEDIOS_PAGO_VALORES).nullish(),
+  observacion: z.string().trim().max(200).nullish(),
+});
+
+// Registra un abono. El estado de la nota lo actualiza el trigger de la base
+// (023), no este action: así dos personas abonando a la vez no pueden dejarlo
+// inconsistente.
+export async function registrarCobro(
+  input: unknown
 ): Promise<NotaVentaActionResult> {
+  const parsed = cobroSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  const datos = parsed.data;
+
   const supabase = await createClient();
 
-  // El .eq("estado") hace la transición atómica: si otra pestaña ya la
-  // pagó o anuló, el update no afecta filas y se rechaza.
-  const { data, error } = await supabase
+  // Una nota anulada no acepta abonos: no es plata que se espere.
+  const { data: nota } = await supabase
     .from("notas_venta")
-    .update({ estado: "pagada", pagada_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("estado", "pendiente")
-    .select("id");
+    .select("estado")
+    .eq("id", datos.nota_venta_id)
+    .single();
+
+  if (!nota) return { error: "La nota de venta no existe" };
+  if (nota.estado === "anulada") {
+    return { error: "No se puede registrar un cobro en una nota anulada" };
+  }
+
+  const { error } = await supabase.from("pagos_nota_venta").insert({
+    nota_venta_id: datos.nota_venta_id,
+    monto: datos.monto,
+    fecha: datos.fecha,
+    medio_pago: datos.medio_pago ?? null,
+    observacion: datos.observacion || null,
+  });
 
   if (error) {
-    console.error("Error al marcar nota de venta como pagada:", error.message);
-    return {
-      error: "No se pudo marcar como pagada. Intenta nuevamente.",
-    };
-  }
-  if (!data?.length) {
-    return { error: "La nota de venta ya no está pendiente" };
+    console.error("Error al registrar cobro:", error.message);
+    return { error: "No se pudo registrar el cobro. Intenta nuevamente." };
   }
 
   revalidatePath("/notas-venta");
-  revalidatePath(`/notas-venta/${id}`);
+  revalidatePath(`/notas-venta/${datos.nota_venta_id}`);
+  revalidatePath("/finanzas");
+  return { success: true };
+}
+
+// Borrar un abono devuelve la nota a pendiente si con eso queda saldo; también
+// lo hace el trigger. Es la corrección de un error de tipeo.
+export async function eliminarCobro(
+  id: string,
+  notaVentaId: string
+): Promise<NotaVentaActionResult> {
+  const supabase = await createClient();
+
+  // El .eq("nota_venta_id") evita borrar (y revalidar) la nota equivocada si
+  // llega un id válido con un notaVentaId que no le corresponde (estado
+  // viejo en el navegador): en ese caso el delete no afecta filas.
+  const { data, error } = await supabase
+    .from("pagos_nota_venta")
+    .delete()
+    .eq("id", id)
+    .eq("nota_venta_id", notaVentaId)
+    .select("id");
+
+  if (error) {
+    console.error("Error al eliminar cobro:", error.message);
+    return { error: "No se pudo eliminar el cobro. Intenta nuevamente." };
+  }
+  if (!data?.length) {
+    return { error: "El cobro ya no existe" };
+  }
+
+  revalidatePath("/notas-venta");
+  revalidatePath(`/notas-venta/${notaVentaId}`);
+  revalidatePath("/finanzas");
   return { success: true };
 }
 

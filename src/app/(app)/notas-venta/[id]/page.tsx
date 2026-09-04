@@ -13,6 +13,7 @@ import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { normalizarRut } from "@/lib/rut";
 import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
+import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
 
 type ItemRow = {
@@ -51,6 +52,13 @@ type NotaVentaDetalle = {
     firmante: string | null;
   } | null;
   nota_venta_items: ItemRow[];
+  pagos_nota_venta: {
+    id: string;
+    monto: number;
+    fecha: string;
+    medio_pago: string | null;
+    observacion: string | null;
+  }[];
 };
 
 function formatFechaHora(value: string) {
@@ -73,7 +81,8 @@ export default async function DetalleNotaVentaPage({
       `id, folio, estado, flete, medio_pago, vendedor, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
-       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion)`
+       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion),
+       pagos_nota_venta(id, monto, fecha, medio_pago, observacion)`
     )
     .eq("id", id)
     .single();
@@ -92,6 +101,10 @@ export default async function DetalleNotaVentaPage({
   );
   const totales = calcularTotales(items);
   const margen = calcularMargen(items);
+  // Más recientes primero: el último abono es el que se mira.
+  const cobros = [...(nota.pagos_nota_venta ?? [])].sort((a, b) =>
+    b.fecha.localeCompare(a.fecha)
+  );
   const cliente = nota.clientes;
 
   // Facturas del SII de esta nota + candidatas para vincular: facturas del
@@ -194,19 +207,26 @@ export default async function DetalleNotaVentaPage({
             )}
           </dl>
         </div>
+      </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Factura de venta (SII)
-          </h2>
-          <FacturaVinculo
-            notaId={nota.id}
-            total={nota.total}
-            vinculadas={facturasVinculadas}
-            candidatas={candidatas}
-            otras={otras}
-          />
-        </div>
+      <CobrosNota
+        notaVentaId={nota.id}
+        total={nota.total}
+        cobros={cobros}
+        anulada={nota.estado === "anulada"}
+      />
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Factura de venta (SII)
+        </h2>
+        <FacturaVinculo
+          notaId={nota.id}
+          total={nota.total}
+          vinculadas={facturasVinculadas}
+          candidatas={candidatas}
+          otras={otras}
+        />
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
