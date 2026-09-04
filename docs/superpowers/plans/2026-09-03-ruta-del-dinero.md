@@ -76,8 +76,12 @@ create policy "members pagos_nota_venta" on pagos_nota_venta
 -- Ojo con estos registros: pagada_at es la fecha del click, no la del pago, así
 -- que la lente "por caja" es exacta de aquí en adelante y aproximada hacia
 -- atrás. El dato real nunca se guardó. La observación lo deja dicho.
+-- `at time zone 'America/Santiago'` antes de cortar a date: pagada_at es
+-- timestamptz y la sesión de Supabase corre en UTC, así que un `::date` a secas
+-- devuelve el día UTC y una nota marcada pagada después de las ~20:00 hora de
+-- Chile quedaría fechada un día tarde.
 insert into pagos_nota_venta (nota_venta_id, monto, fecha, observacion)
-select nv.id, nv.total, nv.pagada_at::date, 'Migrado del estado anterior'
+select nv.id, nv.total, (nv.pagada_at at time zone 'America/Santiago')::date, 'Migrado del estado anterior'
 from notas_venta nv
 where nv.estado = 'pagada'
   and nv.pagada_at is not null
