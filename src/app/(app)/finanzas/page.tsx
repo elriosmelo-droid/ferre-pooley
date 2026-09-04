@@ -85,12 +85,13 @@ export default async function FinanzasPage() {
   const notas: (NotaCobrable & { folio: string; cliente: string })[] = (
     (notasData ?? []) as unknown as NotaQuery[]
   ).map((n) => {
-    const { margen } = calcularMargen(n.nota_venta_items ?? []);
+    const { venta, margen } = calcularMargen(n.nota_venta_items ?? []);
     return {
       id: n.id,
       folio: n.folio,
       cliente: n.clientes?.nombre ?? "—",
       total: n.total,
+      venta,
       margen,
       anulada: n.estado === "anulada",
       fechaVenta: fechaChile(n.created_at),

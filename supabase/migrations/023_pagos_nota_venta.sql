@@ -82,8 +82,17 @@ begin
   from pagos_nota_venta where nota_venta_id = p_nota;
 
   if v_cobrado >= v_total then
+    -- v_ultima es un date "en el aire" (sin zona). Convertirlo directo a
+    -- timestamptz lo interpreta en UTC y la sesión de Supabase corre en UTC,
+    -- así que una fecha '2026-09-03' quedaría en 2026-09-03T00:00:00Z, que la
+    -- UI (formateada en America/Santiago, UTC-4/-3) muestra como el día
+    -- anterior. `at time zone` sobre un timestamp SIN zona hace lo contrario:
+    -- interpreta esa hora de pared como si fuera de Chile y la convierte a
+    -- UTC, así que quede el mismo día al mostrarla en Chile. No "simplificar"
+    -- de vuelta a `::timestamptz`.
     update notas_venta
-    set estado = 'pagada', pagada_at = v_ultima::timestamptz
+    set estado = 'pagada',
+      pagada_at = (v_ultima::timestamp at time zone 'America/Santiago')
     where id = p_nota;
   else
     update notas_venta
@@ -121,3 +130,41 @@ drop trigger if exists pagos_nota_venta_sync_estado on pagos_nota_venta;
 create trigger pagos_nota_venta_sync_estado
 after insert or update or delete on pagos_nota_venta
 for each row execute function public.sync_estado_nota_venta();
+
+-- `_recalc_estado_nota_venta` solo se dispara desde escrituras en
+-- pagos_nota_venta, pero `actualizarNotaVenta` puede cambiar
+-- notas_venta.total en una nota 'pendiente' (solo se permite editar
+-- pendientes). Si el total baja por debajo de lo ya abonado, la nota debería
+-- pasar a 'pagada' y no lo hace: queda 'pendiente' en el listado mientras el
+-- bloque de cobros de la nota muestra saldo a favor del cliente.
+create or replace function public.sync_estado_nota_venta_desde_total()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public._recalc_estado_nota_venta(new.id);
+  return null;
+end $$;
+
+-- Dos cuidados verificados con una réplica mínima del esquema antes de
+-- aplicar esto (ver reporte de la tarea):
+--
+-- 1. Recursión: `update of total` dispara según las columnas MENCIONADAS en
+--    el SET del UPDATE, no según cuáles cambiaron de valor. El UPDATE que
+--    hace _recalc_estado_nota_venta solo menciona `estado` y `pagada_at`, así
+--    que no vuelve a mencionar `total` y este trigger no se re-dispara. No
+--    hace falta guarda adicional contra recursión.
+-- 2. Autobloqueo: _recalc_estado_nota_venta hace `select ... for update`
+--    sobre la misma fila de notas_venta que este UPDATE ya modificó. Los
+--    locks de fila en Postgres son por transacción, no por sentencia: una
+--    transacción puede volver a tomar `for update` sobre una fila que ella
+--    misma ya tiene bloqueada sin quedar esperando a sí misma. Confirmado:
+--    el UPDATE que dispara este trigger termina sin bloquearse.
+drop trigger if exists notas_venta_sync_estado_total on notas_venta;
+create trigger notas_venta_sync_estado_total
+after update of total on notas_venta
+for each row
+when (old.total is distinct from new.total)
+execute function public.sync_estado_nota_venta_desde_total();

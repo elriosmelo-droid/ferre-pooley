@@ -20,6 +20,7 @@ export type Cobro = {
 export type NotaCobrable = {
   id: string;
   total: number; // bruto, con IVA y flete
+  venta: number; // neto, sin flete ni IVA (sale de calcularMargen)
   margen: number; // neto, sin flete
   anulada: boolean;
   fechaVenta: string; // 'AAAA-MM-DD'
@@ -67,6 +68,7 @@ export function estaVencida(nota: NotaCobrable, hoy: string): boolean {
 export type ResumenVenta = {
   notas: number;
   vendido: number;
+  venta: number; // neto, sin flete ni IVA: misma base que `utilidad`
   utilidad: number;
   cobrado: number;
   utilidadPercibida: number;
@@ -84,6 +86,7 @@ export function resumenPorVenta(
   const r: ResumenVenta = {
     notas: 0,
     vendido: 0,
+    venta: 0,
     utilidad: 0,
     cobrado: 0,
     utilidadPercibida: 0,
@@ -96,6 +99,7 @@ export function resumenPorVenta(
     const pendiente = n.total - pagado;
     r.notas += 1;
     r.vendido += n.total;
+    r.venta += n.venta;
     r.utilidad += n.margen;
     r.cobrado += pagado;
     r.utilidadPercibida += utilidadPercibida(n);

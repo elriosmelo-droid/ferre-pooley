@@ -85,8 +85,12 @@ export function FinanzasVista({
 
     // La lente por venta filtra por fecha de la nota; la de caja no filtra las
     // notas, filtra los abonos (una nota de mayo puede cobrarse en junio).
+    // Las anuladas quedan fuera de toda la página: no suman a ningún KPI, así
+    // que tampoco se pintan en la tabla (antes salían en ámbar con opacidad,
+    // como si fueran plata por cobrar).
     const visibles = notas.filter(
       (n) =>
+        !n.anulada &&
         coincide(n) &&
         (!porVenta ||
           ((!desde || n.fechaVenta >= desde) &&
@@ -101,8 +105,7 @@ export function FinanzasVista({
         b.cobro.fecha.localeCompare(a.cobro.fecha)
       ),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notas, desde, hasta, busqueda, porVenta]);
+  }, [notas, desde, hasta, busqueda, porVenta, hoy]);
 
   const inputCls =
     "rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none";
@@ -117,8 +120,12 @@ export function FinanzasVista({
         },
         {
           label: "Utilidad generada",
+          // El % va sobre `venta` (neta, sin flete) y no sobre `vendido`
+          // (bruto, con IVA y flete): son bases distintas y dividir utilidad
+          // (neta) por vendido (bruto) da un porcentaje que no significa
+          // nada. Es la misma base que usa /notas-venta.
           value: `${formatCLP(r.utilidad)} (${formatPct(
-            r.vendido > 0 ? (r.utilidad / r.vendido) * 100 : 0
+            r.venta > 0 ? (r.utilidad / r.venta) * 100 : 0
           )})`,
           detail: "Neta, sin flete",
         },
@@ -155,9 +162,15 @@ export function FinanzasVista({
           detail: "La parte del margen que traía cada abono",
         },
         {
-          label: "Por cobrar (total)",
+          // r sale de resumenPorVenta(visibles, hoy): en esta lente
+          // `visibles` no se filtra por fecha (el rango de la lente por caja
+          // filtra los abonos, no las notas), pero sí respeta la búsqueda.
+          // El número NO es "todas las notas" si hay texto en el buscador.
+          label: "Por cobrar",
           value: formatCLP(r.porCobrar),
-          detail: `${formatCLP(r.porCobrarVencido)} vencido · todas las notas`,
+          detail: `${formatCLP(
+            r.porCobrarVencido
+          )} vencido · no se filtra por fecha`,
           alerta: r.porCobrarVencido > 0,
         },
       ];
@@ -263,10 +276,7 @@ export function FinanzasVista({
                   const pendiente = n.total - pagado;
                   const vencida = estaVencida(n, hoy);
                   return (
-                    <tr
-                      key={n.id}
-                      className={`text-slate-700 ${n.anulada ? "opacity-50" : ""}`}
-                    >
+                    <tr key={n.id} className="text-slate-700">
                       <td className="px-4 py-3 font-medium text-slate-900">
                         {n.folio}
                       </td>

@@ -16,11 +16,13 @@ function cobro(fecha: string, monto: number, id = `${fecha}-${monto}`): Cobro {
   return { id, fecha, monto, medio_pago: null, observacion: null };
 }
 
-// Nota de $100.000 brutos con $20.000 de margen neto, vendida el 1 de junio.
+// Nota de $100.000 brutos (con IVA y flete), $84.000 de venta neta y $20.000
+// de margen neto, vendida el 1 de junio.
 function nota(over: Partial<NotaCobrable> = {}): NotaCobrable {
   return {
     id: "n1",
     total: 100000,
+    venta: 84000,
     margen: 20000,
     anulada: false,
     fechaVenta: "2026-06-01",
@@ -105,30 +107,62 @@ describe("estaVencida", () => {
 });
 
 describe("resumenPorVenta", () => {
-  it("agrega vendido, utilidad, cobrado y por cobrar", () => {
+  it("agrega vendido, venta neta, utilidad, cobrado y por cobrar", () => {
     const r = resumenPorVenta(
       [
         nota({ id: "a", cobros: [cobro("2026-06-10", 60000)] }),
-        nota({ id: "b", total: 50000, margen: 5000, cobros: [] }),
+        nota({
+          id: "b",
+          total: 50000,
+          venta: 40000,
+          margen: 5000,
+          cobros: [],
+        }),
       ],
       "2026-06-15"
     );
     expect(r.notas).toBe(2);
     expect(r.vendido).toBe(150000);
+    expect(r.venta).toBe(124000);
     expect(r.utilidad).toBe(25000);
     expect(r.cobrado).toBe(60000);
     expect(r.utilidadPercibida).toBe(12000);
     expect(r.porCobrar).toBe(90000);
   });
 
-  it("descuenta las anuladas de todos los números", () => {
+  it("descuenta las anuladas de todos los números, incluida la venta neta", () => {
     const r = resumenPorVenta(
-      [nota({ id: "a" }), nota({ id: "b", anulada: true })],
+      [
+        nota({ id: "a" }),
+        nota({ id: "b", anulada: true, venta: 999999 }),
+      ],
       "2026-06-15"
     );
     expect(r.notas).toBe(1);
     expect(r.vendido).toBe(100000);
+    expect(r.venta).toBe(84000);
     expect(r.utilidad).toBe(20000);
+  });
+
+  it("la venta neta acumulada es distinta del vendido bruto (no se dividen entre sí)", () => {
+    // `vendido` es bruto (con IVA y flete) y `venta` es neta: el % de
+    // utilidad va sobre `venta`, nunca sobre `vendido`.
+    const r = resumenPorVenta(
+      [nota({ id: "a" }), nota({ id: "b", total: 200000, venta: 168000 })],
+      "2026-06-15"
+    );
+    expect(r.vendido).toBe(300000);
+    expect(r.venta).toBe(252000);
+    expect(r.vendido).not.toBe(r.venta);
+  });
+
+  it("una nota anulada por sí sola deja la venta neta en cero, aunque tenga venta propia", () => {
+    const r = resumenPorVenta(
+      [nota({ id: "a", anulada: true, venta: 50000 })],
+      "2026-06-15"
+    );
+    expect(r.notas).toBe(0);
+    expect(r.venta).toBe(0);
   });
 
   it("separa el por cobrar vencido del que está al día", () => {
@@ -147,6 +181,7 @@ describe("resumenPorVenta", () => {
     expect(resumenPorVenta([], "2026-08-01")).toEqual({
       notas: 0,
       vendido: 0,
+      venta: 0,
       utilidad: 0,
       cobrado: 0,
       utilidadPercibida: 0,
