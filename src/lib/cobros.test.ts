@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   fechaVentaNota,
+  totalesListadoNotas,
+  type FilaListado,
   cobrado,
   saldo,
   utilidadDeAbono,
@@ -367,5 +369,83 @@ describe("fechaVentaNota", () => {
         creada
       )
     ).toBe("2026-06-15");
+  });
+});
+
+describe("totalesListadoNotas", () => {
+  // Fila del listado reducida a lo que entra en los totales.
+  const fila = (over: Partial<FilaListado> = {}): FilaListado => ({
+    total: 100000,
+    venta: 80000,
+    costo: 60000,
+    cobrado: 0,
+    anulada: false,
+    ...over,
+  });
+
+  it("suma total, cobrado, saldo y margen de las notas activas", () => {
+    const r = totalesListadoNotas([
+      fila({ cobrado: 30000 }),
+      fila({ total: 50000, venta: 40000, costo: 25000, cobrado: 50000 }),
+    ]);
+    expect(r.notas).toBe(2);
+    expect(r.total).toBe(150000);
+    expect(r.cobrado).toBe(80000);
+    expect(r.saldo).toBe(70000);
+    expect(r.margen).toBe(35000); // (80000−60000) + (40000−25000)
+    expect(r.pctMargen).toBeCloseTo((35000 / 120000) * 100, 6);
+  });
+
+  it("NO cuenta las anuladas en ningún total", () => {
+    // La regresión que motivó esto: el pie mostraba $135.688.632 en julio
+    // porque sumaba una nota anulada de $14.844.060, mientras /finanzas
+    // mostraba $120.844.572. Dos pantallas, dos cifras para el mismo mes.
+    const r = totalesListadoNotas([
+      fila(),
+      fila({ total: 999999, venta: 999999, costo: 0, cobrado: 999999, anulada: true }),
+    ]);
+    expect(r.notas).toBe(1);
+    expect(r.total).toBe(100000);
+    expect(r.cobrado).toBe(0);
+    expect(r.saldo).toBe(100000);
+    expect(r.margen).toBe(20000);
+  });
+
+  it("cuenta aparte cuántas anuladas quedaron a la vista", () => {
+    const r = totalesListadoNotas([
+      fila(),
+      fila({ anulada: true }),
+      fila({ anulada: true }),
+    ]);
+    expect(r.anuladas).toBe(2);
+    expect(r.notas).toBe(1);
+  });
+
+  it("un saldo negativo (pagó de más) resta del saldo total", () => {
+    const r = totalesListadoNotas([
+      fila({ cobrado: 120000 }),
+      fila({ cobrado: 0 }),
+    ]);
+    expect(r.saldo).toBe(80000); // −20000 + 100000
+  });
+
+  it("sin filas devuelve todo en cero sin dividir por cero", () => {
+    expect(totalesListadoNotas([])).toEqual({
+      notas: 0,
+      anuladas: 0,
+      total: 0,
+      cobrado: 0,
+      saldo: 0,
+      margen: 0,
+      pctMargen: 0,
+    });
+  });
+
+  it("solo anuladas: todo en cero pero las cuenta", () => {
+    const r = totalesListadoNotas([fila({ anulada: true })]);
+    expect(r.notas).toBe(0);
+    expect(r.anuladas).toBe(1);
+    expect(r.total).toBe(0);
+    expect(r.pctMargen).toBe(0);
   });
 });

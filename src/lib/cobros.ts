@@ -212,6 +212,61 @@ export function pctUtilidad(resumen: ResumenVenta): number {
   return resumen.venta > 0 ? (resumen.utilidad / resumen.venta) * 100 : 0;
 }
 
+// Fila del listado de notas reducida a lo que entra en los totales del pie.
+export type FilaListado = {
+  total: number; // bruto, con IVA y flete
+  venta: number; // neto, sin flete
+  costo: number;
+  cobrado: number;
+  anulada: boolean;
+};
+
+export type TotalesListado = {
+  notas: number; // activas
+  anuladas: number; // a la vista pero fuera de los totales
+  total: number;
+  cobrado: number;
+  saldo: number;
+  margen: number;
+  pctMargen: number;
+};
+
+// Totales del pie del listado de notas de venta.
+//
+// Las anuladas NO suman a nada: no facturaron, no se cobran y no dejaron
+// margen, así que sumarlas al total del mes afirma una venta que no existió.
+// Se cuentan aparte para poder decir en pantalla que están a la vista pero no
+// entran, y siguen visibles como filas.
+//
+// El porcentaje va sobre la venta NETA, no sobre el total bruto: son bases
+// distintas y dividir una por otra da un número sin significado.
+export function totalesListadoNotas(filas: FilaListado[]): TotalesListado {
+  const r: TotalesListado = {
+    notas: 0,
+    anuladas: 0,
+    total: 0,
+    cobrado: 0,
+    saldo: 0,
+    margen: 0,
+    pctMargen: 0,
+  };
+  let venta = 0;
+  for (const f of filas) {
+    if (f.anulada) {
+      r.anuladas += 1;
+      continue;
+    }
+    r.notas += 1;
+    r.total += f.total;
+    r.cobrado += f.cobrado;
+    r.saldo += f.total - f.cobrado;
+    venta += f.venta;
+    r.margen += f.venta - f.costo;
+  }
+  r.pctMargen = venta > 0 ? (r.margen / venta) * 100 : 0;
+  return r;
+}
+
 // Hoy en Chile como 'AAAA-MM-DD'. El servidor corre en UTC, así que usar
 // `new Date()` directo corre el día durante la noche chilena.
 export function hoyChile(): string {

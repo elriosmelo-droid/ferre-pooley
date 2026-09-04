@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
-import { agregarMargen, formatPct } from "@/lib/totals";
+import { formatPct } from "@/lib/totals";
+import { totalesListadoNotas } from "@/lib/cobros";
 import { NotaEstadoBadge, type NotaVentaEstado } from "./nota-estado-badge";
 
 const ESTADO_LABEL: Record<NotaVentaEstado, string> = {
@@ -67,10 +68,19 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
     });
   }, [notas, desde, hasta, busqueda, estado]);
 
-  const total = filtradas.reduce((sum, n) => sum + n.total, 0);
-  // Sobre el mismo conjunto que el Total: si el filtro deja pasar anuladas,
-  // entran en los dos números y no se contradicen entre sí.
-  const margen = agregarMargen(filtradas);
+  // Las anuladas quedan fuera de todos los totales: no facturaron, no se
+  // cobran y no dejaron margen, así que sumarlas afirmaría una venta que no
+  // existió y el pie no cuadraría con /finanzas ni con el SII. Siguen
+  // visibles como filas; el pie dice cuántas hay.
+  const tot = totalesListadoNotas(
+    filtradas.map((n) => ({
+      total: n.total,
+      venta: n.venta,
+      costo: n.costo,
+      cobrado: n.cobrado,
+      anulada: n.estado === "anulada",
+    }))
+  );
   const estados = Array.from(
     new Set(notas.map((n) => n.estado))
   ) as NotaVentaEstado[];
@@ -231,14 +241,17 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
             <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
               <tr>
                 <td className="px-4 py-3" colSpan={4}>
-                  {filtradas.length} nota{filtradas.length === 1 ? "" : "s"} de
-                  venta
-                </td>
-                <td className="px-4 py-3 text-right">{formatCLP(total)}</td>
-                <td className="px-4 py-3 text-right">
-                  {formatCLP(
-                    filtradas.reduce((s, n) => s + (n.total - n.cobrado), 0)
+                  {tot.notas} nota{tot.notas === 1 ? "" : "s"} de venta
+                  {tot.anuladas > 0 && (
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      + {tot.anuladas} anulada{tot.anuladas === 1 ? "" : "s"} sin
+                      sumar
+                    </span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-right">{formatCLP(tot.total)}</td>
+                <td className="px-4 py-3 text-right">
+                  {formatCLP(tot.saldo)}
                 </td>
                 <td className="px-4 py-3 text-right" colSpan={2}>
                   <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -246,10 +259,10 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
                   </span>{" "}
                   <span
                     className={
-                      margen.margen < 0 ? "text-red-600" : "text-slate-900"
+                      tot.margen < 0 ? "text-red-600" : "text-slate-900"
                     }
                   >
-                    {formatCLP(margen.margen)} ({formatPct(margen.pct)})
+                    {formatCLP(tot.margen)} ({formatPct(tot.pctMargen)})
                   </span>
                 </td>
               </tr>
