@@ -83,6 +83,13 @@ const IconOrden = (p: IconProps) => (
     <path d="m9 13 2 2 4-4" />
   </svg>
 );
+const IconFinanzas = (p: IconProps) => (
+  <svg {...baseIcon(p)}>
+    <path d="M3 3v18h18" />
+    <path d="m7 14 3-4 3 3 5-7" />
+    <circle cx="10" cy="10" r="1" />
+  </svg>
+);
 const IconProveedores = (p: IconProps) => (
   <svg {...baseIcon(p)}>
     <path d="M1 3h13v11H1zM14 8h4l3 3v3h-7" />
@@ -179,6 +186,7 @@ const menu: Entry[] = [
       { href: "/ordenes-compra", label: "Órdenes de Compra", icon: IconOrden },
     ],
   },
+  { href: "/finanzas", label: "Finanzas", icon: IconFinanzas },
   { href: "/proveedores", label: "Proveedores", icon: IconProveedores },
   { href: "/productos", label: "Productos", icon: IconProductos },
   {
