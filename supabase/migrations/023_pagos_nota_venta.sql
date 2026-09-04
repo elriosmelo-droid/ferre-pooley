@@ -41,7 +41,12 @@ create policy "members pagos_nota_venta" on pagos_nota_venta
 -- que la lente "por caja" es exacta de aquí en adelante y aproximada hacia
 -- atrás. El dato real nunca se guardó. La observación lo deja dicho.
 insert into pagos_nota_venta (nota_venta_id, monto, fecha, observacion)
-select nv.id, nv.total, nv.pagada_at::date, 'Migrado del estado anterior'
+-- `::date` sobre un timestamptz trunca en la zona de la SESIÓN (UTC en
+-- producción), no en la de Chile: un click a las 21:00 en Chile (01:00 UTC
+-- del día siguiente) migraría con un día de más. `at time zone
+-- 'America/Santiago'` lo convierte a la hora de pared chilena antes de cortar
+-- la fecha, igual que hace `_recalc_estado_nota_venta` más abajo.
+select nv.id, nv.total, (nv.pagada_at at time zone 'America/Santiago')::date, 'Migrado del estado anterior'
 from notas_venta nv
 where nv.estado = 'pagada'
   and nv.pagada_at is not null
@@ -81,7 +86,11 @@ begin
   into v_cobrado, v_ultima
   from pagos_nota_venta where nota_venta_id = p_nota;
 
-  if v_cobrado >= v_total then
+  -- v_total > 0 además de v_cobrado >= v_total: con total 0 (nota editada a
+  -- 0) la comparación sola daría verdadero con cero abonos y la nota
+  -- quedaría 'pagada'. Como editar exige estado 'pendiente', quedaría
+  -- trabada sin forma de corregirla. Una nota en 0 se queda 'pendiente'.
+  if v_total > 0 and v_cobrado >= v_total then
     -- v_ultima es un date "en el aire" (sin zona). Convertirlo directo a
     -- timestamptz lo interpreta en UTC y la sesión de Supabase corre en UTC,
     -- así que una fecha '2026-09-03' quedaría en 2026-09-03T00:00:00Z, que la

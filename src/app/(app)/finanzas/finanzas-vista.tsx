@@ -12,6 +12,7 @@ import {
   abonosEnRango,
   utilidadPercibida,
   estaVencida,
+  pctUtilidad,
   type NotaCobrable,
 } from "@/lib/cobros";
 
@@ -120,13 +121,11 @@ export function FinanzasVista({
         },
         {
           label: "Utilidad generada",
-          // El % va sobre `venta` (neta, sin flete) y no sobre `vendido`
-          // (bruto, con IVA y flete): son bases distintas y dividir utilidad
-          // (neta) por vendido (bruto) da un porcentaje que no significa
-          // nada. Es la misma base que usa /notas-venta.
-          value: `${formatCLP(r.utilidad)} (${formatPct(
-            r.venta > 0 ? (r.utilidad / r.venta) * 100 : 0
-          )})`,
+          // pctUtilidad usa `venta` (neta, sin flete) y no `vendido` (bruto,
+          // con IVA y flete): son bases distintas y dividir utilidad (neta)
+          // por vendido (bruto) da un porcentaje que no significa nada. Es
+          // la misma base que usa /notas-venta.
+          value: `${formatCLP(r.utilidad)} (${formatPct(pctUtilidad(r))})`,
           detail: "Neta, sin flete",
         },
         {

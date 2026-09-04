@@ -8,9 +8,11 @@ import {
   resumenPorVenta,
   abonosEnRango,
   resumenPorCaja,
+  pctUtilidad,
   type Cobro,
   type NotaCobrable,
 } from "./cobros";
+import { agregarMargen } from "./totals";
 
 function cobro(fecha: string, monto: number, id = `${fecha}-${monto}`): Cobro {
   return { id, fecha, monto, medio_pago: null, observacion: null };
@@ -238,5 +240,56 @@ describe("abonosEnRango y resumenPorCaja", () => {
       cobrado: 0,
       utilidadPercibida: 0,
     });
+  });
+});
+
+describe("pctUtilidad", () => {
+  it("calcula el % de utilidad sobre la venta neta", () => {
+    const r = resumenPorVenta([nota({ id: "a" })], "2026-06-15");
+    // venta neta 84.000, margen 20.000 => 20.000 / 84.000 ≈ 23,81%
+    expect(pctUtilidad(r)).toBeCloseTo((20000 / 84000) * 100);
+  });
+
+  it("sin venta devuelve 0 en vez de dividir por cero", () => {
+    expect(pctUtilidad({ notas: 0, vendido: 0, venta: 0, utilidad: 0, cobrado: 0, utilidadPercibida: 0, porCobrar: 0, porCobrarVencido: 0 })).toBe(0);
+  });
+
+  // Regresión: el % de utilidad debe ir sobre `venta` (neta, sin flete ni
+  // IVA), NUNCA sobre `vendido` (bruto). Antes se usaba `vendido` por error y
+  // el porcentaje resultante no significaba nada. Este caso arma un resumen
+  // donde `venta` y `vendido` son distintos a propósito (venta neta 1.000.000,
+  // vendido bruto 1.190.000, misma utilidad) y afirma el porcentaje que
+  // corresponde a la venta neta: si alguien vuelve a usar `vendido`, este test
+  // falla.
+  it("usa la venta neta y no el vendido bruto (protege contra el bug del % sin significado)", () => {
+    const r = {
+      notas: 1,
+      vendido: 1190000, // bruto: venta neta + IVA (1.000.000 * 1.19)
+      venta: 1000000, // neto, sin flete ni IVA
+      utilidad: 200000,
+      cobrado: 0,
+      utilidadPercibida: 0,
+      porCobrar: 0,
+      porCobrarVencido: 0,
+    };
+    expect(pctUtilidad(r)).toBe(20); // 200.000 / 1.000.000 (venta), no / 1.190.000 (vendido)
+  });
+
+  it("coincide con el % que muestra /notas-venta para el mismo conjunto de notas (agregarMargen)", () => {
+    const notas = [
+      { venta: 84000, costo: 64000 }, // margen 20.000
+      { venta: 168000, costo: 130000 }, // margen 38.000
+    ];
+    const margenTotales = agregarMargen(notas);
+
+    const r = resumenPorVenta(
+      [
+        nota({ id: "a", venta: 84000, margen: 20000 }),
+        nota({ id: "b", venta: 168000, margen: 38000, total: 200000 }),
+      ],
+      "2026-06-15"
+    );
+
+    expect(pctUtilidad(r)).toBeCloseTo(margenTotales.pct);
   });
 });

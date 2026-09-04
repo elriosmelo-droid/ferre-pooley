@@ -1807,7 +1807,7 @@ const c = new Client({ host: 'aws-1-sa-east-1.pooler.supabase.com', port: 5432, 
 c.connect()
   .then(() => c.query(\`
     insert into pagos_nota_venta (nota_venta_id, monto, fecha, observacion)
-    select nv.id, nv.total, nv.pagada_at::date, 'Migrado del estado anterior'
+    select nv.id, nv.total, (nv.pagada_at at time zone 'America/Santiago')::date, 'Migrado del estado anterior'
     from notas_venta nv
     where nv.estado = 'pagada' and nv.pagada_at is not null and nv.total > 0
       and not exists (select 1 from pagos_nota_venta p where p.nota_venta_id = nv.id)

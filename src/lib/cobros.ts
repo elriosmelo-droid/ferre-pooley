@@ -165,6 +165,16 @@ export function resumenPorCaja(
   };
 }
 
+// % de utilidad de un resumen: sobre `venta` (neta, sin flete ni IVA), NUNCA
+// sobre `vendido` (bruto, con IVA y flete). Son bases distintas y dividir
+// utilidad (neta) por vendido (bruto) da un porcentaje sin significado que
+// además no coincide con el que muestra /notas-venta para las mismas notas
+// (agregarMargen, en totals.ts, usa la misma base `venta`). Devuelve 0 si no
+// hay venta, para no dividir por cero.
+export function pctUtilidad(resumen: ResumenVenta): number {
+  return resumen.venta > 0 ? (resumen.utilidad / resumen.venta) * 100 : 0;
+}
+
 // Hoy en Chile como 'AAAA-MM-DD'. El servidor corre en UTC, así que usar
 // `new Date()` directo corre el día durante la noche chilena.
 export function hoyChile(): string {
