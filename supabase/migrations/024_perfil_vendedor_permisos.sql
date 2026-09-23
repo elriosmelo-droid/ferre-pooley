@@ -75,6 +75,23 @@ as $$
   );
 $$;
 
+revoke all on function public.es_admin() from public;
+revoke all on function public.puede(text, text) from public;
+grant execute on function public.es_admin() to authenticated;
+grant execute on function public.puede(text, text) to authenticated;
+
+-- 3. Dueño de cotizaciones y notas ------------------------------------------
+
+alter table cotizaciones
+  add column if not exists vendedor_id uuid
+  references auth.users(id) on delete set null default auth.uid();
+alter table notas_venta
+  add column if not exists vendedor_id uuid
+  references auth.users(id) on delete set null default auth.uid();
+
+create index if not exists cotizaciones_vendedor_id_idx on cotizaciones (vendedor_id);
+create index if not exists notas_venta_vendedor_id_idx on notas_venta (vendedor_id);
+
 -- ¿La nota es del usuario actual? Se usa desde ventas_sii: el vendedor puede
 -- tener "Ventas" sin tener "Notas de Venta", así que no se puede depender de
 -- la RLS de notas_venta en un subquery.
@@ -90,24 +107,8 @@ as $$
   );
 $$;
 
-revoke all on function public.es_admin() from public;
-revoke all on function public.puede(text, text) from public;
 revoke all on function public.nota_es_propia(uuid) from public;
-grant execute on function public.es_admin() to authenticated;
-grant execute on function public.puede(text, text) to authenticated;
 grant execute on function public.nota_es_propia(uuid) to authenticated;
-
--- 3. Dueño de cotizaciones y notas ------------------------------------------
-
-alter table cotizaciones
-  add column if not exists vendedor_id uuid
-  references auth.users(id) on delete set null default auth.uid();
-alter table notas_venta
-  add column if not exists vendedor_id uuid
-  references auth.users(id) on delete set null default auth.uid();
-
-create index if not exists cotizaciones_vendedor_id_idx on cotizaciones (vendedor_id);
-create index if not exists notas_venta_vendedor_id_idx on notas_venta (vendedor_id);
 
 -- Backfill por el nombre guardado (snapshot) o, si era un correo, por email.
 -- Lo que no calce queda null: visible solo para admin.
