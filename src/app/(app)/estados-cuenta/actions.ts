@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, esAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,6 +13,7 @@ export async function setVencimientoManual(
   ventaId: string,
   fecha: string
 ): Promise<SetVencimientoResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const limpio = fecha.trim();
   if (limpio !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(limpio)) {
     return { error: "Fecha inválida" };

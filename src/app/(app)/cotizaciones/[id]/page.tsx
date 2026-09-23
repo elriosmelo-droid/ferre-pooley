@@ -15,6 +15,7 @@ import { duplicarCotizacion, pasarANotaVenta } from "../actions";
 import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
 import { EnviarButton } from "./enviar-button";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type ItemRow = {
   id: string;
@@ -79,6 +80,7 @@ export default async function DetalleCotizacionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("cotizaciones");
   const { id } = await params;
   const supabase = await createClient();
 

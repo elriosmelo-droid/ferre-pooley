@@ -4,6 +4,7 @@ import { calcularMargen } from "@/lib/totals";
 import { fechaVentaNota } from "@/lib/cobros";
 import { diaChile } from "@/lib/fecha";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
@@ -22,6 +23,7 @@ type NotaConItems = Omit<
 };
 
 export default async function NotasVentaPage() {
+  await requirePermiso("notas_venta");
   const supabase = await createClient();
 
   const { data, error } = await supabase

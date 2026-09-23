@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type Adjunto = { id: string; filename: string; content_type?: string; size?: number };
 
@@ -43,6 +44,7 @@ export default async function CorreoDetallePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("correos");
   const { id } = await params;
   const supabase = await createClient();
 

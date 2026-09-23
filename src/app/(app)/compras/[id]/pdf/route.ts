@@ -24,10 +24,9 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  // Este handler usa el service role (salta RLS), así que verifica membresía a
-  // mano: solo usuarios provisionados pueden ver el PDF (datos financieros).
+  // Este handler usa el service role (salta RLS): compras son solo admin.
   const perfil = await getPerfilActual();
-  if (!perfil) {
+  if (perfil?.rol !== "admin") {
     return new Response("No autorizado", { status: 401 });
   }
 

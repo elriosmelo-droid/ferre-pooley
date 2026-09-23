@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, esAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { sincronizarVentas } from "@/lib/sii/sync";
 import { precachearVencimientos } from "@/lib/sii/precache-vencimientos";
@@ -17,6 +18,7 @@ export type ActualizarVentasResult = {
 // sync, completa plazos/vencimientos (acotado; si algo queda, se retoma al
 // volver a actualizar o en el cron).
 export async function actualizarVentas(): Promise<ActualizarVentasResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   try {
     const { encontradas, guardadas, vinculadas } = await sincronizarVentas();
 

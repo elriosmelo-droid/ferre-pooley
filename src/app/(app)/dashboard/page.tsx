@@ -12,6 +12,7 @@ import {
 } from "../notas-venta/nota-estado-badge";
 import { Margenes } from "./margenes";
 import { PanelesSii } from "./paneles";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type CotizacionResumen = {
   id: string;
@@ -53,6 +54,7 @@ function estadoNotaVenta(r: VentaMesRow): string | null {
 }
 
 export default async function DashboardPage() {
+  await requirePermiso("dashboard");
   const supabase = await createClient();
 
   const ahora = new Date();

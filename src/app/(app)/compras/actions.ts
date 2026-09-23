@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, esAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sincronizarCompras } from "@/lib/sii/sync";
@@ -17,6 +18,7 @@ export type ActualizarComprasResult = {
 // sesión la valida el middleware (la página vive bajo (app)); no usa el secret
 // del cron. Es la misma lógica idempotente que corre cada hora.
 export async function actualizarCompras(): Promise<ActualizarComprasResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   try {
     const { encontradas, guardadas } = await sincronizarCompras();
     // Tras bajar las compras, trae también los detalles (PDF de cada DTE
@@ -54,6 +56,7 @@ export async function setFormasPagoCompra(
   id: string,
   items: unknown
 ): Promise<SetFormaPagoResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const normalizados = normalizarItemsPago(items);
 
   const supabase = await createClient();
@@ -85,6 +88,7 @@ export type GenerarPdfsResult = {
 // sola sesión al SII (el SII throttlea si se abre una por click). Luego "Ver"
 // sirve del caché en Storage. Idempotente: lo que falte lo toma otra corrida.
 export async function generarPdfsCompras(): Promise<GenerarPdfsResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   try {
     const { generados, pendientes, noDisponibles, rateLimited } =
       await precachearComprasPdf();

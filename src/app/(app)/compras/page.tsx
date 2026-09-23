@@ -2,12 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import { ActualizarComprasButton } from "./actualizar-button";
 import { GenerarPdfsButton } from "./generar-pdfs-button";
 import { ComprasTabla, type CompraRow } from "./compras-tabla";
+import { requireAdmin } from "@/lib/auth/rol";
 
 // El sync del SII puede tardar (polling al RCV); el server action de actualizar
 // corre en esta ruta, así que se le da margen de tiempo.
 export const maxDuration = 300;
 
 export default async function ComprasPage() {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data, error } = await supabase

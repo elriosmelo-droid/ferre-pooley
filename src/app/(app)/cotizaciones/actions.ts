@@ -1,10 +1,12 @@
 "use server";
 
+import { SIN_PERMISO, checkPermiso, requirePermiso } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createElement } from "react";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
@@ -117,6 +119,7 @@ export async function crearCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
+  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseCotizacionForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -154,6 +157,7 @@ export async function actualizarCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
+  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseCotizacionForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -234,6 +238,7 @@ function formatFechaCorta(value: string) {
 export async function enviarCotizacion(
   id: string
 ): Promise<EnviarCotizacionResult> {
+  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { data: cotizacion, error: readError } = await supabase
@@ -383,6 +388,7 @@ export async function enviarCotizacion(
 }
 
 export async function duplicarCotizacion(id: string): Promise<void> {
+  await requirePermiso("cotizaciones", "escritura");
   const supabase = await createClient();
 
   const { data: original, error: readError } = await supabase
@@ -438,6 +444,8 @@ export async function duplicarCotizacion(id: string): Promise<void> {
 // cliente, ítems, medios de pago y vendedor copiados. Máximo una nota por
 // cotización (unique en notas_venta.cotizacion_id).
 export async function pasarANotaVenta(id: string): Promise<void> {
+  await requirePermiso("cotizaciones", "escritura");
+  await requirePermiso("notas_venta", "escritura");
   const supabase = await createClient();
 
   const { data: cotizacion, error: readError } = await supabase
@@ -509,7 +517,7 @@ export async function pasarANotaVenta(id: string): Promise<void> {
 
   // Si hay una factura del SII que calza sin ambigüedad (mismo RUT + mismo
   // total), queda vinculada de inmediato.
-  await autoVincularNota(supabase, nota.id);
+  await autoVincularNota(createAdminClient(), nota.id);
 
   revalidatePath("/notas-venta");
   revalidatePath(`/cotizaciones/${id}`);
@@ -524,6 +532,7 @@ export type EliminarCotizacionResult = { error?: string; success?: boolean };
 export async function eliminarCotizacion(
   id: string
 ): Promise<EliminarCotizacionResult> {
+  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { data: nota } = await supabase

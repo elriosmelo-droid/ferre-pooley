@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { RedactarForm } from "../redactar-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function RedactarCorreoPage({
   searchParams,
 }: {
   searchParams: Promise<{ para?: string; asunto?: string; cuerpo?: string }>;
 }) {
+  await requirePermiso("correos", "escritura");
   const { para, asunto, cuerpo } = await searchParams;
 
   return (

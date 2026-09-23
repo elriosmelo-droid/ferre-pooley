@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProductosTabla, type ProductoRow } from "./productos-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function ProductosPage() {
+  await requirePermiso("productos");
   const supabase = await createClient();
 
   const { data, error } = await supabase

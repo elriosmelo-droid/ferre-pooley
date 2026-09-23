@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CotizacionesTabla, type CotizacionRow } from "./cotizaciones-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function CotizacionesPage() {
+  await requirePermiso("cotizaciones");
   const supabase = await createClient();
 
   const { data, error } = await supabase

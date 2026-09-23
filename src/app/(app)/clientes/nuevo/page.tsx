@@ -1,7 +1,9 @@
 import { crearCliente } from "../actions";
 import { ClienteForm } from "../cliente-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
-export default function NuevoClientePage() {
+export default async function NuevoClientePage() {
+  await requirePermiso("clientes", "escritura");
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">Nuevo cliente</h1>

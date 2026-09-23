@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { CorreosLista, type CorreoRow } from "../correos-lista";
 import { CorreosNav } from "../correos-nav";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function CorreosEnviadosPage() {
+  await requirePermiso("correos");
   const supabase = await createClient();
 
   const { data, error } = await supabase

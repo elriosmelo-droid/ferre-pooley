@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { EstadosCuentaLista, type ClienteLista } from "./estados-cuenta-lista";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function EstadosCuentaPage() {
+  await requirePermiso("estados_cuenta");
   const supabase = await createClient();
 
   const { data, error } = await supabase

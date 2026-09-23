@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, esAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { normalizarRut } from "@/lib/rut";
@@ -22,6 +23,7 @@ export async function setTipoProveedor(
   id: string,
   tipo: TipoProveedor | null
 ): Promise<SetTipoResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   if (tipo !== null && !TIPOS_PROVEEDOR.includes(tipo)) {
     return { error: "Tipo de proveedor inválido" };
   }
@@ -68,6 +70,7 @@ export type CrearProveedorResult =
 export async function crearProveedor(
   input: CrearProveedorInput
 ): Promise<CrearProveedorResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const rut = rutConGuion(input.rut);
   if (rut.replace(/[^0-9kK]/gi, "").length < 2) {
     return { error: "Ingresa un RUT válido" };
@@ -121,6 +124,7 @@ export async function setCorreoProveedor(
   id: string,
   correo: string
 ): Promise<SetCorreoResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const limpio = correo.trim();
   if (limpio !== "" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio)) {
     return { error: "Correo inválido" };

@@ -8,6 +8,7 @@ import {
   type VentaSiiEstadoCuenta,
 } from "@/lib/estado-cuenta";
 import { EstadoCuentaTabla } from "../estado-cuenta-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 // La nota vinculada viene embebida (ventas_sii.nota_venta_id → notas_venta).
 type VentaConNota = Omit<VentaSiiEstadoCuenta, "estado_nota"> & {
@@ -24,6 +25,7 @@ export default async function EstadoCuentaClientePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("estados_cuenta");
   const { id } = await params;
   const supabase = await createClient();
 

@@ -6,6 +6,7 @@ import {
   OrdenCompraForm,
   type OrdenCompraItemInput,
 } from "../../orden-compra-form";
+import { requireAdmin } from "@/lib/auth/rol";
 
 type ItemRow = {
   producto_id: string | null;
@@ -21,6 +22,7 @@ export default async function EditarOrdenCompraPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
   const { id } = await params;
   const supabase = await createClient();
 

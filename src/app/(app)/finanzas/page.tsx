@@ -13,6 +13,9 @@ import {
 } from "@/lib/forma-pago-compra";
 import { signoDte } from "@/lib/dte-doc";
 import { FinanzasVista } from "./finanzas-vista";
+import { redirect } from "next/navigation";
+import { requirePermiso } from "@/lib/auth/rol";
+import { primeraRutaPermitida, puedeVerCostos } from "@/lib/auth/permisos";
 
 type NotaQuery = {
   id: string;
@@ -57,6 +60,9 @@ function fechaChile(iso: string): string {
 }
 
 export default async function FinanzasPage() {
+  const perfil = await requirePermiso("finanzas");
+  // Finanzas es utilidad de punta a punta: sin «ver costos» no se entra.
+  if (!puedeVerCostos(perfil)) redirect(primeraRutaPermitida({ rol: perfil.rol, permisos: { ...perfil.permisos, finanzas: undefined } }));
   const supabase = await createClient();
 
   const [{ data: notasData, error }, { data: ventasData }, { data: comprasData }] =

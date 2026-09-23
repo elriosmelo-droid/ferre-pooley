@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { type TipoProveedor } from "./tipos";
 import { ProveedoresTabla, type ProveedorRow } from "./proveedores-tabla";
 import { NuevoProveedor } from "./nuevo-proveedor";
+import { requireAdmin } from "@/lib/auth/rol";
 
 type ProveedorDB = {
   id: string;
@@ -12,6 +13,7 @@ type ProveedorDB = {
 };
 
 export default async function ProveedoresPage() {
+  await requireAdmin();
   const supabase = await createClient();
 
   const [{ data, error }, { data: comprasData }] = await Promise.all([

@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { ActualizarVentasButton } from "./actualizar-button";
 import { VentasTabla, type VentaRow } from "./ventas-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 // El sync del SII puede tardar (polling al RCV); el server action corre en esta
 // ruta, así que se le da margen de tiempo.
 export const maxDuration = 300;
 
 export default async function VentasPage() {
+  await requirePermiso("ventas");
   const supabase = await createClient();
 
   // Cada factura trae su nota vinculada embebida vía nota_venta_id.

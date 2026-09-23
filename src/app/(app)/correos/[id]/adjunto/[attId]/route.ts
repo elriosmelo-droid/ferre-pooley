@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilActual } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 export const maxDuration = 60;
 
@@ -10,7 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string; attId: string }> }
 ) {
   const perfil = await getPerfilActual();
-  if (!perfil) return new Response("No autorizado", { status: 401 });
+  if (!tienePermiso(perfil, "correos", "lectura")) {
+    return new Response("No autorizado", { status: 401 });
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return new Response("Resend no configurado", { status: 500 });

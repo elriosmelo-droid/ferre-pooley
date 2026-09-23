@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { OrdenesCompraTabla, type OrdenCompraRow } from "./ordenes-compra-tabla";
+import { requireAdmin } from "@/lib/auth/rol";
 
 export default async function OrdenesCompraPage() {
+  await requireAdmin();
   const supabase = await createClient();
 
   const { data, error } = await supabase

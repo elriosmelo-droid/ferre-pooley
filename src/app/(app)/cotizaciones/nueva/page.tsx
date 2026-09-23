@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { crearCotizacion } from "../actions";
 import { CotizacionForm } from "../cotizacion-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function NuevaCotizacionPage() {
+  await requirePermiso("cotizaciones", "escritura");
   const supabase = await createClient();
 
   const [{ data: clientes }, { data: productos }] = await Promise.all([

@@ -1,7 +1,9 @@
 import { crearProducto } from "../actions";
 import { ProductoForm } from "../producto-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
-export default function NuevoProductoPage() {
+export default async function NuevoProductoPage() {
+  await requirePermiso("productos", "escritura");
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">Nuevo producto</h1>

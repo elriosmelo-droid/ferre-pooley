@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarNotaVenta } from "../../actions";
 import { NotaVentaForm, type NotaVentaItemInput } from "../../nota-venta-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type NotaEditable = {
   id: string;
@@ -19,6 +20,7 @@ export default async function EditarNotaVentaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("notas_venta", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, checkPermiso } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -44,6 +45,7 @@ export async function crearCliente(
   _prevState: ClienteFormState,
   formData: FormData
 ): Promise<ClienteFormState> {
+  if (!(await checkPermiso("clientes", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseClienteForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -66,6 +68,7 @@ export async function actualizarCliente(
   _prevState: ClienteFormState,
   formData: FormData
 ): Promise<ClienteFormState> {
+  if (!(await checkPermiso("clientes", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseClienteForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -89,6 +92,7 @@ export async function actualizarCliente(
 export async function eliminarCliente(
   id: string
 ): Promise<{ error?: string } | void> {
+  if (!(await checkPermiso("clientes", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
   const { error } = await supabase.from("clientes").delete().eq("id", id);
 

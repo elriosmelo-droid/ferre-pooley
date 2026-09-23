@@ -7,6 +7,7 @@ import { EstadoBadge, type OrdenCompraEstado } from "../estado-badge";
 import { EnviarButton } from "./enviar-button";
 import { ReenviarButton } from "./reenviar-button";
 import { CerrarOrdenButton } from "./cerrar-orden-button";
+import { requireAdmin } from "@/lib/auth/rol";
 
 type ItemRow = {
   id: string;
@@ -71,6 +72,7 @@ export default async function DetalleOrdenCompraPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
   const { id } = await params;
   const supabase = await createClient();
 

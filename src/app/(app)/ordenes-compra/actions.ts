@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, esAdmin, requireAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createElement } from "react";
@@ -106,6 +107,7 @@ export async function crearOrdenCompra(
   _prevState: OrdenCompraFormState,
   formData: FormData
 ): Promise<OrdenCompraFormState> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const parsed = parseOrdenForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -143,6 +145,7 @@ export async function actualizarOrdenCompra(
   _prevState: OrdenCompraFormState,
   formData: FormData
 ): Promise<OrdenCompraFormState> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const parsed = parseOrdenForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -351,6 +354,7 @@ async function despacharCorreoOrden(
 export async function enviarOrdenCompra(
   id: string
 ): Promise<EnviarOrdenResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const despacho = await despacharCorreoOrden(supabase, id, {
@@ -394,6 +398,7 @@ export async function enviarOrdenCompra(
 export async function reenviarOrdenCompra(
   id: string
 ): Promise<EnviarOrdenResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const despacho = await despacharCorreoOrden(supabase, id, {
@@ -425,6 +430,7 @@ export async function reenviarOrdenCompra(
 // Avanza el estado tras el envío: enviada → recibida → cerrada. Cada paso es
 // atómico vía .eq("estado") sobre el estado de origen esperado.
 export async function marcarRecibida(id: string): Promise<void> {
+  await requireAdmin();
   const supabase = await createClient();
   await supabase
     .from("ordenes_compra")
@@ -441,6 +447,7 @@ export async function cerrarOrden(
   id: string,
   observacion: string
 ): Promise<CerrarOrdenResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const obs = observacion.trim();
   if (obs === "") {
     return { error: "Debes dejar una observación para cerrar la orden." };

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { signoDte } from "@/lib/dte-doc";
 import { ConciliacionTabla, type ConciliacionRow } from "./conciliacion-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type NotaRow = {
   id: string;
@@ -17,6 +18,7 @@ function clasificar(total: number, facturado: number, nFacturas: number) {
 }
 
 export default async function ConciliacionPage() {
+  await requirePermiso("conciliacion");
   const supabase = await createClient();
 
   const [{ data: notasData, error }, { data: ventasData }] = await Promise.all([

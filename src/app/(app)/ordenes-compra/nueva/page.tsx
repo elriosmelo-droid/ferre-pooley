@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { crearOrdenCompra } from "../actions";
 import { OrdenCompraForm } from "../orden-compra-form";
+import { requireAdmin } from "@/lib/auth/rol";
 
 export default async function NuevaOrdenCompraPage() {
+  await requireAdmin();
   const supabase = await createClient();
 
   const [{ data: proveedores }, { data: productos }] = await Promise.all([

@@ -1,9 +1,11 @@
 "use server";
 
+import { SIN_PERMISO, checkPermiso, esAdmin } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { calcularTotales } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
@@ -31,6 +33,7 @@ const cobroSchema = z.object({
 export async function registrarCobro(
   input: unknown
 ): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const parsed = cobroSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -76,6 +79,7 @@ export async function eliminarCobro(
   id: string,
   notaVentaId: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   // El .eq("nota_venta_id") evita borrar (y revalidar) la nota equivocada si
@@ -192,6 +196,7 @@ export async function crearNotaVenta(
   _prevState: NotaVentaFormState,
   formData: FormData
 ): Promise<NotaVentaFormState> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseNotaVentaForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -222,7 +227,7 @@ export async function crearNotaVenta(
 
   // Si hay una factura del SII que calza sin ambigüedad (mismo RUT + mismo
   // total), queda vinculada de inmediato.
-  await autoVincularNota(supabase, nota.id);
+  await autoVincularNota(createAdminClient(), nota.id);
 
   revalidatePath("/notas-venta");
   redirect(`/notas-venta/${nota.id}`);
@@ -233,6 +238,7 @@ export async function actualizarNotaVenta(
   _prevState: NotaVentaFormState,
   formData: FormData
 ): Promise<NotaVentaFormState> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseNotaVentaForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -280,7 +286,7 @@ export async function actualizarNotaVenta(
 
   // El total pudo cambiar: reintenta el calce automático (autoVincularNota
   // no toca notas que ya tienen factura vinculada).
-  await autoVincularNota(supabase, id);
+  await autoVincularNota(createAdminClient(), id);
 
   revalidatePath("/notas-venta");
   revalidatePath(`/notas-venta/${id}`);
@@ -293,6 +299,7 @@ export async function actualizarNotaVenta(
 export async function eliminarNotaVenta(
   id: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -322,6 +329,7 @@ export async function vincularFacturaVenta(
   notaId: string,
   ventaSiiId: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -375,6 +383,7 @@ export async function setObservacionVenta(
   notaId: string,
   observacion: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -396,6 +405,7 @@ export async function setObservacionVenta(
 export async function desvincularFacturaVenta(
   ventaSiiId: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await esAdmin())) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -417,6 +427,7 @@ export async function desvincularFacturaVenta(
 export async function anularNotaVenta(
   id: string
 ): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
   const supabase = await createClient();
 
   const { data, error } = await supabase

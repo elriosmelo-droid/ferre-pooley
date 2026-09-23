@@ -12,7 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const perfil = await getPerfilActual();
-  if (!perfil) return new Response("No autorizado", { status: 401 });
+  if (perfil?.rol !== "admin") {
+    return new Response("No autorizado", { status: 401 });
+  }
 
   const { id } = await params;
   const supabase = await createClient();

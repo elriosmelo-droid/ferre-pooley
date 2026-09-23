@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { enviarCorreoTexto } from "@/lib/email/send";
-import { getPerfilActual } from "@/lib/auth/rol";
+import { SIN_PERMISO, checkPermiso, getPerfilActual } from "@/lib/auth/rol";
 
 // Remitente según el usuario que envía: Victor sale con su casilla; el resto
 // con la casilla de ventas.
@@ -43,6 +43,7 @@ export async function enviarCorreoNuevo(
   _prev: EnviarCorreoState,
   formData: FormData
 ): Promise<EnviarCorreoState> {
+  if (!(await checkPermiso("correos", "escritura"))) return { error: SIN_PERMISO };
   const parsed = schema.safeParse({
     para: String(formData.get("para") ?? "").trim(),
     asunto: String(formData.get("asunto") ?? ""),

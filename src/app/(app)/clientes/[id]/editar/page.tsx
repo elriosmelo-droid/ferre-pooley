@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarCliente } from "../../actions";
 import { ClienteForm } from "../../cliente-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function EditarClientePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("clientes", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 

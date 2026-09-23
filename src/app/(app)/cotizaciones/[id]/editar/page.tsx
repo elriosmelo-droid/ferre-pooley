@@ -5,6 +5,7 @@ import {
   CotizacionForm,
   type CotizacionItemInput,
 } from "../../cotizacion-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type CotizacionEditable = {
   id: string;
@@ -22,6 +23,7 @@ export default async function EditarCotizacionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("cotizaciones", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 

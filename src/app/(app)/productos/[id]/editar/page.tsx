@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarProducto } from "../../actions";
 import { ProductoForm } from "../../producto-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function EditarProductoPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("productos", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 

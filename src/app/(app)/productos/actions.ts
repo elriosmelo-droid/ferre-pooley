@@ -1,5 +1,6 @@
 "use server";
 
+import { SIN_PERMISO, checkPermiso } from "@/lib/auth/rol";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -40,6 +41,7 @@ export async function crearProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
+  if (!(await checkPermiso("productos", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseProductoForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -65,6 +67,7 @@ export async function actualizarProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
+  if (!(await checkPermiso("productos", "escritura"))) return { error: SIN_PERMISO };
   const parsed = parseProductoForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };

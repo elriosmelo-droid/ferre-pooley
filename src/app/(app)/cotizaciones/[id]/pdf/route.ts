@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilActual } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { generarPdfCotizacion } from "@/lib/pdf/cotizacion-pdf";
 
@@ -13,7 +14,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const perfil = await getPerfilActual();
-  if (!perfil) return new Response("No autorizado", { status: 401 });
+  if (!tienePermiso(perfil, "cotizaciones", "lectura")) {
+    return new Response("No autorizado", { status: 401 });
+  }
 
   const { id } = await params;
   const supabase = await createClient();

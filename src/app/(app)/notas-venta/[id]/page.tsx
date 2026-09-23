@@ -15,6 +15,7 @@ import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
 import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
+import { requirePermiso } from "@/lib/auth/rol";
 
 type ItemRow = {
   id: string;
@@ -72,6 +73,7 @@ export default async function DetalleNotaVentaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermiso("notas_venta");
   const { id } = await params;
   const supabase = await createClient();
 

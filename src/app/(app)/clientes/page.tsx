@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ClientesTabla, type ClienteRow } from "./clientes-tabla";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function ClientesPage() {
+  await requirePermiso("clientes");
   const supabase = await createClient();
 
   const { data, error } = await supabase

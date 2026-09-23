@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilActual } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 import { normalizarRut } from "@/lib/rut";
 import {
   construirEstadoCuenta,
@@ -25,7 +26,9 @@ export async function GET(
 ) {
   // Datos financieros del cliente: exige miembro.
   const perfil = await getPerfilActual();
-  if (!perfil) return new Response("No autorizado", { status: 401 });
+  if (!tienePermiso(perfil, "estados_cuenta", "lectura")) {
+    return new Response("No autorizado", { status: 401 });
+  }
 
   const { id } = await params;
   const supabase = await createClient();

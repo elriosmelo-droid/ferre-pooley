@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { crearNotaVenta } from "../actions";
 import { NotaVentaForm } from "../nota-venta-form";
+import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function NuevaNotaVentaPage() {
+  await requirePermiso("notas_venta", "escritura");
   const supabase = await createClient();
 
   const [{ data: clientes }, { data: productos }] = await Promise.all([

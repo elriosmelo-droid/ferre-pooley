@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPerfilActual } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
+import { createClient } from "@/lib/supabase/server";
 import { descargarDteEmitidoXml } from "@/lib/sii/mipe";
 import { parseDte } from "@/lib/sii/dte-xml";
 import { generarPdfVenta } from "@/lib/pdf/venta-pdf";
@@ -24,11 +26,26 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  // Este handler usa el service role (salta RLS), así que verifica membresía a
-  // mano: solo usuarios provisionados pueden ver el PDF (datos financieros).
+  // Este handler usa el service role (salta RLS): el acceso se valida a mano.
+  // Para un vendedor, la propia RLS decide si la factura es suya: si con su
+  // sesión no la ve, no existe para él.
   const perfil = await getPerfilActual();
-  if (!perfil) {
+  const puedeVer =
+    tienePermiso(perfil, "ventas", "lectura") ||
+    tienePermiso(perfil, "conciliacion", "lectura") ||
+    tienePermiso(perfil, "estados_cuenta", "lectura") ||
+    tienePermiso(perfil, "notas_venta", "lectura");
+  if (!perfil || !puedeVer) {
     return new Response("No autorizado", { status: 401 });
+  }
+  if (perfil.rol !== "admin") {
+    const supabase = await createClient();
+    const { data: propia } = await supabase
+      .from("ventas_sii")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!propia) return new Response("Venta no encontrada", { status: 404 });
   }
 
   const db = createAdminClient();
