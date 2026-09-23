@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
+import { tienePermiso, type ClaveModulo, type SujetoPermisos } from "@/lib/auth/permisos";
 
 // --- Íconos (SVG inline, stroke currentColor, sin dependencias) ---
 type IconProps = SVGProps<SVGSVGElement>;
@@ -160,52 +161,74 @@ const Chevron = (p: IconProps) => (
 );
 
 // --- Estructura del menú ---
-type Item = { href: string; label: string; icon: (p: IconProps) => ReactNode };
+// modulo: clave del catálogo de permisos. soloAdmin: fuera del catálogo
+// (compras, OC, proveedores), visible solo para admin.
+type Item = {
+  href: string;
+  label: string;
+  icon: (p: IconProps) => ReactNode;
+  modulo?: ClaveModulo;
+  soloAdmin?: boolean;
+};
 type Group = { label: string; icon: (p: IconProps) => ReactNode; items: Item[] };
 type Entry = Item | Group;
 
 const isGroup = (e: Entry): e is Group => "items" in e;
 
+function itemVisible(i: Item, perfil: SujetoPermisos) {
+  if (i.soloAdmin) return perfil.rol === "admin";
+  return i.modulo ? tienePermiso(perfil, i.modulo, "lectura") : true;
+}
+
 const menu: Entry[] = [
-  { href: "/dashboard", label: "Dashboard", icon: IconDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: IconDashboard, modulo: "dashboard" },
   {
     label: "Ventas",
     icon: IconVentas,
     items: [
-      { href: "/cotizaciones", label: "Cotizaciones", icon: IconCotizaciones },
-      { href: "/ventas", label: "Ventas", icon: IconVenta },
-      { href: "/notas-venta", label: "Notas de Venta", icon: IconNota },
-      { href: "/conciliacion", label: "Conciliación", icon: IconConciliacion },
+      { href: "/cotizaciones", label: "Cotizaciones", icon: IconCotizaciones, modulo: "cotizaciones" },
+      { href: "/ventas", label: "Ventas", icon: IconVenta, modulo: "ventas" },
+      { href: "/notas-venta", label: "Notas de Venta", icon: IconNota, modulo: "notas_venta" },
+      { href: "/conciliacion", label: "Conciliación", icon: IconConciliacion, modulo: "conciliacion" },
     ],
   },
   {
     label: "Compras",
     icon: IconCompras,
     items: [
-      { href: "/compras", label: "Compras", icon: IconCompra },
-      { href: "/ordenes-compra", label: "Órdenes de Compra", icon: IconOrden },
+      { href: "/compras", label: "Compras", icon: IconCompra, soloAdmin: true },
+      { href: "/ordenes-compra", label: "Órdenes de Compra", icon: IconOrden, soloAdmin: true },
     ],
   },
-  { href: "/finanzas", label: "Finanzas", icon: IconFinanzas },
-  { href: "/proveedores", label: "Proveedores", icon: IconProveedores },
-  { href: "/productos", label: "Productos", icon: IconProductos },
+  { href: "/finanzas", label: "Finanzas", icon: IconFinanzas, modulo: "finanzas" },
+  { href: "/proveedores", label: "Proveedores", icon: IconProveedores, soloAdmin: true },
+  { href: "/productos", label: "Productos", icon: IconProductos, modulo: "productos" },
   {
     label: "Clientes",
     icon: IconClientes,
     items: [
-      { href: "/clientes", label: "Clientes", icon: IconClientes },
-      { href: "/estados-cuenta", label: "Estados de Cuenta", icon: IconEstadoCuenta },
+      { href: "/clientes", label: "Clientes", icon: IconClientes, modulo: "clientes" },
+      { href: "/estados-cuenta", label: "Estados de Cuenta", icon: IconEstadoCuenta, modulo: "estados_cuenta" },
     ],
   },
   {
     label: "Correos",
     icon: IconCorreos,
     items: [
-      { href: "/correos", label: "Recibidos", icon: IconRecibidos },
-      { href: "/correos/enviados", label: "Enviados", icon: IconEnviados },
+      { href: "/correos", label: "Recibidos", icon: IconRecibidos, modulo: "correos" },
+      { href: "/correos/enviados", label: "Enviados", icon: IconEnviados, modulo: "correos" },
     ],
   },
 ];
+
+// Deja solo lo que el perfil puede ver; un grupo sin hijos visibles desaparece.
+function filtrarMenu(perfil: SujetoPermisos): Entry[] {
+  return menu.flatMap((e): Entry[] => {
+    if (!isGroup(e)) return itemVisible(e, perfil) ? [e] : [];
+    const items = e.items.filter((i) => itemVisible(i, perfil));
+    return items.length ? [{ ...e, items }] : [];
+  });
+}
 
 function itemClasses(active: boolean) {
   return `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -216,12 +239,14 @@ function itemClasses(active: boolean) {
 }
 
 export function Sidebar({
-  esAdmin = false,
+  perfil,
   correosSinLeer = 0,
 }: {
-  esAdmin?: boolean;
+  perfil: SujetoPermisos;
   correosSinLeer?: number;
 }) {
+  const esAdmin = perfil.rol === "admin";
+  const menuVisible = filtrarMenu(perfil);
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -249,7 +274,7 @@ export function Sidebar({
         </Link>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
-        {menu.map((entry) => {
+        {menuVisible.map((entry) => {
           if (!isGroup(entry)) {
             const Icon = entry.icon;
             return (
