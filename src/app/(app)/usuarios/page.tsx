@@ -1,6 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/rol";
-import { CrearUsuarioForm } from "./crear-usuario-form";
+import Link from "next/link";
+import {
+  contarModulos,
+  normalizarPermisos,
+  type Permisos,
+} from "@/lib/auth/permisos";
+import { crearUsuario } from "./actions";
+import { UsuarioForm } from "./usuario-form";
 import { EliminarUsuarioButton } from "./eliminar-usuario-button";
 
 export type UsuarioRow = {
@@ -8,6 +15,7 @@ export type UsuarioRow = {
   email: string;
   nombre: string | null;
   rol: string;
+  permisos: Permisos;
   created_at: string;
 };
 
@@ -25,11 +33,11 @@ export default async function UsuariosPage() {
   const admin = createAdminClient();
   const [{ data: lista, error }, { data: perfiles }] = await Promise.all([
     admin.auth.admin.listUsers(),
-    admin.from("perfiles").select("user_id, nombre, rol"),
+    admin.from("perfiles").select("user_id, nombre, rol, permisos"),
   ]);
 
   const porId = new Map(
-    (perfiles ?? []).map((p) => [p.user_id, p as { nombre: string | null; rol: string }])
+    (perfiles ?? []).map((p) => [p.user_id, p as { nombre: string | null; rol: string; permisos: unknown }])
   );
 
   const usuarios: UsuarioRow[] = (lista?.users ?? [])
@@ -39,7 +47,8 @@ export default async function UsuariosPage() {
         id: u.id,
         email: u.email ?? "—",
         nombre: p?.nombre ?? null,
-        rol: p?.rol ?? "usuario",
+        rol: p?.rol ?? "vendedor",
+        permisos: normalizarPermisos(p?.permisos),
         created_at: u.created_at,
       };
     })
@@ -88,7 +97,9 @@ export default async function UsuariosPage() {
                     <td className="px-4 py-3">{u.nombre ?? "—"}</td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-700">
-                        {u.rol}
+                        {u.rol === "vendedor"
+                          ? `Vendedor · ${contarModulos(u.permisos)} módulos`
+                          : u.rol}
                       </span>
                     </td>
                     <td className="px-4 py-3">{formatearFecha(u.created_at)}</td>
@@ -96,7 +107,15 @@ export default async function UsuariosPage() {
                       {u.id === perfilActual.userId ? (
                         <span className="text-xs text-slate-400">Tú</span>
                       ) : (
-                        <EliminarUsuarioButton id={u.id} email={u.email} />
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/usuarios/${u.id}/editar`}
+                            className="text-sm font-medium text-brand-600 hover:text-brand-800"
+                          >
+                            Editar
+                          </Link>
+                          <EliminarUsuarioButton id={u.id} email={u.email} />
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -110,7 +129,7 @@ export default async function UsuariosPage() {
           <h2 className="mb-4 text-sm font-semibold text-slate-900">
             Nuevo usuario
           </h2>
-          <CrearUsuarioForm />
+          <UsuarioForm action={crearUsuario} submitLabel="Crear usuario" />
         </div>
       </div>
     </div>
