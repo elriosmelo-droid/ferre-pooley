@@ -10,9 +10,11 @@ const tabCls = (activo: boolean) =>
 export function CorreosNav({
   activo,
   sinLeer = 0,
+  puedeEscribir = true,
 }: {
   activo: "recibidos" | "enviados";
   sinLeer?: number;
+  puedeEscribir?: boolean;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -38,6 +40,7 @@ export function CorreosNav({
           </Link>
         </div>
       </div>
+      {puedeEscribir && (
       <Link
         href="/correos/nuevo"
         className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
@@ -47,6 +50,7 @@ export function CorreosNav({
         </svg>
         Redactar
       </Link>
+      )}
     </div>
   );
 }

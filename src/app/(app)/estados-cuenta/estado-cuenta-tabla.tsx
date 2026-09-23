@@ -16,7 +16,14 @@ function fmtFecha(iso: string | null) {
 const inputCls =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none";
 
-export function EstadoCuentaTabla({ filas }: { filas: FilaEstadoCuenta[] }) {
+export function EstadoCuentaTabla({
+  filas,
+  editable = true,
+}: {
+  filas: FilaEstadoCuenta[];
+  // El vencimiento manual lo corrige solo el admin.
+  editable?: boolean;
+}) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [estado, setEstado] = useState("");
@@ -168,6 +175,8 @@ export function EstadoCuentaTabla({ filas }: { filas: FilaEstadoCuenta[] }) {
                   <td className="px-4 py-3">
                     {f.esCredito ? (
                       "—"
+                    ) : !editable ? (
+                      fmtFecha(f.vencimiento)
                     ) : (
                       <VencimientoEditable
                         ventaId={f.id}

@@ -2,9 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { CorreosLista, type CorreoRow } from "./correos-lista";
 import { CorreosNav } from "./correos-nav";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 export default async function CorreosPage() {
-  await requirePermiso("correos");
+  const perfil = await requirePermiso("correos");
+  const puedeEscribir = tienePermiso(perfil, "correos", "escritura");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -18,7 +20,7 @@ export default async function CorreosPage() {
 
   return (
     <div>
-      <CorreosNav activo="recibidos" sinLeer={sinLeer} />
+      <CorreosNav activo="recibidos" sinLeer={sinLeer} puedeEscribir={puedeEscribir} />
       {error ? (
         <p className="text-sm text-red-600">
           No se pudieron cargar los correos. Intenta nuevamente.

@@ -2,9 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ClientesTabla, type ClienteRow } from "./clientes-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 export default async function ClientesPage() {
-  await requirePermiso("clientes");
+  const perfil = await requirePermiso("clientes");
+  const puedeEscribir = tienePermiso(perfil, "clientes", "escritura");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -18,12 +20,14 @@ export default async function ClientesPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
+        {puedeEscribir && (
         <Link
           href="/clientes/nuevo"
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           Nuevo cliente
         </Link>
+        )}
       </div>
 
       {error ? (
@@ -31,7 +35,7 @@ export default async function ClientesPage() {
           No se pudieron cargar los clientes. Intenta nuevamente.
         </p>
       ) : (
-        <ClientesTabla clientes={clientes} />
+        <ClientesTabla clientes={clientes} puedeEscribir={puedeEscribir} />
       )}
     </div>
   );

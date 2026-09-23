@@ -5,6 +5,7 @@ import { fechaVentaNota } from "@/lib/cobros";
 import { diaChile } from "@/lib/fecha";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
@@ -23,7 +24,8 @@ type NotaConItems = Omit<
 };
 
 export default async function NotasVentaPage() {
-  await requirePermiso("notas_venta");
+  const perfil = await requirePermiso("notas_venta");
+  const puedeEscribir = tienePermiso(perfil, "notas_venta", "escritura");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -57,12 +59,14 @@ export default async function NotasVentaPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Notas de Venta</h1>
+        {puedeEscribir && (
         <Link
           href="/notas-venta/nueva"
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           Nueva nota de venta
         </Link>
+        )}
       </div>
 
       {error ? (

@@ -17,11 +17,14 @@ export function CobrosNota({
   total,
   cobros,
   anulada,
+  soloLectura = false,
 }: {
   notaVentaId: string;
   total: number;
   cobros: Cobro[];
   anulada: boolean;
+  // Sin permiso de escritura: ve los cobros, no registra ni borra.
+  soloLectura?: boolean;
 }) {
   const pagado = cobrado(cobros);
   const pendiente = saldo(total, cobros);
@@ -142,6 +145,7 @@ export function CobrosNota({
                   <p className="text-xs text-slate-500">{c.observacion}</p>
                 )}
               </div>
+              {!soloLectura && (
               <button
                 type="button"
                 onClick={() => borrar(c.id)}
@@ -150,12 +154,13 @@ export function CobrosNota({
               >
                 Eliminar
               </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      {anulada ? (
+      {soloLectura ? null : anulada ? (
         <p className="px-6 py-4 text-sm text-slate-500">
           La nota está anulada: no acepta cobros.
         </p>

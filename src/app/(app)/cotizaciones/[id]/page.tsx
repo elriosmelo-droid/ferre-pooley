@@ -16,6 +16,7 @@ import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
 import { EnviarButton } from "./enviar-button";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 type ItemRow = {
   id: string;
@@ -80,7 +81,9 @@ export default async function DetalleCotizacionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("cotizaciones");
+  const perfil = await requirePermiso("cotizaciones");
+  const puedeEscribir = tienePermiso(perfil, "cotizaciones", "escritura");
+  const puedeCrearNota = puedeEscribir && tienePermiso(perfil, "notas_venta", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -135,7 +138,7 @@ export default async function DetalleCotizacionPage({
           >
             Ver PDF
           </a>
-          {cotizacion.estado === "borrador" && (
+          {puedeEscribir && cotizacion.estado === "borrador" && (
             <>
               <Link
                 href={`/cotizaciones/${cotizacion.id}/editar`}
@@ -146,6 +149,7 @@ export default async function DetalleCotizacionPage({
               <EnviarButton cotizacionId={cotizacion.id} />
             </>
           )}
+          {puedeEscribir && (
           <form action={duplicar}>
             <button
               type="submit"
@@ -154,6 +158,7 @@ export default async function DetalleCotizacionPage({
               Duplicar
             </button>
           </form>
+          )}
           {notaExistente ? (
             <Link
               href={`/notas-venta/${notaExistente.id}`}
@@ -161,7 +166,7 @@ export default async function DetalleCotizacionPage({
             >
               Nota {notaExistente.folio}
             </Link>
-          ) : (
+          ) : puedeCrearNota ? (
             <form action={pasar}>
               <button
                 type="submit"
@@ -170,7 +175,7 @@ export default async function DetalleCotizacionPage({
                 Pasar a nota de venta
               </button>
             </form>
-          )}
+          ) : null}
         </div>
       </div>
 

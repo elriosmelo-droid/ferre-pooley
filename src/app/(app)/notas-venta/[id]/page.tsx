@@ -16,6 +16,7 @@ import { AccionesNota } from "./acciones-nota";
 import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 type ItemRow = {
   id: string;
@@ -73,7 +74,9 @@ export default async function DetalleNotaVentaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("notas_venta");
+  const perfil = await requirePermiso("notas_venta");
+  const puedeEscribir = tienePermiso(perfil, "notas_venta", "escritura");
+  const esAdmin = perfil.rol === "admin";
   const { id } = await params;
   const supabase = await createClient();
 
@@ -143,7 +146,7 @@ export default async function DetalleNotaVentaPage({
           <NotaEstadoBadge estado={nota.estado} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {nota.estado === "pendiente" && (
+          {puedeEscribir && nota.estado === "pendiente" && (
             <Link
               href={`/notas-venta/${nota.id}/editar`}
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
@@ -151,7 +154,9 @@ export default async function DetalleNotaVentaPage({
               Editar
             </Link>
           )}
-          <AccionesNota notaVentaId={nota.id} estado={nota.estado} />
+          {puedeEscribir && (
+            <AccionesNota notaVentaId={nota.id} estado={nota.estado} />
+          )}
         </div>
       </div>
 
@@ -216,19 +221,32 @@ export default async function DetalleNotaVentaPage({
         total={nota.total}
         cobros={cobros}
         anulada={nota.estado === "anulada"}
+        soloLectura={!puedeEscribir}
       />
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Factura de venta (SII)
         </h2>
-        <FacturaVinculo
-          notaId={nota.id}
-          total={nota.total}
-          vinculadas={facturasVinculadas}
-          candidatas={candidatas}
-          otras={otras}
-        />
+        {esAdmin ? (
+          <FacturaVinculo
+            notaId={nota.id}
+            total={nota.total}
+            vinculadas={facturasVinculadas}
+            candidatas={candidatas}
+            otras={otras}
+          />
+        ) : facturasVinculadas.length === 0 ? (
+          <p className="text-sm text-slate-500">Aún sin factura vinculada.</p>
+        ) : (
+          <ul className="text-sm text-slate-700">
+            {facturasVinculadas.map((f) => (
+              <li key={f.id}>
+                Folio {f.folio} · {formatCLP(f.monto_total)}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

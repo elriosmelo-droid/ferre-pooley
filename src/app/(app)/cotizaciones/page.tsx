@@ -2,9 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CotizacionesTabla, type CotizacionRow } from "./cotizaciones-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 export default async function CotizacionesPage() {
-  await requirePermiso("cotizaciones");
+  const perfil = await requirePermiso("cotizaciones");
+  const puedeEscribir = tienePermiso(perfil, "cotizaciones", "escritura");
+  const puedeCrearNota = puedeEscribir && tienePermiso(perfil, "notas_venta", "escritura");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -20,12 +23,14 @@ export default async function CotizacionesPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Cotizaciones</h1>
+        {puedeEscribir && (
         <Link
           href="/cotizaciones/nueva"
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           Nueva cotización
         </Link>
+        )}
       </div>
 
       {error ? (
@@ -33,7 +38,11 @@ export default async function CotizacionesPage() {
           No se pudieron cargar las cotizaciones. Intenta nuevamente.
         </p>
       ) : (
-        <CotizacionesTabla cotizaciones={cotizaciones} />
+        <CotizacionesTabla
+          cotizaciones={cotizaciones}
+          puedeEscribir={puedeEscribir}
+          puedeCrearNota={puedeCrearNota}
+        />
       )}
     </div>
   );

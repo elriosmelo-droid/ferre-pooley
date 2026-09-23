@@ -8,7 +8,7 @@ import { requirePermiso } from "@/lib/auth/rol";
 export const maxDuration = 300;
 
 export default async function VentasPage() {
-  await requirePermiso("ventas");
+  const perfil = await requirePermiso("ventas");
   const supabase = await createClient();
 
   // Cada factura trae su nota vinculada embebida vía nota_venta_id.
@@ -32,7 +32,7 @@ export default async function VentasPage() {
             actualizan cada noche; también puedes refrescarlas a mano.
           </p>
         </div>
-        <ActualizarVentasButton />
+        {perfil.rol === "admin" && <ActualizarVentasButton />}
       </div>
 
       {error ? (

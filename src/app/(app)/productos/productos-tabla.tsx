@@ -18,7 +18,13 @@ function formatMargen(costo: number, precio: number): string {
   return `${Math.round(((precio - costo) / costo) * 100)}%`;
 }
 
-export function ProductosTabla({ productos }: { productos: ProductoRow[] }) {
+export function ProductosTabla({
+  productos,
+  puedeEscribir = true,
+}: {
+  productos: ProductoRow[];
+  puedeEscribir?: boolean;
+}) {
   const [buscar, setBuscar] = useState("");
   const [estado, setEstado] = useState("");
 
@@ -125,12 +131,14 @@ export function ProductosTabla({ productos }: { productos: ProductoRow[] }) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
+                    {puedeEscribir && (
                     <Link
                       href={`/productos/${producto.id}/editar`}
                       className="text-sm font-medium text-brand-600 hover:text-brand-800"
                     >
                       Editar
                     </Link>
+                    )}
                   </td>
                 </tr>
               ))

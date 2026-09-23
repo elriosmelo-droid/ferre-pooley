@@ -42,8 +42,12 @@ function formatFecha(value: string) {
 
 export function CotizacionesTabla({
   cotizaciones,
+  puedeEscribir = true,
+  puedeCrearNota = true,
 }: {
   cotizaciones: CotizacionRow[];
+  puedeEscribir?: boolean;
+  puedeCrearNota?: boolean;
 }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -234,7 +238,7 @@ export function CotizacionesTabla({
                           >
                             {nota.folio}
                           </Link>
-                        ) : (
+                        ) : puedeCrearNota ? (
                           <button
                             type="button"
                             onClick={() => pasarANota(cotizacion.id)}
@@ -253,8 +257,9 @@ export function CotizacionesTabla({
                               </>
                             )}
                           </button>
-                        );
+                        ) : null;
                       })()}
+                      {puedeEscribir && (
                       <button
                         type="button"
                         onClick={() => eliminar(cotizacion)}
@@ -271,6 +276,7 @@ export function CotizacionesTabla({
                           </svg>
                         )}
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>

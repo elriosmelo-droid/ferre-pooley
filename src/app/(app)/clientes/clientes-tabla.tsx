@@ -12,7 +12,13 @@ export type ClienteRow = {
   telefono: string | null;
 };
 
-export function ClientesTabla({ clientes }: { clientes: ClienteRow[] }) {
+export function ClientesTabla({
+  clientes,
+  puedeEscribir = true,
+}: {
+  clientes: ClienteRow[];
+  puedeEscribir?: boolean;
+}) {
   const [busqueda, setBusqueda] = useState("");
 
   const filtrados = useMemo(() => {
@@ -81,6 +87,7 @@ export function ClientesTabla({ clientes }: { clientes: ClienteRow[] }) {
                   <td className="px-4 py-3">{cliente.correo}</td>
                   <td className="px-4 py-3">{cliente.telefono ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
+                    {puedeEscribir && (
                     <div className="flex justify-end gap-4">
                       <Link
                         href={`/clientes/${cliente.id}/editar`}
@@ -93,6 +100,7 @@ export function ClientesTabla({ clientes }: { clientes: ClienteRow[] }) {
                         nombre={cliente.nombre}
                       />
                     </div>
+                    )}
                   </td>
                 </tr>
               ))

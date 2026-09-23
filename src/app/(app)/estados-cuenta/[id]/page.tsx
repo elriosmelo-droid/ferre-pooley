@@ -25,7 +25,7 @@ export default async function EstadoCuentaClientePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("estados_cuenta");
+  const perfil = await requirePermiso("estados_cuenta");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -83,7 +83,7 @@ export default async function EstadoCuentaClientePage({
         </a>
       </div>
 
-      <EstadoCuentaTabla filas={filas} />
+      <EstadoCuentaTabla filas={filas} editable={perfil.rol === "admin"} />
     </div>
   );
 }

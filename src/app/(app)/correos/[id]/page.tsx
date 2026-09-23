@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermiso } from "@/lib/auth/rol";
+import { tienePermiso } from "@/lib/auth/permisos";
 
 type Adjunto = { id: string; filename: string; content_type?: string; size?: number };
 
@@ -44,7 +45,8 @@ export default async function CorreoDetallePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("correos");
+  const perfil = await requirePermiso("correos");
+  const puedeEscribir = tienePermiso(perfil, "correos", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -77,7 +79,7 @@ export default async function CorreoDetallePage({
         <Link href={volver} className="text-sm text-slate-500 hover:text-slate-700">
           ← {esEntrante ? "Recibidos" : "Enviados"}
         </Link>
-        {esEntrante && (
+        {esEntrante && puedeEscribir && (
           <Link
             href={responderHref}
             className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
