@@ -6,6 +6,9 @@
 -- - RLS: el admin ve todo; el vendedor solo los módulos habilitados y, dentro
 --   de ellos, solo sus documentos. Compras/OC/proveedores: solo admin.
 
+-- Todo en una transacción: si algo falla, no queda la RLS a medias.
+begin;
+
 -- 1. perfiles ---------------------------------------------------------------
 
 alter table perfiles
@@ -233,3 +236,5 @@ begin
       'using (public.es_admin()) with check (public.es_admin())', t);
   end loop;
 end $$;
+
+commit;
