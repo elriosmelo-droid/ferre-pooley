@@ -2,11 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProductosTabla, type ProductoRow } from "./productos-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
-import { tienePermiso } from "@/lib/auth/permisos";
+import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
 
 export default async function ProductosPage() {
   const perfil = await requirePermiso("productos");
   const puedeEscribir = tienePermiso(perfil, "productos", "escritura");
+  const verCostos = puedeVerCostos(perfil);
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -14,7 +15,10 @@ export default async function ProductosPage() {
     .select("id, sku, descripcion, costo, precio, activo")
     .order("sku");
 
-  const productos: ProductoRow[] = data ?? [];
+  // Sin «ver costos» el costo no viaja al navegador.
+  const productos: ProductoRow[] = (data ?? []).map((p) =>
+    verCostos ? p : { ...p, costo: 0 }
+  );
 
   return (
     <div>
@@ -35,7 +39,11 @@ export default async function ProductosPage() {
           No se pudieron cargar los productos. Intenta nuevamente.
         </p>
       ) : (
-        <ProductosTabla productos={productos} puedeEscribir={puedeEscribir} />
+        <ProductosTabla
+          productos={productos}
+          puedeEscribir={puedeEscribir}
+          verCostos={verCostos}
+        />
       )}
     </div>
   );

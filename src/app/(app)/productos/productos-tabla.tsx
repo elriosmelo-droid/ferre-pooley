@@ -21,9 +21,11 @@ function formatMargen(costo: number, precio: number): string {
 export function ProductosTabla({
   productos,
   puedeEscribir = true,
+  verCostos = true,
 }: {
   productos: ProductoRow[];
   puedeEscribir?: boolean;
+  verCostos?: boolean;
 }) {
   const [buscar, setBuscar] = useState("");
   const [estado, setEstado] = useState("");
@@ -82,9 +84,13 @@ export function ProductosTabla({
             <tr>
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Descripción</th>
-              <th className="px-4 py-3 text-right">Costo</th>
+              {verCostos && (
+                <th className="px-4 py-3 text-right">Costo</th>
+              )}
               <th className="px-4 py-3 text-right">Precio</th>
-              <th className="px-4 py-3 text-right">Margen</th>
+              {verCostos && (
+                <th className="px-4 py-3 text-right">Margen</th>
+              )}
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -92,7 +98,7 @@ export function ProductosTabla({
           <tbody className="divide-y divide-slate-100">
             {filtrados.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={verCostos ? 7 : 5} className="px-4 py-8 text-center text-slate-500">
                   No hay productos que coincidan con los filtros.
                 </td>
               </tr>
@@ -110,15 +116,19 @@ export function ProductosTabla({
                     {producto.sku}
                   </td>
                   <td className="px-4 py-3">{producto.descripcion}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatCLP(producto.costo)}
-                  </td>
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {formatCLP(producto.costo)}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right tabular-nums">
                     {formatCLP(producto.precio)}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatMargen(producto.costo, producto.precio)}
-                  </td>
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {formatMargen(producto.costo, producto.precio)}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${

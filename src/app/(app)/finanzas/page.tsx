@@ -82,9 +82,12 @@ export default async function FinanzasPage() {
       ),
     // Para las cuentas por pagar: la deuda con proveedores sale de la forma de
     // pago cargada a mano en cada compra, no del RCV.
-    supabase
-      .from("compras_sii")
-      .select("tipo_doc, monto_total, monto_neto, formas_pago"),
+    // Solo el admin ve lo que se debe a proveedores.
+    perfil.rol === "admin"
+      ? supabase
+          .from("compras_sii")
+          .select("tipo_doc, monto_total, monto_neto, formas_pago")
+      : Promise.resolve({ data: [] }),
   ]);
 
   const ventas = (ventasData ?? []) as VentaQuery[];
@@ -228,6 +231,7 @@ export default async function FinanzasPage() {
           porCobrar={porCobrar}
           porPagar={porPagar}
           pagarPendiente={pagarPendiente}
+          mostrarPorPagar={perfil.rol === "admin"}
         />
       )}
     </div>

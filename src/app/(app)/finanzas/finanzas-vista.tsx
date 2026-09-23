@@ -115,12 +115,14 @@ export function FinanzasVista({
   porCobrar,
   porPagar,
   pagarPendiente,
+  mostrarPorPagar = true,
 }: {
   notas: NotaFinanzas[];
   sinNota: { cantidad: number; monto: number };
   porCobrar: Desglose;
   porPagar: Desglose;
   pagarPendiente: { cantidad: number; monto: number };
+  mostrarPorPagar?: boolean;
 }) {
   const hoy = hoyChile();
   const [lente, setLente] = useState<string>("venta");
@@ -471,22 +473,24 @@ export function FinanzasVista({
             tono="cobrar"
           />
 
-          <CardMonto
-            label="Cuentas por pagar"
-            monto={conIva ? porPagar.bruto : porPagar.neto}
-            detalle="Deuda total a hoy · NO sigue el filtro"
-            nota={
-              conIva
-                ? `Incluye ${formatCLP(porPagar.iva)} de IVA recuperable`
-                : undefined
-            }
-            tono="pagar"
-            aviso={
-              pagarPendiente.cantidad > 0
-                ? `${pagarPendiente.cantidad} compras por ${formatCLP(pagarPendiente.monto)} sin forma de pago cargada: no suman acá`
-                : undefined
-            }
-          />
+          {mostrarPorPagar && (
+            <CardMonto
+              label="Cuentas por pagar"
+              monto={conIva ? porPagar.bruto : porPagar.neto}
+              detalle="Deuda total a hoy · NO sigue el filtro"
+              nota={
+                conIva
+                  ? `Incluye ${formatCLP(porPagar.iva)} de IVA recuperable`
+                  : undefined
+              }
+              tono="pagar"
+              aviso={
+                pagarPendiente.cantidad > 0
+                  ? `${pagarPendiente.cantidad} compras por ${formatCLP(pagarPendiente.monto)} sin forma de pago cargada: no suman acá`
+                  : undefined
+              }
+            />
+          )}
         </div>
         <p className="mt-4 text-xs text-slate-400">
           El IVA no es utilidad: en lo que te deben lo cobras para enterarlo al

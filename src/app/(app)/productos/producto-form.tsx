@@ -18,12 +18,15 @@ type ProductoFormProps = {
     activo: boolean;
   };
   submitLabel: string;
+  // Sin «ver costos» no se muestra ni se edita el costo.
+  verCostos?: boolean;
 };
 
 export function ProductoForm({
   action,
   producto,
   submitLabel,
+  verCostos = true,
 }: ProductoFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
 
@@ -60,22 +63,24 @@ export function ProductoForm({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="costo" className={labelClass}>
-            Costo (CLP) *
-          </label>
-          <input
-            id="costo"
-            name="costo"
-            type="number"
-            required
-            min={0}
-            step={1}
-            defaultValue={producto?.costo ?? 0}
-            className={inputClass}
-          />
-          <FieldErrors errors={state.fieldErrors?.costo} />
-        </div>
+        {verCostos && (
+          <div>
+            <label htmlFor="costo" className={labelClass}>
+              Costo (CLP) *
+            </label>
+            <input
+              id="costo"
+              name="costo"
+              type="number"
+              required
+              min={0}
+              step={1}
+              defaultValue={producto?.costo ?? 0}
+              className={inputClass}
+            />
+            <FieldErrors errors={state.fieldErrors?.costo} />
+          </div>
+        )}
 
         <div>
           <label htmlFor="precio" className={labelClass}>

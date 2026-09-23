@@ -3,13 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { actualizarProducto } from "../../actions";
 import { ProductoForm } from "../../producto-form";
 import { requirePermiso } from "@/lib/auth/rol";
+import { puedeVerCostos } from "@/lib/auth/permisos";
 
 export default async function EditarProductoPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("productos", "escritura");
+  const perfil = await requirePermiso("productos", "escritura");
+  const verCostos = puedeVerCostos(perfil);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -33,7 +35,8 @@ export default async function EditarProductoPage({
       <div className="max-w-lg rounded-xl border border-slate-200 bg-white p-6">
         <ProductoForm
           action={action}
-          producto={producto}
+          producto={verCostos ? producto : { ...producto, costo: 0 }}
+          verCostos={verCostos}
           submitLabel="Guardar cambios"
         />
       </div>

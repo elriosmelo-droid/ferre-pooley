@@ -54,7 +54,10 @@ function estadoNotaVenta(r: VentaMesRow): string | null {
 }
 
 export default async function DashboardPage() {
-  await requirePermiso("dashboard");
+  const perfil = await requirePermiso("dashboard");
+  // Compras, márgenes y paneles SII son de la empresa: solo admin. Para un
+  // vendedor la RLS ya filtra ventas, cotizaciones y notas a lo suyo.
+  const esAdmin = perfil.rol === "admin";
   const supabase = await createClient();
 
   const ahora = new Date();
@@ -74,10 +77,12 @@ export default async function DashboardPage() {
       .select("tipo_doc, monto_neto, monto_exento, notas_venta(estado)")
       .gte("fecha_emision", inicioMesFecha),
     // Compras del SII recibidas (emitidas) este mes.
-    supabase
-      .from("compras_sii")
-      .select("tipo_doc, monto_neto, monto_exento")
-      .gte("fecha_emision", inicioMesFecha),
+    esAdmin
+      ? supabase
+          .from("compras_sii")
+          .select("tipo_doc, monto_neto, monto_exento")
+          .gte("fecha_emision", inicioMesFecha)
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from("cotizaciones")
       .select("id, folio, total, estado, clientes(nombre)")
@@ -124,11 +129,15 @@ export default async function DashboardPage() {
       value: formatCLP(porCobrarMes),
       detail: "Ventas del mes aún sin pagar (neto)",
     },
-    {
-      label: "Por pagar del mes",
-      value: formatCLP(porPagarMes),
-      detail: "Neto de compras del mes (NC restan)",
-    },
+    ...(esAdmin
+      ? [
+          {
+            label: "Por pagar del mes",
+            value: formatCLP(porPagarMes),
+            detail: "Neto de compras del mes (NC restan)",
+          },
+        ]
+      : []),
   ];
 
   const ultimasCotizaciones = (ultimasCotizacionesResult.data ??
@@ -163,9 +172,9 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <Margenes />
+      {esAdmin && <Margenes />}
 
-      <PanelesSii />
+      {esAdmin && <PanelesSii />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white">

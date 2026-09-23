@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { puedeVerCostos } from "@/lib/auth/permisos";
 
 export type ProductoFormState = {
   error?: string;
@@ -41,14 +42,20 @@ export async function crearProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
-  if (!(await checkPermiso("productos", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("productos", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseProductoForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("productos").insert(parsed.data);
+  // Sin «ver costos» el producto nuevo queda con costo 0 (lo completa el admin).
+  const { error } = await supabase
+    .from("productos")
+    .insert(
+      puedeVerCostos(perfil) ? parsed.data : { ...parsed.data, costo: 0 }
+    );
 
   if (error) {
     if (error.code === "23505") {
@@ -67,16 +74,20 @@ export async function actualizarProducto(
   _prevState: ProductoFormState,
   formData: FormData
 ): Promise<ProductoFormState> {
-  if (!(await checkPermiso("productos", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("productos", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseProductoForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
   const supabase = await createClient();
+  // Sin «ver costos» el form no trae costo: no se toca el que ya tiene.
+  const { sku, descripcion, precio, activo } = parsed.data;
+  const sinCosto = { sku, descripcion, precio, activo };
   const { error } = await supabase
     .from("productos")
-    .update(parsed.data)
+    .update(puedeVerCostos(perfil) ? parsed.data : sinCosto)
     .eq("id", id);
 
   if (error) {

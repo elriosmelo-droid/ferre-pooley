@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizarRut } from "@/lib/rut";
 import { EstadosCuentaLista, type ClienteLista } from "./estados-cuenta-lista";
 import { requirePermiso } from "@/lib/auth/rol";
 
 export default async function EstadosCuentaPage() {
-  await requirePermiso("estados_cuenta");
+  const perfil = await requirePermiso("estados_cuenta");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -12,6 +13,15 @@ export default async function EstadosCuentaPage() {
     .order("nombre");
 
   const clientes = (data ?? []) as ClienteLista[];
+
+  // Un vendedor ve el catálogo completo de clientes, pero su estado de cuenta
+  // solo tiene sentido con los clientes a los que les ha facturado.
+  let visibles = clientes;
+  if (perfil.rol !== "admin") {
+    const { data: ventas } = await supabase.from("ventas_sii").select("rut_cliente");
+    const ruts = new Set((ventas ?? []).map((v) => normalizarRut(v.rut_cliente)));
+    visibles = clientes.filter((c) => ruts.has(normalizarRut(c.rut)));
+  }
 
   return (
     <div>
@@ -27,7 +37,7 @@ export default async function EstadosCuentaPage() {
           No se pudieron cargar los clientes. Intenta nuevamente.
         </p>
       ) : (
-        <EstadosCuentaLista clientes={clientes} />
+        <EstadosCuentaLista clientes={visibles} />
       )}
     </div>
   );
