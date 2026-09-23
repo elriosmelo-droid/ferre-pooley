@@ -5,7 +5,7 @@ import { fechaVentaNota } from "@/lib/cobros";
 import { diaChile } from "@/lib/fecha";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
-import { tienePermiso } from "@/lib/auth/permisos";
+import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
@@ -26,6 +26,7 @@ type NotaConItems = Omit<
 export default async function NotasVentaPage() {
   const perfil = await requirePermiso("notas_venta");
   const puedeEscribir = tienePermiso(perfil, "notas_venta", "escritura");
+  const verCostos = puedeVerCostos(perfil);
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -46,7 +47,8 @@ export default async function NotasVentaPage() {
     return {
       ...nota,
       venta,
-      costo,
+      // Sin «ver costos» el costo no viaja al navegador.
+      costo: verCostos ? costo : 0,
       cobrado: (pagos_nota_venta ?? []).reduce((s, p) => s + p.monto, 0),
       // La venta se fecha por la emisión de su factura, no por el día en que
       // se digitó la nota: si no, una puesta al día de la carga mete las
@@ -74,7 +76,7 @@ export default async function NotasVentaPage() {
           No se pudieron cargar las notas de venta. Intenta nuevamente.
         </p>
       ) : (
-        <NotasVentaTabla notas={notas} />
+        <NotasVentaTabla notas={notas} verCostos={verCostos} />
       )}
     </div>
   );

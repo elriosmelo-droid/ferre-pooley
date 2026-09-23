@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { puedeVerCostos } from "@/lib/auth/permisos";
+import { restaurarCostosOcultos, costosDeProductos } from "@/lib/costos-ocultos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calcularTotales } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
@@ -196,17 +198,29 @@ export async function crearNotaVenta(
   _prevState: NotaVentaFormState,
   formData: FormData
 ): Promise<NotaVentaFormState> {
-  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("notas_venta", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseNotaVentaForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
   const supabase = await createClient();
+
+  // Sin «ver costos» el formulario no trae costo ni flete: se restauran.
+  let items = parsed.data.items;
+  if (!puedeVerCostos(perfil)) {
+    items = restaurarCostosOcultos(
+      items,
+      [],
+      await costosDeProductos(supabase, items)
+    );
+  }
+  const datos = { ...parsed.data, items };
   const vendedor = await resolverVendedor(supabase);
   const { data: nota, error } = await supabase
     .from("notas_venta")
-    .insert({ ...toNotaVentaRow(parsed.data), vendedor })
+    .insert({ ...toNotaVentaRow(datos), vendedor })
     .select("id")
     .single();
 
@@ -217,7 +231,7 @@ export async function crearNotaVenta(
 
   const { error: itemsError } = await supabase
     .from("nota_venta_items")
-    .insert(toNotaItemRows(nota.id, parsed.data.items));
+    .insert(toNotaItemRows(nota.id, datos.items));
 
   if (itemsError) {
     console.error("Error al guardar ítems:", itemsError.message);
@@ -238,7 +252,8 @@ export async function actualizarNotaVenta(
   _prevState: NotaVentaFormState,
   formData: FormData
 ): Promise<NotaVentaFormState> {
-  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("notas_venta", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseNotaVentaForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
@@ -246,11 +261,27 @@ export async function actualizarNotaVenta(
 
   const supabase = await createClient();
 
+  // Sin «ver costos» el formulario no trae costo ni flete: se restauran.
+  let items = parsed.data.items;
+  if (!puedeVerCostos(perfil)) {
+    const { data: previos } = await supabase
+      .from("nota_venta_items")
+      .select("sku, descripcion, costo, flete, posicion")
+      .eq("nota_venta_id", id)
+      .order("posicion");
+    items = restaurarCostosOcultos(
+      items,
+      previos ?? [],
+      await costosDeProductos(supabase, items)
+    );
+  }
+  const datos = { ...parsed.data, items };
+
   // .eq("estado") hace la transición atómica: si otra pestaña la pagó o
   // anuló, el update no afecta filas y se rechaza.
   const { data: updated, error: updateError } = await supabase
     .from("notas_venta")
-    .update(toNotaVentaRow(parsed.data))
+    .update(toNotaVentaRow(datos))
     .eq("id", id)
     .eq("estado", "pendiente")
     .select("id");
@@ -277,7 +308,7 @@ export async function actualizarNotaVenta(
 
   const { error: itemsError } = await supabase
     .from("nota_venta_items")
-    .insert(toNotaItemRows(id, parsed.data.items));
+    .insert(toNotaItemRows(id, datos.items));
 
   if (itemsError) {
     console.error("Error al guardar ítems:", itemsError.message);

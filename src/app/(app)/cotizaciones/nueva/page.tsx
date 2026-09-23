@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { crearCotizacion } from "../actions";
 import { CotizacionForm } from "../cotizacion-form";
 import { requirePermiso } from "@/lib/auth/rol";
+import { puedeVerCostos } from "@/lib/auth/permisos";
 
 export default async function NuevaCotizacionPage() {
-  await requirePermiso("cotizaciones", "escritura");
+  const perfil = await requirePermiso("cotizaciones", "escritura");
   const supabase = await createClient();
 
   const [{ data: clientes }, { data: productos }] = await Promise.all([
@@ -15,6 +16,12 @@ export default async function NuevaCotizacionPage() {
       .eq("activo", true)
       .order("sku"),
   ]);
+  const verCostos = puedeVerCostos(perfil);
+  // Sin «ver costos» el costo no viaja al navegador. El flete sí (el total de
+  // la línea lo incluye) pero no se muestra.
+  const productosForm = (productos ?? []).map((p) =>
+    verCostos ? p : { ...p, costo: 0 }
+  );
 
   return (
     <div>
@@ -24,7 +31,8 @@ export default async function NuevaCotizacionPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <CotizacionForm
           clientes={clientes ?? []}
-          productos={productos ?? []}
+          productos={productosForm}
+          verCostos={verCostos}
           action={crearCotizacion}
         />
       </div>

@@ -39,7 +39,13 @@ function formatFecha(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
+export function NotasVentaTabla({
+  notas,
+  verCostos = true,
+}: {
+  notas: NotaVentaRow[];
+  verCostos?: boolean;
+}) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -289,16 +295,20 @@ export function NotasVentaTabla({ notas }: { notas: NotaVentaRow[] }) {
                   {formatCLP(tot.saldo)}
                 </td>
                 <td className="px-4 py-3 text-right" colSpan={2}>
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Margen interno
-                  </span>{" "}
-                  <span
-                    className={
-                      tot.margen < 0 ? "text-red-600" : "text-slate-900"
-                    }
-                  >
-                    {formatCLP(tot.margen)} ({formatPct(tot.pctMargen)})
-                  </span>
+                  {verCostos && (
+                    <>
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Margen interno
+                      </span>{" "}
+                      <span
+                        className={
+                          tot.margen < 0 ? "text-red-600" : "text-slate-900"
+                        }
+                      >
+                        {formatCLP(tot.margen)} ({formatPct(tot.pctMargen)})
+                      </span>
+                    </>
+                  )}
                 </td>
               </tr>
             </tfoot>

@@ -16,7 +16,7 @@ import { EstadoBadge, type CotizacionEstado } from "../estado-badge";
 import { CopiarLink } from "./copiar-link";
 import { EnviarButton } from "./enviar-button";
 import { requirePermiso } from "@/lib/auth/rol";
-import { tienePermiso } from "@/lib/auth/permisos";
+import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
 
 type ItemRow = {
   id: string;
@@ -82,6 +82,7 @@ export default async function DetalleCotizacionPage({
   params: Promise<{ id: string }>;
 }) {
   const perfil = await requirePermiso("cotizaciones");
+  const verCostos = puedeVerCostos(perfil);
   const puedeEscribir = tienePermiso(perfil, "cotizaciones", "escritura");
   const puedeCrearNota = puedeEscribir && tienePermiso(perfil, "notas_venta", "escritura");
   const { id } = await params;
@@ -241,25 +242,33 @@ export default async function DetalleCotizacionPage({
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Descripción</th>
               <th className="px-4 py-3 text-right">Cantidad</th>
-              <th className="px-4 py-3 text-right text-amber-600">
-                Costo (interno)
-              </th>
-              <th className="px-4 py-3 text-right">Precio</th>
-              <th className="px-4 py-3 text-right text-amber-600">
-                Flete unit. (interno)
-              </th>
+              {verCostos && (
+                <th className="px-4 py-3 text-right text-amber-600">
+                  Costo (interno)
+                </th>
+              )}
+              {verCostos && (
+                <th className="px-4 py-3 text-right">Precio</th>
+              )}
+              {verCostos && (
+                <th className="px-4 py-3 text-right text-amber-600">
+                  Flete unit. (interno)
+                </th>
+              )}
               <th className="px-4 py-3 text-right">Desc. %</th>
               <th className="px-4 py-3 text-right">Precio final</th>
               <th className="px-4 py-3 text-right">Total línea</th>
-              <th className="px-4 py-3 text-right text-amber-600">
-                Margen (interno)
-              </th>
+              {verCostos && (
+                <th className="px-4 py-3 text-right text-amber-600">
+                  Margen (interno)
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={verCostos ? 10 : 6} className="px-4 py-8 text-center text-slate-500">
                   Esta cotización no tiene ítems.
                 </td>
               </tr>
@@ -271,15 +280,21 @@ export default async function DetalleCotizacionPage({
                     {item.descripcion}
                   </td>
                   <td className="px-4 py-3 text-right">{item.cantidad}</td>
-                  <td className="px-4 py-3 text-right text-amber-600">
-                    {formatCLP(item.costo)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {formatCLP(item.precio)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-amber-600">
-                    {formatCLP(item.flete)}
-                  </td>
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right text-amber-600">
+                      {formatCLP(item.costo)}
+                    </td>
+                  )}
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right">
+                      {formatCLP(item.precio)}
+                    </td>
+                  )}
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right text-amber-600">
+                      {formatCLP(item.flete)}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right">
                     {item.descuento > 0 ? `${item.descuento}%` : "—"}
                   </td>
@@ -298,19 +313,21 @@ export default async function DetalleCotizacionPage({
                           item.flete)
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-amber-600">
-                    {formatCLP(
-                      item.cantidad *
-                        (item.precio -
-                          descuentoUnitario(item.precio, item.descuento) -
-                          item.costo)
-                    )}
-                    <div className="text-xs text-amber-500">
-                      {formatPct(
-                        markupPctLinea(item.precio, item.costo, item.descuento)
+                  {verCostos && (
+                    <td className="px-4 py-3 text-right text-amber-600">
+                      {formatCLP(
+                        item.cantidad *
+                          (item.precio -
+                            descuentoUnitario(item.precio, item.descuento) -
+                            item.costo)
                       )}
-                    </div>
-                  </td>
+                      <div className="text-xs text-amber-500">
+                        {formatPct(
+                          markupPctLinea(item.precio, item.costo, item.descuento)
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -350,19 +367,23 @@ export default async function DetalleCotizacionPage({
             <dt>Total</dt>
             <dd>{formatCLP(cotizacion.total)}</dd>
           </div>
-          <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
-            <dt>Margen (interno)</dt>
-            <dd className="font-semibold">
-              {formatCLP(margen.margen)} · {formatPct(margen.pctSobreCosto)}
-            </dd>
-          </div>
-          <div
-            className="flex justify-between text-xs text-amber-600"
-            title="El mismo margen medido sobre la venta neta en vez del costo"
-          >
-            <dt className="pl-3">sobre venta</dt>
-            <dd>{formatPct(margen.pct)}</dd>
-          </div>
+          {verCostos && (
+            <div className="flex justify-between border-t border-amber-200 pt-2 text-amber-600">
+              <dt>Margen (interno)</dt>
+              <dd className="font-semibold">
+                {formatCLP(margen.margen)} · {formatPct(margen.pctSobreCosto)}
+              </dd>
+            </div>
+          )}
+          {verCostos && (
+            <div
+              className="flex justify-between text-xs text-amber-600"
+              title="El mismo margen medido sobre la venta neta en vez del costo"
+            >
+              <dt className="pl-3">sobre venta</dt>
+              <dd>{formatPct(margen.pct)}</dd>
+            </div>
+          )}
         </dl>
       </div>
 

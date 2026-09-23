@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { createElement } from "react";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { puedeVerCostos } from "@/lib/auth/permisos";
+import { restaurarCostosOcultos, costosDeProductos } from "@/lib/costos-ocultos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calcularTotales, descuentoUnitario } from "@/lib/totals";
 import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
@@ -119,17 +121,29 @@ export async function crearCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
-  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("cotizaciones", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseCotizacionForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
   const supabase = await createClient();
+
+  // Sin «ver costos» el formulario no trae costo ni flete: se restauran.
+  let items = parsed.data.items;
+  if (!puedeVerCostos(perfil)) {
+    items = restaurarCostosOcultos(
+      items,
+      [],
+      await costosDeProductos(supabase, items)
+    );
+  }
+  const datos = { ...parsed.data, items };
   const vendedor = await resolverVendedor(supabase);
   const { data: cotizacion, error } = await supabase
     .from("cotizaciones")
-    .insert({ ...toCotizacionRow(parsed.data), vendedor })
+    .insert({ ...toCotizacionRow(datos), vendedor })
     .select("id")
     .single();
 
@@ -140,7 +154,7 @@ export async function crearCotizacion(
 
   const { error: itemsError } = await supabase
     .from("cotizacion_items")
-    .insert(toItemRows(cotizacion.id, parsed.data.items));
+    .insert(toItemRows(cotizacion.id, datos.items));
 
   if (itemsError) {
     console.error("Error al guardar ítems:", itemsError.message);
@@ -157,13 +171,30 @@ export async function actualizarCotizacion(
   _prevState: CotizacionFormState,
   formData: FormData
 ): Promise<CotizacionFormState> {
-  if (!(await checkPermiso("cotizaciones", "escritura"))) return { error: SIN_PERMISO };
+  const perfil = await checkPermiso("cotizaciones", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
   const parsed = parseCotizacionForm(formData);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
   const supabase = await createClient();
+
+  // Sin «ver costos» el formulario no trae costo ni flete: se restauran.
+  let items = parsed.data.items;
+  if (!puedeVerCostos(perfil)) {
+    const { data: previos } = await supabase
+      .from("cotizacion_items")
+      .select("producto_id, sku, descripcion, costo, flete, posicion")
+      .eq("cotizacion_id", id)
+      .order("posicion");
+    items = restaurarCostosOcultos(
+      items,
+      previos ?? [],
+      await costosDeProductos(supabase, items)
+    );
+  }
+  const datos = { ...parsed.data, items };
 
   const { data: actual, error: readError } = await supabase
     .from("cotizaciones")
@@ -182,7 +213,7 @@ export async function actualizarCotizacion(
   // el update no afecta filas y se rechaza.
   const { data: updated, error: updateError } = await supabase
     .from("cotizaciones")
-    .update(toCotizacionRow(parsed.data))
+    .update(toCotizacionRow(datos))
     .eq("id", id)
     .eq("estado", "borrador")
     .select("id");
@@ -211,7 +242,7 @@ export async function actualizarCotizacion(
 
   const { error: itemsError } = await supabase
     .from("cotizacion_items")
-    .insert(toItemRows(id, parsed.data.items));
+    .insert(toItemRows(id, datos.items));
 
   if (itemsError) {
     console.error("Error al guardar ítems:", itemsError.message);

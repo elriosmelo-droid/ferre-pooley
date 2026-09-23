@@ -6,6 +6,7 @@ import {
   type CotizacionItemInput,
 } from "../../cotizacion-form";
 import { requirePermiso } from "@/lib/auth/rol";
+import { puedeVerCostos } from "@/lib/auth/permisos";
 
 type CotizacionEditable = {
   id: string;
@@ -23,7 +24,7 @@ export default async function EditarCotizacionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("cotizaciones", "escritura");
+  const perfil = await requirePermiso("cotizaciones", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -49,6 +50,13 @@ export default async function EditarCotizacionPage({
     notFound();
   }
 
+  const verCostos = puedeVerCostos(perfil);
+  // Sin «ver costos» el costo no viaja al navegador. El flete sí (el total de
+  // la línea lo incluye) pero no se muestra.
+  const productosForm = (productos ?? []).map((p) =>
+    verCostos ? p : { ...p, costo: 0 }
+  );
+
   const cotizacion = data as unknown as CotizacionEditable;
 
   if (cotizacion.estado !== "borrador") {
@@ -63,7 +71,7 @@ export default async function EditarCotizacionPage({
         sku,
         descripcion,
         cantidad,
-        costo,
+        costo: verCostos ? costo : 0,
         precio,
         flete,
         descuento,
@@ -80,7 +88,8 @@ export default async function EditarCotizacionPage({
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <CotizacionForm
           clientes={clientes ?? []}
-          productos={productos ?? []}
+          productos={productosForm}
+          verCostos={verCostos}
           cotizacion={{
             cliente_id: cotizacion.cliente_id,
             fecha_validez: cotizacion.fecha_validez,

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { actualizarNotaVenta } from "../../actions";
 import { NotaVentaForm, type NotaVentaItemInput } from "../../nota-venta-form";
 import { requirePermiso } from "@/lib/auth/rol";
+import { puedeVerCostos } from "@/lib/auth/permisos";
 
 type NotaEditable = {
   id: string;
@@ -20,7 +21,7 @@ export default async function EditarNotaVentaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePermiso("notas_venta", "escritura");
+  const perfil = await requirePermiso("notas_venta", "escritura");
   const { id } = await params;
   const supabase = await createClient();
 
@@ -46,6 +47,13 @@ export default async function EditarNotaVentaPage({
     notFound();
   }
 
+  const verCostos = puedeVerCostos(perfil);
+  // Sin «ver costos» el costo no viaja al navegador. El flete sí (el total de
+  // la línea lo incluye) pero no se muestra.
+  const productosForm = (productos ?? []).map((p) =>
+    verCostos ? p : { ...p, costo: 0 }
+  );
+
   const nota = data as unknown as NotaEditable;
 
   if (nota.estado !== "pendiente") {
@@ -60,7 +68,7 @@ export default async function EditarNotaVentaPage({
       sku,
       descripcion,
       cantidad,
-      costo,
+      costo: verCostos ? costo : 0,
       precio,
       flete,
       descuento,
@@ -76,7 +84,8 @@ export default async function EditarNotaVentaPage({
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <NotaVentaForm
           clientes={clientes ?? []}
-          productos={productos ?? []}
+          productos={productosForm}
+          verCostos={verCostos}
           nota={{
             cliente_id: nota.cliente_id,
             medio_pago: nota.medio_pago,

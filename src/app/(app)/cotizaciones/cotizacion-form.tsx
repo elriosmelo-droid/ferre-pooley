@@ -46,6 +46,8 @@ type CotizacionFormProps = {
     notas: string | null;
     items: CotizacionItemInput[];
   };
+  // Sin «ver costos»: se ocultan costo, margen y flete. El server los restaura.
+  verCostos?: boolean;
   action: (
     prevState: CotizacionFormState,
     formData: FormData
@@ -137,6 +139,7 @@ export function CotizacionForm({
   productos,
   cotizacion,
   action,
+  verCostos = true,
 }: CotizacionFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
   const [items, setItems] = useState<ItemRow[]>(() =>
@@ -370,12 +373,16 @@ export function CotizacionForm({
                 <th className="w-32 px-3 py-3">SKU</th>
                 <th className="min-w-56 px-3 py-3">Descripción</th>
                 <th className="w-24 px-3 py-3">Cantidad</th>
-                <th className="w-28 px-3 py-3">Costo</th>
-                <th className="w-24 px-3 py-3" title="Markup sobre el costo: precio = costo × (1 + margen/100)">
-                  Margen %
-                </th>
+                {verCostos && (
+                  <>
+                    <th className="w-28 px-3 py-3">Costo</th>
+                    <th className="w-24 px-3 py-3" title="Markup sobre el costo: precio = costo × (1 + margen/100)">
+                      Margen %
+                    </th>
+                  </>
+                )}
                 <th className="w-28 px-3 py-3">Precio</th>
-                <th className="w-28 px-3 py-3">Flete unit.</th>
+                {verCostos && <th className="w-28 px-3 py-3">Flete unit.</th>}
                 <th className="w-24 px-3 py-3">Desc. %</th>
                 <th className="w-32 px-3 py-3 text-right">Total línea</th>
                 <th className="w-12 px-3 py-3"></th>
@@ -384,7 +391,7 @@ export function CotizacionForm({
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={verCostos ? 10 : 7} className="px-3 py-8 text-center text-slate-500">
                     Agrega productos del catálogo o ítems libres.
                   </td>
                 </tr>
@@ -434,6 +441,7 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      {verCostos && (
                       <td className="px-3 py-2">
                         <input
                           type="number"
@@ -445,6 +453,8 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      )}
+                      {verCostos && (
                       <td className="px-3 py-2">
                         <input
                           type="text"
@@ -463,6 +473,7 @@ export function CotizacionForm({
                           }`}
                         />
                       </td>
+                      )}
                       <td className="px-3 py-2">
                         <input
                           type="number"
@@ -474,6 +485,7 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      {verCostos && (
                       <td className="px-3 py-2">
                         <input
                           type="number"
@@ -489,6 +501,7 @@ export function CotizacionForm({
                           className={itemInputClass}
                         />
                       </td>
+                      )}
                       <td className="px-3 py-2">
                         <input
                           type="number"
@@ -538,6 +551,8 @@ export function CotizacionForm({
       </div>
 
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
+        {verCostos && (
+          <>
         <p className="text-xs text-slate-500">
           El flete unitario se suma al precio de cada ítem. El cliente ve el
           precio final sin una línea de flete separada.
@@ -549,6 +564,8 @@ export function CotizacionForm({
           sobre la venta, así que para esa línea mostrará 23,1%. El descuento y
           el flete no entran en este cálculo.
         </p>
+          </>
+        )}
       </div>
 
       <div className="max-w-2xl">
