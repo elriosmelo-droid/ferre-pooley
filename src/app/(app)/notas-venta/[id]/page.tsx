@@ -15,6 +15,7 @@ import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
 import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
+import { EntregaCheck, EntregaResumen } from "./entrega-controles";
 import { requirePermiso } from "@/lib/auth/rol";
 import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
 
@@ -28,6 +29,8 @@ type ItemRow = {
   flete: number;
   descuento: number;
   posicion: number;
+  entregado: boolean;
+  entregado_at: string | null;
 };
 
 type NotaVentaDetalle = {
@@ -87,7 +90,7 @@ export default async function DetalleNotaVentaPage({
       `id, folio, estado, flete, medio_pago, vendedor, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
-       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion),
+       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion, entregado, entregado_at),
        pagos_nota_venta(id, monto, fecha, medio_pago, observacion)`
     )
     .eq("id", id)
@@ -250,10 +253,19 @@ export default async function DetalleNotaVentaPage({
         )}
       </div>
 
+      <div className="flex flex-col gap-3">
+      {nota.estado !== "anulada" && (
+        <EntregaResumen
+          notaVentaId={nota.id}
+          items={items}
+          soloLectura={!puedeEscribir}
+        />
+      )}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
+              <th className="px-4 py-3 text-center">Entregado</th>
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Descripción</th>
               <th className="px-4 py-3 text-right">Cantidad</th>
@@ -283,13 +295,25 @@ export default async function DetalleNotaVentaPage({
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={verCostos ? 10 : 6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={verCostos ? 11 : 7} className="px-4 py-8 text-center text-slate-500">
                   Esta nota de venta no tiene ítems.
                 </td>
               </tr>
             ) : (
               items.map((item) => (
-                <tr key={item.id} className="text-slate-700">
+                <tr
+                  key={item.id}
+                  className={item.entregado ? "text-slate-700" : "bg-amber-50/40 text-slate-700"}
+                >
+                  <td className="px-4 py-3 text-center">
+                    <EntregaCheck
+                      notaVentaId={nota.id}
+                      itemId={item.id}
+                      entregado={item.entregado}
+                      entregadoAt={item.entregado_at}
+                      soloLectura={!puedeEscribir || nota.estado === "anulada"}
+                    />
+                  </td>
                   <td className="px-4 py-3">{item.sku || "—"}</td>
                   <td className="px-4 py-3 font-medium text-slate-900">
                     {item.descripcion}
@@ -348,6 +372,7 @@ export default async function DetalleNotaVentaPage({
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       <div className="ml-auto w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4 text-sm">

@@ -13,6 +13,7 @@ import { MEDIOS_PAGO_VALORES } from "@/lib/medio-pago";
 import { resolverVendedor } from "@/lib/vendedor";
 import { autoVincularNota } from "@/lib/vinculo-nota";
 import { esNotaCredito } from "@/lib/dte-doc";
+import { conservarEntregas } from "@/lib/entregas";
 
 export type NotaVentaActionResult = {
   error?: string;
@@ -261,14 +262,15 @@ export async function actualizarNotaVenta(
 
   const supabase = await createClient();
 
-  // Sin «ver costos» el formulario no trae costo ni flete: se restauran.
+  // Ítems actuales: para conservar la marca de entregado y, sin «ver
+  // costos», restaurar costo y flete que el formulario no trae.
+  const { data: previos } = await supabase
+    .from("nota_venta_items")
+    .select("sku, descripcion, costo, flete, posicion, entregado, entregado_at")
+    .eq("nota_venta_id", id)
+    .order("posicion");
   let items = parsed.data.items;
   if (!puedeVerCostos(perfil)) {
-    const { data: previos } = await supabase
-      .from("nota_venta_items")
-      .select("sku, descripcion, costo, flete, posicion")
-      .eq("nota_venta_id", id)
-      .order("posicion");
     items = restaurarCostosOcultos(
       items,
       previos ?? [],
@@ -308,7 +310,7 @@ export async function actualizarNotaVenta(
 
   const { error: itemsError } = await supabase
     .from("nota_venta_items")
-    .insert(toNotaItemRows(id, datos.items));
+    .insert(conservarEntregas(toNotaItemRows(id, datos.items), previos ?? []));
 
   if (itemsError) {
     console.error("Error al guardar ítems:", itemsError.message);
@@ -481,4 +483,36 @@ export async function anularNotaVenta(
   revalidatePath("/notas-venta");
   revalidatePath(`/notas-venta/${id}`);
   return { success: true };
+}
+
+// Marca o desmarca ítems como entregados. La RLS limita al vendedor a sus
+// propias notas; el .eq por nota evita tocar ítems de otra nota.
+export async function marcarEntregado(
+  notaVentaId: string,
+  itemIds: string[],
+  entregado: boolean
+): Promise<{ error?: string }> {
+  const perfil = await checkPermiso("notas_venta", "escritura");
+  if (!perfil) return { error: SIN_PERMISO };
+  const ids = z.array(z.uuid()).min(1).safeParse(itemIds);
+  if (!z.uuid().safeParse(notaVentaId).success || !ids.success) {
+    return { error: "Datos inválidos." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("nota_venta_items")
+    .update({ entregado, entregado_at: entregado ? new Date().toISOString() : null })
+    .eq("nota_venta_id", notaVentaId)
+    .in("id", ids.data)
+    .select("id");
+
+  if (error || !data?.length) {
+    console.error("Error al marcar entrega:", error?.message ?? "sin filas");
+    return { error: "No se pudo guardar la entrega. Intenta nuevamente." };
+  }
+
+  revalidatePath("/notas-venta");
+  revalidatePath(`/notas-venta/${notaVentaId}`);
+  return {};
 }

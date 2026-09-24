@@ -31,6 +31,8 @@ export type NotaVentaRow = {
   // Fecha en que ocurrió la venta: emisión de su factura del SII, o el día en
   // que se cargó la nota si todavía no se factura. NO es created_at.
   fechaVenta: string;
+  // Ítems de la nota y cuántos faltan por entregar.
+  entrega: { items: number; pendientes: number };
 };
 
 // 'AAAA-MM-DD' a 'DD/MM/AAAA'.
@@ -50,6 +52,7 @@ export function NotasVentaTabla({
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("");
+  const [entrega, setEntrega] = useState("");
   // Atajos por mes: el mes en curso y los dos anteriores. Setean desde/hasta,
   // así que no son un filtro aparte y se pueden ajustar a mano después.
   const meses = useMemo(() => ultimosMeses(hoyChile(), 3), []);
@@ -74,13 +77,20 @@ export function NotasVentaTabla({
       if (desde && fecha < desde) return false;
       if (hasta && fecha > hasta) return false;
       if (estado && n.estado !== estado) return false;
+      // Una anulada no se entrega: no cuenta como pendiente ni como entregada.
+      if (entrega) {
+        if (n.estado === "anulada") return false;
+        const pendiente = n.entrega.pendientes > 0;
+        if (entrega === "pendientes" && !pendiente) return false;
+        if (entrega === "entregadas" && pendiente) return false;
+      }
       if (q) {
         const hay = `${n.folio} ${n.clientes?.nombre ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [notas, desde, hasta, busqueda, estado]);
+  }, [notas, desde, hasta, busqueda, estado, entrega]);
 
   // Las anuladas quedan fuera de todos los totales: no facturaron, no se
   // cobran y no dejaron margen, así que sumarlas afirmaría una venta que no
@@ -148,7 +158,19 @@ export function NotasVentaTabla({
             ))}
           </select>
         </label>
-        {(desde || hasta || busqueda || estado) && (
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Entrega
+          <select
+            value={entrega}
+            onChange={(e) => setEntrega(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Todas</option>
+            <option value="pendientes">Con productos sin entregar</option>
+            <option value="entregadas">Entregadas</option>
+          </select>
+        </label>
+        {(desde || hasta || busqueda || estado || entrega) && (
           <button
             type="button"
             onClick={() => {
@@ -156,6 +178,7 @@ export function NotasVentaTabla({
               setHasta("");
               setBusqueda("");
               setEstado("");
+              setEntrega("");
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
@@ -202,13 +225,14 @@ export function NotasVentaTabla({
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-right">Saldo</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Entrega</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   No hay notas de venta que coincidan con los filtros.
                 </td>
               </tr>
@@ -266,6 +290,19 @@ export function NotasVentaTabla({
                   <td className="px-4 py-3">
                     <NotaEstadoBadge estado={nota.estado} />
                   </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {nota.estado === "anulada" || nota.entrega.items === 0 ? (
+                      <span className="text-slate-400">—</span>
+                    ) : nota.entrega.pendientes === 0 ? (
+                      <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        Entregada
+                      </span>
+                    ) : (
+                      <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        {nota.entrega.pendientes} de {nota.entrega.items} sin entregar
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/notas-venta/${nota.id}`}
@@ -294,7 +331,7 @@ export function NotasVentaTabla({
                 <td className="px-4 py-3 text-right">
                   {formatCLP(tot.saldo)}
                 </td>
-                <td className="px-4 py-3 text-right" colSpan={2}>
+                <td className="px-4 py-3 text-right" colSpan={3}>
                   {verCostos && (
                     <>
                       <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
