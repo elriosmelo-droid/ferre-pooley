@@ -3,11 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
+import { EliminarProductoButton } from "./eliminar-producto-button";
 
 export type ProductoRow = {
   id: string;
   sku: string;
+  sku_proveedor: string | null;
   descripcion: string;
+  marca: string | null;
+  unidad: string | null;
   costo: number;
   precio: number;
   activo: boolean;
@@ -36,7 +40,7 @@ export function ProductosTabla({
       if (estado === "activos" && !p.activo) return false;
       if (estado === "inactivos" && p.activo) return false;
       if (q) {
-        const hay = `${p.sku} ${p.descripcion}`.toLowerCase();
+        const hay = `${p.sku} ${p.sku_proveedor ?? ""} ${p.descripcion} ${p.marca ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -55,7 +59,7 @@ export function ProductosTabla({
             type="text"
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
-            placeholder="SKU o descripción…"
+            placeholder="SKU, SKU proveedor, descripción o marca…"
             className={inputCls}
           />
         </label>
@@ -82,8 +86,11 @@ export function ProductosTabla({
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3">SKU</th>
+              <th className="px-4 py-3">SKU propio</th>
+              <th className="px-4 py-3">SKU proveedor</th>
               <th className="px-4 py-3">Descripción</th>
+              <th className="px-4 py-3">Marca</th>
+              <th className="px-4 py-3">Unidad</th>
               {verCostos && (
                 <th className="px-4 py-3 text-right">Costo</th>
               )}
@@ -98,7 +105,7 @@ export function ProductosTabla({
           <tbody className="divide-y divide-slate-100">
             {filtrados.length === 0 ? (
               <tr>
-                <td colSpan={verCostos ? 7 : 5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={verCostos ? 10 : 8} className="px-4 py-8 text-center text-slate-500">
                   No hay productos que coincidan con los filtros.
                 </td>
               </tr>
@@ -115,7 +122,12 @@ export function ProductosTabla({
                   >
                     {producto.sku}
                   </td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {producto.sku_proveedor ?? "—"}
+                  </td>
                   <td className="px-4 py-3">{producto.descripcion}</td>
+                  <td className="px-4 py-3">{producto.marca ?? "—"}</td>
+                  <td className="px-4 py-3">{producto.unidad ?? "—"}</td>
                   {verCostos && (
                     <td className="px-4 py-3 text-right tabular-nums">
                       {formatCLP(producto.costo)}
@@ -142,12 +154,15 @@ export function ProductosTabla({
                   </td>
                   <td className="px-4 py-3 text-right">
                     {puedeEscribir && (
-                    <Link
-                      href={`/productos/${producto.id}/editar`}
-                      className="text-sm font-medium text-brand-600 hover:text-brand-800"
-                    >
-                      Editar
-                    </Link>
+                      <div className="flex items-start justify-end gap-4">
+                        <Link
+                          href={`/productos/${producto.id}/editar`}
+                          className="text-sm font-medium text-brand-600 hover:text-brand-800"
+                        >
+                          Editar
+                        </Link>
+                        <EliminarProductoButton id={producto.id} sku={producto.sku} />
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -157,7 +172,7 @@ export function ProductosTabla({
           {filtrados.length > 0 && (
             <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
               <tr>
-                <td className="px-4 py-3" colSpan={7}>
+                <td className="px-4 py-3" colSpan={10}>
                   {filtrados.length} producto{filtrados.length === 1 ? "" : "s"}
                 </td>
               </tr>

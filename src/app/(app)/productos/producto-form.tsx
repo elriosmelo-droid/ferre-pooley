@@ -12,7 +12,11 @@ type ProductoFormProps = {
   ) => Promise<ProductoFormState>;
   producto?: {
     sku: string;
+    sku_proveedor: string | null;
     descripcion: string;
+    marca: string | null;
+    unidad: string | null;
+    proveedor_id: string | null;
     costo: number;
     precio: number;
     activo: boolean;
@@ -20,31 +24,52 @@ type ProductoFormProps = {
   submitLabel: string;
   // Sin «ver costos» no se muestra ni se edita el costo.
   verCostos?: boolean;
+  // Solo admin ve proveedores; sin la lista no se muestra el campo.
+  proveedores?: { id: string; nombre: string }[];
 };
+
+const UNIDADES = ["unidad", "caja", "paquete", "metro", "kg", "litro", "rollo", "par", "juego"];
 
 export function ProductoForm({
   action,
   producto,
   submitLabel,
   verCostos = true,
+  proveedores,
 }: ProductoFormProps) {
   const [state, formAction, isPending] = useActionState(action, {});
 
   return (
     <form action={formAction} className="flex max-w-lg flex-col gap-4">
-      <div>
-        <label htmlFor="sku" className={labelClass}>
-          SKU *
-        </label>
-        <input
-          id="sku"
-          name="sku"
-          type="text"
-          required
-          defaultValue={producto?.sku ?? ""}
-          className={inputClass}
-        />
-        <FieldErrors errors={state.fieldErrors?.sku} />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="sku" className={labelClass}>
+            SKU propio *
+          </label>
+          <input
+            id="sku"
+            name="sku"
+            type="text"
+            required
+            defaultValue={producto?.sku ?? ""}
+            className={inputClass}
+          />
+          <FieldErrors errors={state.fieldErrors?.sku} />
+        </div>
+
+        <div>
+          <label htmlFor="sku_proveedor" className={labelClass}>
+            SKU proveedor
+          </label>
+          <input
+            id="sku_proveedor"
+            name="sku_proveedor"
+            type="text"
+            defaultValue={producto?.sku_proveedor ?? ""}
+            className={inputClass}
+          />
+          <FieldErrors errors={state.fieldErrors?.sku_proveedor} />
+        </div>
       </div>
 
       <div>
@@ -61,6 +86,64 @@ export function ProductoForm({
         />
         <FieldErrors errors={state.fieldErrors?.descripcion} />
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="marca" className={labelClass}>
+            Marca
+          </label>
+          <input
+            id="marca"
+            name="marca"
+            type="text"
+            defaultValue={producto?.marca ?? ""}
+            className={inputClass}
+          />
+          <FieldErrors errors={state.fieldErrors?.marca} />
+        </div>
+
+        <div>
+          <label htmlFor="unidad" className={labelClass}>
+            Unidad de medida
+          </label>
+          <input
+            id="unidad"
+            name="unidad"
+            type="text"
+            list="unidades"
+            placeholder="unidad, caja, metro…"
+            defaultValue={producto?.unidad ?? ""}
+            className={inputClass}
+          />
+          <datalist id="unidades">
+            {UNIDADES.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
+          <FieldErrors errors={state.fieldErrors?.unidad} />
+        </div>
+      </div>
+
+      {proveedores && (
+        <div>
+          <label htmlFor="proveedor_id" className={labelClass}>
+            Proveedor
+          </label>
+          <select
+            id="proveedor_id"
+            name="proveedor_id"
+            defaultValue={producto?.proveedor_id ?? ""}
+            className={inputClass}
+          >
+            <option value="">— Sin proveedor —</option>
+            {proveedores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         {verCostos && (

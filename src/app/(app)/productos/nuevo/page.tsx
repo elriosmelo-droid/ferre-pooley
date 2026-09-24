@@ -2,9 +2,11 @@ import { crearProducto } from "../actions";
 import { ProductoForm } from "../producto-form";
 import { requirePermiso } from "@/lib/auth/rol";
 import { puedeVerCostos } from "@/lib/auth/permisos";
+import { proveedoresOpciones } from "../proveedores-opciones";
 
 export default async function NuevoProductoPage() {
   const perfil = await requirePermiso("productos", "escritura");
+  const proveedores = await proveedoresOpciones(perfil);
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">Nuevo producto</h1>
@@ -13,6 +15,7 @@ export default async function NuevoProductoPage() {
           action={crearProducto}
           submitLabel="Crear producto"
           verCostos={puedeVerCostos(perfil)}
+          proveedores={proveedores}
         />
       </div>
     </div>

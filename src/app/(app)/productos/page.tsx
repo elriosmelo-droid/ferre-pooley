@@ -12,7 +12,9 @@ export default async function ProductosPage() {
 
   const { data, error } = await supabase
     .from("productos")
-    .select("id, sku, descripcion, costo, precio, activo")
+    .select(
+      "id, sku, sku_proveedor, descripcion, marca, unidad, costo, precio, activo"
+    )
     .order("sku");
 
   // Sin «ver costos» el costo no viaja al navegador.
