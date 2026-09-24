@@ -1,12 +1,12 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { estadoItem, resumenEntrega } from "@/lib/entregas";
 import { registrarEntrega } from "../actions";
 
-// Entrega de un ítem: el check entrega todo (o lo desmarca) y «Parcial»
-// permite indicar cuánto se entregó. Optimista: cambia al instante y vuelve
-// atrás si el servidor rechaza.
+// Entrega de un ítem: el check entrega todo (o lo desmarca) y el número
+// indica cuánto se entregó; se guarda al salir del campo o con Enter.
+// Optimista: cambia al instante y vuelve atrás si el servidor rechaza.
 export function EntregaItem({
   notaVentaId,
   itemId,
@@ -23,11 +23,10 @@ export function EntregaItem({
   soloLectura: boolean;
 }) {
   const [optimista, setOptimista] = useOptimistic(cantidadEntregada);
-  const [editando, setEditando] = useState(false);
-  const [valor, setValor] = useState("");
+  // null = el campo muestra el valor guardado; texto = lo que se está tipeando.
+  const [borrador, setBorrador] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const estado = estadoItem({ cantidad, cantidad_entregada: optimista });
   const fecha = entregadoAt
@@ -39,9 +38,11 @@ export function EntregaItem({
       : estado === "parcial"
         ? `Entregado ${optimista} de ${cantidad}${fecha ? ` (último cambio ${fecha})` : ""}`
         : "Sin entregar";
+  const max = Math.max(cantidad, 0);
 
   function guardar(nuevo: number) {
     setError(null);
+    if (nuevo === optimista) return;
     startTransition(async () => {
       setOptimista(nuevo);
       const r = await registrarEntrega(notaVentaId, [{ id: itemId, cantidad_entregada: nuevo }]);
@@ -49,26 +50,27 @@ export function EntregaItem({
     });
   }
 
-  function abrirParcial() {
-    setValor(optimista > 0 && optimista < cantidad ? String(optimista) : "");
-    setError(null);
-    setEditando(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
-
-  function guardarParcial(e: React.FormEvent) {
-    e.preventDefault();
-    const n = Number(valor);
-    if (!Number.isInteger(n) || n < 0 || n > cantidad) {
-      setError(`Ingresa un número entre 0 y ${cantidad}`);
+  function confirmarBorrador() {
+    if (borrador === null) return;
+    const texto = borrador.trim();
+    setBorrador(null);
+    const n = texto === "" ? 0 : Number(texto);
+    if (!Number.isInteger(n) || n < 0 || n > max) {
+      setError(`Ingresa un número entre 0 y ${max}`);
       return;
     }
-    setEditando(false);
     guardar(n);
   }
 
+  const colorNumero =
+    estado === "entregado"
+      ? "border-green-300 bg-green-50 text-green-800"
+      : estado === "parcial"
+        ? "border-amber-300 bg-amber-50 text-amber-800"
+        : "border-slate-300 bg-white text-slate-700";
+
   return (
-    <div className="flex flex-col items-center gap-1" title={titulo}>
+    <div className="flex flex-col items-start gap-1" title={titulo}>
       <div className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -77,56 +79,40 @@ export function EntregaItem({
             if (el) el.indeterminate = estado === "parcial";
           }}
           disabled={soloLectura || pending}
-          onChange={() => guardar(estado === "entregado" ? 0 : cantidad)}
+          onChange={() => guardar(estado === "entregado" ? 0 : max)}
           aria-label={titulo}
           className="h-5 w-5 cursor-pointer rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:cursor-default"
         />
-        {!soloLectura && !editando && cantidad > 1 && (
-          <button
-            type="button"
-            onClick={abrirParcial}
-            className="text-xs font-medium text-brand-600 hover:text-brand-800"
-          >
-            Parcial
-          </button>
+        {soloLectura ? (
+          <span className="whitespace-nowrap text-xs tabular-nums text-slate-600">
+            {optimista} de {cantidad}
+          </span>
+        ) : (
+          <label className="flex items-center gap-1">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={max}
+              step={1}
+              value={borrador ?? String(optimista)}
+              onChange={(e) => setBorrador(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onBlur={confirmarBorrador}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setBorrador(null);
+                  setError(null);
+                }
+              }}
+              aria-label={`Cantidad entregada de ${cantidad}`}
+              className={`w-16 rounded border px-1.5 py-0.5 text-right text-sm tabular-nums focus:border-brand-500 focus:outline-none ${colorNumero}`}
+            />
+            <span className="whitespace-nowrap text-xs text-slate-500">de {cantidad}</span>
+          </label>
         )}
       </div>
-
-      {estado === "parcial" && !editando && (
-        <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-          {optimista} de {cantidad}
-        </span>
-      )}
-
-      {editando && (
-        <form onSubmit={guardarParcial} className="flex items-center gap-1">
-          <input
-            ref={inputRef}
-            type="number"
-            min={0}
-            max={cantidad}
-            step={1}
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setEditando(false)}
-            aria-label={`Cantidad entregada de ${cantidad}`}
-            className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs focus:border-brand-500 focus:outline-none"
-          />
-          <span className="whitespace-nowrap text-xs text-slate-500">de {cantidad}</span>
-          <button type="submit" className="text-xs font-semibold text-brand-600 hover:text-brand-800">
-            OK
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditando(false)}
-            className="text-xs text-slate-500 hover:text-slate-700"
-            aria-label="Cancelar"
-          >
-            ✕
-          </button>
-        </form>
-      )}
-
       {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   );

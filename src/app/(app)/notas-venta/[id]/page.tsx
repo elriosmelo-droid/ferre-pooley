@@ -266,7 +266,7 @@ export default async function DetalleNotaVentaPage({
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-3 text-center">Entregado</th>
+              <th className="px-4 py-3">Entregado</th>
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Descripción</th>
               <th className="px-4 py-3 text-right">Cantidad</th>
@@ -310,7 +310,7 @@ export default async function DetalleNotaVentaPage({
                       : "bg-amber-50/40 text-slate-700"
                   }
                 >
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3">
                     <EntregaItem
                       notaVentaId={nota.id}
                       itemId={item.id}
