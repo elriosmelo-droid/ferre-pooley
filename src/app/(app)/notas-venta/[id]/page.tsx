@@ -15,7 +15,8 @@ import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
 import { AccionesNota } from "./acciones-nota";
 import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
-import { EntregaCheck, EntregaResumen } from "./entrega-controles";
+import { EntregaItem, EntregaResumen } from "./entrega-controles";
+import { estadoItem } from "@/lib/entregas";
 import { requirePermiso } from "@/lib/auth/rol";
 import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
 
@@ -29,7 +30,7 @@ type ItemRow = {
   flete: number;
   descuento: number;
   posicion: number;
-  entregado: boolean;
+  cantidad_entregada: number;
   entregado_at: string | null;
 };
 
@@ -90,7 +91,7 @@ export default async function DetalleNotaVentaPage({
       `id, folio, estado, flete, medio_pago, vendedor, subtotal_neto, iva, total, pagada_at, created_at,
        clientes(nombre, rut, correo),
        cotizaciones(id, folio, firma, firmante),
-       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion, entregado, entregado_at),
+       nota_venta_items(id, sku, descripcion, cantidad, costo, precio, flete, descuento, posicion, cantidad_entregada, entregado_at),
        pagos_nota_venta(id, monto, fecha, medio_pago, observacion)`
     )
     .eq("id", id)
@@ -303,13 +304,18 @@ export default async function DetalleNotaVentaPage({
               items.map((item) => (
                 <tr
                   key={item.id}
-                  className={item.entregado ? "text-slate-700" : "bg-amber-50/40 text-slate-700"}
+                  className={
+                    estadoItem(item) === "entregado"
+                      ? "text-slate-700"
+                      : "bg-amber-50/40 text-slate-700"
+                  }
                 >
                   <td className="px-4 py-3 text-center">
-                    <EntregaCheck
+                    <EntregaItem
                       notaVentaId={nota.id}
                       itemId={item.id}
-                      entregado={item.entregado}
+                      cantidad={item.cantidad}
+                      cantidadEntregada={item.cantidad_entregada}
                       entregadoAt={item.entregado_at}
                       soloLectura={!puedeEscribir || nota.estado === "anulada"}
                     />

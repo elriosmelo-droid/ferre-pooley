@@ -19,7 +19,7 @@ type NotaConItems = Omit<
     costo: number;
     precio: number;
     descuento: number;
-    entregado: boolean;
+    cantidad_entregada: number;
   }[];
   pagos_nota_venta: { monto: number }[];
   ventas_sii: { tipo_doc: number; fecha_emision: string | null }[];
@@ -35,7 +35,7 @@ export default async function NotasVentaPage() {
     .from("notas_venta")
     .select(
       `id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio),
-       nota_venta_items(cantidad, costo, precio, descuento, entregado), pagos_nota_venta(monto),
+       nota_venta_items(cantidad, costo, precio, descuento, cantidad_entregada), pagos_nota_venta(monto),
        ventas_sii(tipo_doc, fecha_emision)`
     )
     .order("created_at", { ascending: false });

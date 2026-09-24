@@ -1,5 +1,6 @@
 "use client";
 
+import type { resumenEntrega } from "@/lib/entregas";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
@@ -31,8 +32,8 @@ export type NotaVentaRow = {
   // Fecha en que ocurrió la venta: emisión de su factura del SII, o el día en
   // que se cargó la nota si todavía no se factura. NO es created_at.
   fechaVenta: string;
-  // Ítems de la nota y cuántos faltan por entregar.
-  entrega: { items: number; pendientes: number };
+  // Estado de entrega de la nota y conteo de ítems por estado.
+  entrega: ReturnType<typeof resumenEntrega>;
 };
 
 // 'AAAA-MM-DD' a 'DD/MM/AAAA'.
@@ -80,9 +81,12 @@ export function NotasVentaTabla({
       // Una anulada no se entrega: no cuenta como pendiente ni como entregada.
       if (entrega) {
         if (n.estado === "anulada") return false;
-        const pendiente = n.entrega.pendientes > 0;
-        if (entrega === "pendientes" && !pendiente) return false;
-        if (entrega === "entregadas" && pendiente) return false;
+        const e = n.entrega.estado;
+        if (e === "sin_items") return false;
+        if (entrega === "pendientes" && e === "entregada") return false;
+        if (entrega === "parciales" && e !== "parcial") return false;
+        if (entrega === "sin_entregar" && e !== "pendiente") return false;
+        if (entrega === "entregadas" && e !== "entregada") return false;
       }
       if (q) {
         const hay = `${n.folio} ${n.clientes?.nombre ?? ""}`.toLowerCase();
@@ -166,7 +170,9 @@ export function NotasVentaTabla({
             className={inputCls}
           >
             <option value="">Todas</option>
-            <option value="pendientes">Con productos sin entregar</option>
+            <option value="pendientes">Con productos por entregar</option>
+            <option value="parciales">Con entrega parcial</option>
+            <option value="sin_entregar">Nada entregado</option>
             <option value="entregadas">Entregadas</option>
           </select>
         </label>
@@ -291,15 +297,22 @@ export function NotasVentaTabla({
                     <NotaEstadoBadge estado={nota.estado} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {nota.estado === "anulada" || nota.entrega.items === 0 ? (
+                    {nota.estado === "anulada" || nota.entrega.estado === "sin_items" ? (
                       <span className="text-slate-400">—</span>
-                    ) : nota.entrega.pendientes === 0 ? (
+                    ) : nota.entrega.estado === "entregada" ? (
                       <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                         Entregada
                       </span>
+                    ) : nota.entrega.estado === "parcial" ? (
+                      <span
+                        className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                        title={`${nota.entrega.entregados} de ${nota.entrega.items} ítems completos`}
+                      >
+                        Parcial · {nota.entrega.entregados}/{nota.entrega.items}
+                      </span>
                     ) : (
-                      <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                        {nota.entrega.pendientes} de {nota.entrega.items} sin entregar
+                      <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        Sin entregar
                       </span>
                     )}
                   </td>

@@ -262,11 +262,11 @@ export async function actualizarNotaVenta(
 
   const supabase = await createClient();
 
-  // Ítems actuales: para conservar la marca de entregado y, sin «ver
+  // Ítems actuales: para conservar lo entregado y, sin «ver
   // costos», restaurar costo y flete que el formulario no trae.
   const { data: previos } = await supabase
     .from("nota_venta_items")
-    .select("sku, descripcion, costo, flete, posicion, entregado, entregado_at")
+    .select("sku, descripcion, costo, flete, posicion, cantidad_entregada, entregado_at")
     .eq("nota_venta_id", id)
     .order("posicion");
   let items = parsed.data.items;
@@ -485,30 +485,56 @@ export async function anularNotaVenta(
   return { success: true };
 }
 
-// Marca o desmarca ítems como entregados. La RLS limita al vendedor a sus
-// propias notas; el .eq por nota evita tocar ítems de otra nota.
-export async function marcarEntregado(
+// Registra cuánto se entregó de cada ítem (0 = nada, cantidad = todo).
+// La RLS limita al vendedor a sus propias notas; el .eq por nota evita tocar
+// ítems de otra nota.
+export async function registrarEntrega(
   notaVentaId: string,
-  itemIds: string[],
-  entregado: boolean
+  entregas: { id: string; cantidad_entregada: number }[]
 ): Promise<{ error?: string }> {
   const perfil = await checkPermiso("notas_venta", "escritura");
   if (!perfil) return { error: SIN_PERMISO };
-  const ids = z.array(z.uuid()).min(1).safeParse(itemIds);
-  if (!z.uuid().safeParse(notaVentaId).success || !ids.success) {
+  const parsed = z
+    .array(z.object({ id: z.uuid(), cantidad_entregada: z.number().int().min(0) }))
+    .min(1)
+    .safeParse(entregas);
+  if (!z.uuid().safeParse(notaVentaId).success || !parsed.success) {
     return { error: "Datos inválidos." };
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: items } = await supabase
     .from("nota_venta_items")
-    .update({ entregado, entregado_at: entregado ? new Date().toISOString() : null })
+    .select("id, cantidad")
     .eq("nota_venta_id", notaVentaId)
-    .in("id", ids.data)
-    .select("id");
+    .in("id", parsed.data.map((e) => e.id));
+  const cantidades = new Map((items ?? []).map((i) => [i.id as string, i.cantidad as number]));
+  for (const e of parsed.data) {
+    const cantidad = cantidades.get(e.id);
+    if (cantidad === undefined) return { error: "Ítem no encontrado." };
+    if (e.cantidad_entregada > Math.max(cantidad, 0)) {
+      return { error: `No se puede entregar más de lo vendido (${cantidad}).` };
+    }
+  }
 
-  if (error || !data?.length) {
-    console.error("Error al marcar entrega:", error?.message ?? "sin filas");
+  // Un update por valor distinto: «marcar todo» son pocos ítems.
+  const porValor = new Map<number, string[]>();
+  for (const e of parsed.data) {
+    porValor.set(e.cantidad_entregada, [...(porValor.get(e.cantidad_entregada) ?? []), e.id]);
+  }
+  const ahora = new Date().toISOString();
+  const resultados = await Promise.all(
+    [...porValor].map(([cantidad_entregada, ids]) =>
+      supabase
+        .from("nota_venta_items")
+        .update({ cantidad_entregada, entregado_at: cantidad_entregada > 0 ? ahora : null })
+        .eq("nota_venta_id", notaVentaId)
+        .in("id", ids)
+    )
+  );
+  const fallo = resultados.find((r) => r.error);
+  if (fallo) {
+    console.error("Error al registrar entrega:", fallo.error!.message);
     return { error: "No se pudo guardar la entrega. Intenta nuevamente." };
   }
 
