@@ -11,7 +11,9 @@ import {
 } from "@/lib/totals";
 import { etiquetasMedioPago } from "@/lib/medio-pago";
 import { normalizarRut } from "@/lib/rut";
-import { NotaEstadoBadge, type NotaVentaEstado } from "../nota-estado-badge";
+import { type NotaVentaEstado } from "../nota-estado-badge";
+import { EstadoPagoMenu } from "../estado-pago-menu";
+import { cobrado as sumaCobrado } from "@/lib/cobros";
 import { AccionesNota } from "./acciones-nota";
 import { CobrosNota } from "./cobros-nota";
 import { FacturaVinculo, type FacturaOpcion } from "./factura-vinculo";
@@ -148,7 +150,14 @@ export default async function DetalleNotaVentaPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-slate-900">{nota.folio}</h1>
-          <NotaEstadoBadge estado={nota.estado} />
+          <EstadoPagoMenu
+            notaVentaId={nota.id}
+            estado={nota.estado}
+            total={nota.total}
+            cobrado={sumaCobrado(cobros)}
+            nCobros={cobros.length}
+            editable={puedeEscribir}
+          />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {puedeEscribir && nota.estado === "pendiente" && (
