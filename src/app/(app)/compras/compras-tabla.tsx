@@ -13,10 +13,14 @@ import {
   vencimientoDesde,
   montoDeuda,
   totalDeuda,
+  estadoPagoCompra,
+  compraVencida,
   type FormaPagoCompra,
   type FormaPagoItem,
 } from "@/lib/forma-pago-compra";
 import { setFormasPagoCompra } from "./actions";
+import { hoyChile } from "@/lib/fecha";
+import { AtajosMes, RangoMonto, dentroDeRango, hayRango } from "@/components/filtros";
 
 const TIPO_DOC: Record<number, string> = {
   33: "Factura electrónica",
@@ -40,13 +44,6 @@ export type CompraRow = {
   formas_pago: unknown;
 };
 
-// "Sin asignar" es un filtro útil por sí mismo: son las compras que faltan
-// completar. Se distingue de "Todas" con un valor centinela.
-const SIN_ASIGNAR = "__sin__";
-// "Con deuda" cruza varias formas (cheque y crédito), así que tampoco es una
-// forma concreta y necesita su propio centinela.
-const CON_DEUDA = "__deuda__";
-
 function formatFecha(iso: string | null): string {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
@@ -59,6 +56,11 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
   const [proveedor, setProveedor] = useState("");
   const [tipo, setTipo] = useState("");
   const [pago, setPago] = useState("");
+  const [estadoPago, setEstadoPago] = useState("");
+  const [venc, setVenc] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+  const hoy = useMemo(() => hoyChile(), []);
   // Las formas de pago viven en el estado del padre, no en cada celda: si no, al
   // cambiarlas el filtro seguiría viendo el valor viejo.
   const [items, setItems] = useState<Record<string, FormaPagoItem[]>>(() =>
@@ -147,25 +149,40 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
       if (desde && (!c.fecha_emision || c.fecha_emision < desde)) return false;
       if (hasta && (!c.fecha_emision || c.fecha_emision > hasta)) return false;
       if (tipo && String(c.tipo_doc) !== tipo) return false;
-      if (pago) {
-        // Con varias formas por compra, filtrar es "incluye ésta": una compra
-        // pagada con cheque + débito aparece al filtrar por cualquiera de las dos.
-        const propias = items[c.id] ?? [];
-        const actuales = formasDe(propias);
-        let coincide: boolean;
-        if (pago === SIN_ASIGNAR) coincide = actuales.length === 0;
-        else if (pago === CON_DEUDA)
-          coincide = (montoDeuda(propias, c.monto_total) ?? 0) > 0;
-        else coincide = actuales.includes(pago as FormaPagoCompra);
-        if (!coincide) return false;
+      const propias = items[c.id] ?? [];
+      // Con varias formas por compra, filtrar es "incluye ésta": una compra
+      // pagada con cheque + débito aparece al filtrar por cualquiera de las dos.
+      if (pago && !formasDe(propias).includes(pago as FormaPagoCompra)) return false;
+      if (estadoPago && estadoPagoCompra(propias, c.monto_total) !== estadoPago) {
+        return false;
       }
+      if (
+        venc === "vencidas" &&
+        !compraVencida(propias, c.fecha_emision, c.monto_total, hoy)
+      ) {
+        return false;
+      }
+      if (!dentroDeRango(c.monto_total, montoMin, montoMax)) return false;
       if (q) {
         const hay = `${c.razon_social ?? ""} ${c.rut_proveedor}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [compras, desde, hasta, proveedor, tipo, pago, items]);
+  }, [
+    compras,
+    desde,
+    hasta,
+    proveedor,
+    tipo,
+    pago,
+    estadoPago,
+    venc,
+    montoMin,
+    montoMax,
+    hoy,
+    items,
+  ]);
 
   const totNeto = filtradas.reduce((s, c) => s + c.monto_neto, 0);
   const totIva = filtradas.reduce((s, c) => s + c.monto_iva, 0);
@@ -220,14 +237,41 @@ export function ComprasTabla({ compras }: { compras: CompraRow[] }) {
             {FORMAS_PAGO_COMPRA.map((f) => (
               <option key={f} value={f}>{FORMA_PAGO_COMPRA_LABEL[f]}</option>
             ))}
-            <option value={CON_DEUDA}>Con deuda</option>
-            <option value={SIN_ASIGNAR}>Sin asignar</option>
           </select>
         </label>
-        {(desde || hasta || proveedor || tipo || pago) && (
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Estado de pago
+          <select value={estadoPago} onChange={(e) => setEstadoPago(e.target.value)} className={inputCls}>
+            <option value="">Todos</option>
+            <option value="pagada">Pagadas</option>
+            <option value="con_deuda">Con deuda</option>
+            <option value="sin_cargar">Sin cargar</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Vencimiento
+          <select value={venc} onChange={(e) => setVenc(e.target.value)} className={inputCls}>
+            <option value="">Todos</option>
+            <option value="vencidas">Vencidas</option>
+          </select>
+        </label>
+        <RangoMonto
+          min={montoMin}
+          max={montoMax}
+          onChange={(a, b) => { setMontoMin(a); setMontoMax(b); }}
+        />
+        <AtajosMes
+          desde={desde}
+          hasta={hasta}
+          onChange={(d, h) => { setDesde(d); setHasta(h); }}
+        />
+        {(desde || hasta || proveedor || tipo || pago || estadoPago || venc || hayRango(montoMin, montoMax)) && (
           <button
             type="button"
-            onClick={() => { setDesde(""); setHasta(""); setProveedor(""); setTipo(""); setPago(""); }}
+            onClick={() => {
+              setDesde(""); setHasta(""); setProveedor(""); setTipo(""); setPago("");
+              setEstadoPago(""); setVenc(""); setMontoMin(""); setMontoMax("");
+            }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
             Limpiar

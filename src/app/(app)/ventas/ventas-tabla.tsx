@@ -5,6 +5,9 @@ import Link from "next/link";
 import { formatCLP } from "@/lib/money";
 import { TIPO_DOC, esNotaCredito, signoDte } from "@/lib/dte-doc";
 import { tipoPagoLabel, plazoDias, vencimientoEfectivo } from "@/lib/estado-cuenta";
+import { estadoCobroFactura } from "@/lib/cobros";
+import { hoyChile } from "@/lib/fecha";
+import { AtajosMes, RangoMonto, dentroDeRango, hayRango } from "@/components/filtros";
 
 export type VentaRow = {
   id: string;
@@ -20,7 +23,7 @@ export type VentaRow = {
   term_pago_dias: number | null;
   fecha_vencimiento: string | null;
   fecha_vencimiento_manual: string | null;
-  notas_venta: { id: string; folio: string } | null;
+  notas_venta: { id: string; folio: string; estado: string } | null;
 };
 
 function formatFecha(iso: string | null): string {
@@ -35,6 +38,11 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
   const [hasta, setHasta] = useState("");
   const [cliente, setCliente] = useState("");
   const [tipo, setTipo] = useState("");
+  const [cobro, setCobro] = useState("");
+  const [nota, setNota] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+  const hoy = useMemo(() => hoyChile(), []);
 
   const filtradas = useMemo(() => {
     const q = cliente.trim().toLowerCase();
@@ -42,13 +50,29 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
       if (desde && (!v.fecha_emision || v.fecha_emision < desde)) return false;
       if (hasta && (!v.fecha_emision || v.fecha_emision > hasta)) return false;
       if (tipo && String(v.tipo_doc) !== tipo) return false;
+      if (!dentroDeRango(v.monto_total, montoMin, montoMax)) return false;
+      if (nota === "con" && !v.notas_venta) return false;
+      if (nota === "sin" && v.notas_venta) return false;
+      if (cobro) {
+        const venc = vencimientoEfectivo(
+          v.fecha_vencimiento_manual,
+          v.fecha_emision,
+          v.forma_pago,
+          v.term_pago_dias
+        );
+        const e = estadoCobroFactura(
+          { tipo_doc: v.tipo_doc, vencimiento: venc, nota: v.notas_venta },
+          hoy
+        );
+        if (e !== cobro) return false;
+      }
       if (q) {
         const hay = `${v.razon_social ?? ""} ${v.rut_cliente}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [ventas, desde, hasta, cliente, tipo]);
+  }, [ventas, desde, hasta, cliente, tipo, cobro, nota, montoMin, montoMax, hoy]);
 
   // Totales: facturas suman, notas de crédito restan.
   const total = filtradas.reduce(
@@ -94,10 +118,40 @@ export function VentasTabla({ ventas }: { ventas: VentaRow[] }) {
             ))}
           </select>
         </label>
-        {(desde || hasta || cliente || tipo) && (
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Cobro
+          <select value={cobro} onChange={(e) => setCobro(e.target.value)} className={inputCls}>
+            <option value="">Todos</option>
+            <option value="cobrada">Cobradas</option>
+            <option value="con_saldo">Con saldo</option>
+            <option value="vencida">Vencidas</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Nota de venta
+          <select value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls}>
+            <option value="">Todas</option>
+            <option value="con">Con nota vinculada</option>
+            <option value="sin">Sin vincular</option>
+          </select>
+        </label>
+        <RangoMonto
+          min={montoMin}
+          max={montoMax}
+          onChange={(a, b) => { setMontoMin(a); setMontoMax(b); }}
+        />
+        <AtajosMes
+          desde={desde}
+          hasta={hasta}
+          onChange={(d, h) => { setDesde(d); setHasta(h); }}
+        />
+        {(desde || hasta || cliente || tipo || cobro || nota || hayRango(montoMin, montoMax)) && (
           <button
             type="button"
-            onClick={() => { setDesde(""); setHasta(""); setCliente(""); setTipo(""); }}
+            onClick={() => {
+              setDesde(""); setHasta(""); setCliente(""); setTipo("");
+              setCobro(""); setNota(""); setMontoMin(""); setMontoMax("");
+            }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
             Limpiar

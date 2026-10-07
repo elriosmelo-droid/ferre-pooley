@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCLP } from "@/lib/money";
+import { resumenPagoNota } from "@/lib/cobros";
 import { EstadoBadge, type CotizacionEstado } from "./estado-badge";
 import { pasarANotaVenta, eliminarCotizacion } from "./actions";
 
@@ -14,7 +15,13 @@ const ESTADO_LABEL: Record<CotizacionEstado, string> = {
   vencida: "Vencida",
 };
 
-type NotaRef = { id: string; folio: string };
+type NotaRef = {
+  id: string;
+  folio: string;
+  estado?: string;
+  total?: number;
+  pagos_nota_venta?: { monto: number }[];
+};
 
 export type CotizacionRow = {
   id: string;
@@ -178,13 +185,14 @@ export function CotizacionesTabla({
               <th className="px-4 py-3">Válida hasta</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Pago</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No hay cotizaciones que coincidan con los filtros.
                 </td>
               </tr>
@@ -211,6 +219,37 @@ export function CotizacionesTabla({
                   </td>
                   <td className="px-4 py-3">
                     <EstadoBadge estado={cotizacion.estado} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {(() => {
+                      const nota = notaDe(cotizacion);
+                      if (!nota || !nota.estado) {
+                        return <span className="text-slate-400">—</span>;
+                      }
+                      const r = resumenPagoNota({
+                        estado: nota.estado,
+                        total: nota.total ?? 0,
+                        cobrado: (nota.pagos_nota_venta ?? []).reduce(
+                          (s, p) => s + p.monto,
+                          0
+                        ),
+                      });
+                      const cls =
+                        r.tono === "ok"
+                          ? "bg-green-100 text-green-700"
+                          : r.tono === "aviso"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-slate-100 text-slate-600";
+                      return (
+                        <Link
+                          href={`/notas-venta/${nota.id}`}
+                          title={`Nota de venta ${nota.folio}`}
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}
+                        >
+                          {r.texto}
+                        </Link>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3 whitespace-nowrap">
@@ -291,7 +330,7 @@ export function CotizacionesTabla({
                   {filtradas.length === 1 ? "" : "es"}
                 </td>
                 <td className="px-4 py-3 text-right">{formatCLP(total)}</td>
-                <td className="px-4 py-3" colSpan={2} />
+                <td className="px-4 py-3" colSpan={3} />
               </tr>
             </tfoot>
           )}

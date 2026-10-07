@@ -13,7 +13,7 @@ export default async function CotizacionesPage() {
   const { data, error } = await supabase
     .from("cotizaciones")
     .select(
-      "id, folio, created_at, fecha_validez, total, estado, clientes(nombre), notas_venta(id, folio)"
+      "id, folio, created_at, fecha_validez, total, estado, clientes(nombre), notas_venta(id, folio, estado, total, pagos_nota_venta(monto))"
     )
     .order("created_at", { ascending: false });
 
