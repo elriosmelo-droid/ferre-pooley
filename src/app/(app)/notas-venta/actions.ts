@@ -14,6 +14,7 @@ import { resolverVendedor } from "@/lib/vendedor";
 import { autoVincularNota } from "@/lib/vinculo-nota";
 import { esNotaCredito } from "@/lib/dte-doc";
 import { conservarEntregas } from "@/lib/entregas";
+import { montoParaSaldar, abonosParaReabrir } from "@/lib/cobros";
 
 export type NotaVentaActionResult = {
   error?: string;
@@ -106,6 +107,112 @@ export async function eliminarCobro(
   revalidatePath("/notas-venta");
   revalidatePath(`/notas-venta/${notaVentaId}`);
   revalidatePath("/finanzas");
+  return { success: true };
+}
+
+const saldarSchema = z.object({
+  nota_venta_id: z.uuid(),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha del pago es obligatoria"),
+  medio_pago: z.enum(MEDIOS_PAGO_VALORES).nullish(),
+});
+
+function revalidarNota(id: string) {
+  revalidatePath("/notas-venta");
+  revalidatePath(`/notas-venta/${id}`);
+  revalidatePath("/cotizaciones");
+  revalidatePath("/ventas");
+  revalidatePath("/finanzas");
+}
+
+// Atajo de "Marcar pagada": registra UN abono por lo que falta. El estado lo
+// sigue calculando el trigger (023); así Finanzas y la utilidad percibida
+// quedan consistentes con lo que se ve en la lista.
+export async function marcarNotaPagada(
+  input: unknown
+): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
+  const parsed = saldarSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  const datos = parsed.data;
+  const supabase = await createClient();
+
+  const { data: nota } = await supabase
+    .from("notas_venta")
+    .select("estado, total, pagos_nota_venta(id, monto, fecha, medio_pago, observacion)")
+    .eq("id", datos.nota_venta_id)
+    .single();
+
+  if (!nota) return { error: "La nota de venta no existe" };
+  if (nota.estado === "anulada") {
+    return { error: "No se puede cobrar una nota anulada" };
+  }
+  const monto = montoParaSaldar(nota.total, nota.pagos_nota_venta ?? []);
+  if (monto <= 0) return { error: "La nota no tiene saldo por cobrar" };
+
+  const { error } = await supabase.from("pagos_nota_venta").insert({
+    nota_venta_id: datos.nota_venta_id,
+    monto,
+    fecha: datos.fecha,
+    medio_pago: datos.medio_pago ?? null,
+    observacion: "Marcada como pagada",
+  });
+  if (error) {
+    console.error("Error al marcar pagada:", error.message);
+    return { error: "No se pudo marcar como pagada. Intenta nuevamente." };
+  }
+
+  revalidarNota(datos.nota_venta_id);
+  return { success: true };
+}
+
+// Atajo de "Volver a pendiente": borra los abonos más recientes hasta que la
+// nota vuelva a tener saldo (ver abonosParaReabrir). Si se pagó de más, borrar
+// solo el último la dejaría pagada.
+export async function volverNotaAPendiente(
+  notaVentaId: string
+): Promise<NotaVentaActionResult> {
+  if (!(await checkPermiso("notas_venta", "escritura"))) return { error: SIN_PERMISO };
+  const id = z.uuid().safeParse(notaVentaId);
+  if (!id.success) return { error: "Nota inválida" };
+  const supabase = await createClient();
+
+  const { data: nota } = await supabase
+    .from("notas_venta")
+    .select("estado, total")
+    .eq("id", id.data)
+    .single();
+  if (!nota) return { error: "La nota de venta no existe" };
+  if (nota.estado !== "pagada") {
+    return { error: "La nota no está pagada" };
+  }
+
+  const { data: pagos } = await supabase
+    .from("pagos_nota_venta")
+    .select("id, monto, fecha, medio_pago, observacion, created_at")
+    .eq("nota_venta_id", id.data)
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const borrar = abonosParaReabrir(nota.total, pagos ?? []);
+  if (borrar.length === 0) return { error: "No hay abonos que revertir" };
+
+  const { data: borrados, error } = await supabase
+    .from("pagos_nota_venta")
+    .delete()
+    .in("id", borrar.map((c) => c.id))
+    .eq("nota_venta_id", id.data)
+    .select("id");
+  if (error) {
+    console.error("Error al volver a pendiente:", error.message);
+    return { error: "No se pudo volver a pendiente. Intenta nuevamente." };
+  }
+  if (!borrados?.length) return { error: "Los abonos ya no existen" };
+
+  revalidarNota(id.data);
   return { success: true };
 }
 
