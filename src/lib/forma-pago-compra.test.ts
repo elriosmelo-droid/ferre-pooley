@@ -3,6 +3,8 @@ import {
   montoDeuda,
   totalDeuda,
   etiquetaItemsPago,
+  estadoPagoCompra,
+  compraVencida,
   type FormaPagoItem,
 } from "./forma-pago-compra";
 
@@ -124,5 +126,32 @@ describe("etiquetaItemsPago", () => {
   it("sin total de referencia muestra el monto de la única forma", () => {
     // Sin con qué comparar no se puede saber si es redundante: se muestra.
     expect(etiquetaItemsPago([item("credito", 40000)])).toBe("Crédito $40.000");
+  });
+});
+
+describe("estadoPagoCompra", () => {
+  it("sin formas cargadas es sin_cargar", () => {
+    expect(estadoPagoCompra([], 100000)).toBe("sin_cargar");
+  });
+  it("crédito sin monto absorbe el total: con_deuda", () => {
+    expect(estadoPagoCompra([{ forma: "credito", monto: null, plazo_dias: 30 }], 100000)).toBe("con_deuda");
+  });
+  it("contado es pagada", () => {
+    expect(estadoPagoCompra([item("contado")], 100000)).toBe("pagada");
+  });
+});
+
+describe("compraVencida", () => {
+  const credito: FormaPagoItem[] = [{ forma: "credito", monto: null, plazo_dias: 30 }];
+  it("vencida si emisión + plazo ya pasó y hay deuda", () => {
+    expect(compraVencida(credito, "2026-05-01", 100000, "2026-07-10")).toBe(true);
+  });
+  it("no vencida si el plazo sigue corriendo", () => {
+    expect(compraVencida(credito, "2026-07-01", 100000, "2026-07-10")).toBe(false);
+  });
+  it("sin deuda o sin plazo nunca vence", () => {
+    expect(compraVencida([item("contado")], "2026-01-01", 100000, "2026-07-10")).toBe(false);
+    expect(compraVencida([item("credito")], "2026-01-01", 100000, "2026-07-10")).toBe(false);
+    expect(compraVencida([], "2026-01-01", 100000, "2026-07-10")).toBe(false);
   });
 });

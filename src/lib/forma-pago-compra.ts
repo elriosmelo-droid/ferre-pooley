@@ -48,14 +48,23 @@ export function vencimientoDesde(
   fechaEmision: string | null,
   plazoDias: number | null
 ): string | null {
+  const iso = vencimientoIso(fechaEmision, plazoDias);
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// Igual que vencimientoDesde pero en 'AAAA-MM-DD', comparable como texto.
+export function vencimientoIso(
+  fechaEmision: string | null,
+  plazoDias: number | null
+): string | null {
   if (!fechaEmision || plazoDias === null) return null;
   const [a, m, d] = fechaEmision.slice(0, 10).split("-").map(Number);
   if (!a || !m || !d) return null;
   const fecha = new Date(Date.UTC(a, m - 1, d));
   fecha.setUTCDate(fecha.getUTCDate() + plazoDias);
-  const dd = String(fecha.getUTCDate()).padStart(2, "0");
-  const mm = String(fecha.getUTCMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${fecha.getUTCFullYear()}`;
+  return fecha.toISOString().slice(0, 10);
 }
 
 export function esFormaPagoCompra(v: string): v is FormaPagoCompra {
@@ -191,4 +200,33 @@ export function etiquetaItemsPago(
       return resumenItem(i, !redundante);
     })
     .join(" · ");
+}
+
+// Estado de pago de una compra para filtrar. Sin formas cargadas no se sabe si
+// se debe: es "sin_cargar", nunca "pagada".
+export function estadoPagoCompra(
+  items: FormaPagoItem[],
+  montoTotal: number
+): "sin_cargar" | "con_deuda" | "pagada" {
+  const deuda = montoDeuda(items, montoTotal);
+  if (deuda === null) return "sin_cargar";
+  return deuda > 0 ? "con_deuda" : "pagada";
+}
+
+// Vencida = hay deuda y la forma a plazo más temprana ya cumplió su plazo. Sin
+// plazo cargado no se sabe cuándo vence, así que no cuenta como vencida.
+export function compraVencida(
+  items: FormaPagoItem[],
+  fechaEmision: string | null,
+  montoTotal: number,
+  hoy: string
+): boolean {
+  if ((montoDeuda(items, montoTotal) ?? 0) <= 0) return false;
+  let temprano: string | null = null;
+  for (const i of items) {
+    if (!esFormaDeuda(i.forma)) continue;
+    const v = vencimientoIso(fechaEmision, i.plazo_dias);
+    if (v && (!temprano || v < temprano)) temprano = v;
+  }
+  return temprano !== null && temprano < hoy;
 }

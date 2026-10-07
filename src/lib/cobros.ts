@@ -9,6 +9,8 @@
 // proporción se calcula bruto contra bruto y el resultado se aplica sobre el
 // margen neto; los dos números no se dividen entre sí en ninguna parte.
 
+import { formatCLP } from "./money";
+
 export type Cobro = {
   id: string;
   fecha: string; // 'AAAA-MM-DD', cuándo entró el dinero
@@ -78,6 +80,69 @@ export function cobrado(cobros: Cobro[]): number {
 // propósito: bloquearlo obligaría a inventar cifras para poder guardar.
 export function saldo(total: number, cobros: Cobro[]): number {
   return total - cobrado(cobros);
+}
+
+// Lo que hay que abonar para dejar la nota saldada. Nunca negativo: con saldo
+// a favor o nota en cero no hay nada que abonar.
+export function montoParaSaldar(total: number, cobros: Cobro[]): number {
+  return Math.max(saldo(total, cobros), 0);
+}
+
+// Abonos a borrar para que una nota pagada vuelva a tener saldo. Recibe los
+// cobros del más reciente al más antiguo y saca desde el último hasta que lo
+// cobrado quede bajo el total: si se pagó de más, borrar solo el último puede
+// dejarla pagada y el botón "volver a pendiente" no haría nada.
+export function abonosParaReabrir(
+  total: number,
+  recientesPrimero: Cobro[]
+): Cobro[] {
+  let restante = cobrado(recientesPrimero);
+  const borrar: Cobro[] = [];
+  for (const c of recientesPrimero) {
+    if (restante < total) break;
+    borrar.push(c);
+    restante -= c.monto;
+  }
+  return borrar;
+}
+
+// Texto corto del estado de pago de una nota, para mostrarlo en otras pantallas
+// (cotizaciones) sin recalcular en cada una.
+export function resumenPagoNota(n: {
+  estado: string;
+  total: number;
+  cobrado: number;
+}): { texto: string; tono: "ok" | "aviso" | "neutro" } {
+  if (n.estado === "anulada") return { texto: "Anulada", tono: "neutro" };
+  if (n.estado === "pagada") return { texto: "Pagada", tono: "ok" };
+  const pendiente = Math.max(n.total - n.cobrado, 0);
+  return { texto: `Saldo ${formatCLP(pendiente)}`, tono: "aviso" };
+}
+
+export type EstadoCobroFactura =
+  | "cobrada"
+  | "con_saldo"
+  | "vencida"
+  | "sin_nota"
+  | "no_aplica";
+
+// Estado de cobro de una factura según la nota de venta vinculada. Las notas
+// de crédito y débito y las facturas de notas anuladas no son plata que se
+// espere.
+export function estadoCobroFactura(
+  v: {
+    tipo_doc: number;
+    vencimiento: string | null;
+    nota: { estado: string } | null;
+  },
+  hoy: string
+): EstadoCobroFactura {
+  if (v.tipo_doc === 56 || v.tipo_doc === 61) return "no_aplica";
+  if (!v.nota) return "sin_nota";
+  if (v.nota.estado === "anulada") return "no_aplica";
+  if (v.nota.estado === "pagada") return "cobrada";
+  if (v.vencimiento && v.vencimiento < hoy) return "vencida";
+  return "con_saldo";
 }
 
 // Parte del margen que arrastra un abono. Con total en cero no hay proporción
@@ -295,6 +360,8 @@ export type FilaListado = {
   costo: number;
   cobrado: number;
   anulada: boolean;
+  // Vencimiento de la nota (el de su factura); null si no tiene factura.
+  vencimiento?: string | null;
 };
 
 export type TotalesListado = {
@@ -305,6 +372,7 @@ export type TotalesListado = {
   saldo: number;
   margen: number;
   pctMargen: number;
+  vencido: number; // parte del saldo que ya pasó su vencimiento
 };
 
 // Totales del pie del listado de notas de venta.
@@ -316,7 +384,10 @@ export type TotalesListado = {
 //
 // El porcentaje va sobre la venta NETA, no sobre el total bruto: son bases
 // distintas y dividir una por otra da un número sin significado.
-export function totalesListadoNotas(filas: FilaListado[]): TotalesListado {
+export function totalesListadoNotas(
+  filas: FilaListado[],
+  hoy?: string
+): TotalesListado {
   const r: TotalesListado = {
     notas: 0,
     anuladas: 0,
@@ -325,6 +396,7 @@ export function totalesListadoNotas(filas: FilaListado[]): TotalesListado {
     saldo: 0,
     margen: 0,
     pctMargen: 0,
+    vencido: 0,
   };
   let venta = 0;
   for (const f of filas) {
@@ -336,6 +408,10 @@ export function totalesListadoNotas(filas: FilaListado[]): TotalesListado {
     r.total += f.total;
     r.cobrado += f.cobrado;
     r.saldo += f.total - f.cobrado;
+    // Un saldo a favor del cliente no es plata vencida por cobrar.
+    if (hoy && f.vencimiento && f.vencimiento < hoy && f.total - f.cobrado > 0) {
+      r.vencido += f.total - f.cobrado;
+    }
     venta += f.venta;
     r.margen += f.venta - f.costo;
   }

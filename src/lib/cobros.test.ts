@@ -14,6 +14,10 @@ import {
   abonosEnRango,
   resumenPorCaja,
   pctUtilidad,
+  montoParaSaldar,
+  abonosParaReabrir,
+  resumenPagoNota,
+  estadoCobroFactura,
   type Cobro,
   type NotaCobrable,
 } from "./cobros";
@@ -449,6 +453,7 @@ describe("totalesListadoNotas", () => {
       saldo: 0,
       margen: 0,
       pctMargen: 0,
+      vencido: 0,
     });
   });
 
@@ -571,5 +576,90 @@ describe("resumenPorVenta en versión neta", () => {
     const r = resumenPorVenta([nota({ anulada: true })], "2026-06-15");
     expect(r.vendidoNeto).toBe(0);
     expect(r.porCobrarNeto).toBe(0);
+  });
+});
+
+describe("montoParaSaldar", () => {
+  it("sin abonos es el total", () => {
+    expect(montoParaSaldar(100000, [])).toBe(100000);
+  });
+  it("con abonos parciales es solo lo que falta", () => {
+    expect(montoParaSaldar(100000, [cobro("2026-06-10", 30000)])).toBe(70000);
+  });
+  it("saldo a favor o nota saldada devuelve 0, nunca negativo", () => {
+    expect(montoParaSaldar(100000, [cobro("2026-06-10", 120000)])).toBe(0);
+    expect(montoParaSaldar(100000, [cobro("2026-06-10", 100000)])).toBe(0);
+  });
+  it("total 0 devuelve 0", () => {
+    expect(montoParaSaldar(0, [])).toBe(0);
+  });
+});
+
+describe("abonosParaReabrir", () => {
+  it("devuelve el último abono si con eso queda saldo", () => {
+    const cs = [cobro("2026-07-05", 20000, "b"), cobro("2026-06-10", 80000, "a")];
+    expect(abonosParaReabrir(100000, cs).map((c) => c.id)).toEqual(["b"]);
+  });
+  it("pagada de más: borra los abonos necesarios hasta dejar saldo", () => {
+    const cs = [
+      cobro("2026-07-05", 60000, "c"),
+      cobro("2026-06-20", 60000, "b"),
+      cobro("2026-06-10", 60000, "a"),
+    ];
+    // 180.000 cobrados sobre 100.000: sacar c deja 120.000 (aún pagada),
+    // sacar c y b deja 60.000 (pendiente).
+    expect(abonosParaReabrir(100000, cs).map((c) => c.id)).toEqual(["c", "b"]);
+  });
+  it("sin abonos o ya con saldo no borra nada", () => {
+    expect(abonosParaReabrir(100000, [])).toEqual([]);
+    expect(abonosParaReabrir(100000, [cobro("2026-06-10", 30000)])).toEqual([]);
+  });
+});
+
+describe("resumenPagoNota", () => {
+  it("anulada, pagada y con saldo", () => {
+    expect(resumenPagoNota({ estado: "anulada", total: 1000, cobrado: 0 }).texto).toBe("Anulada");
+    expect(resumenPagoNota({ estado: "pagada", total: 1000, cobrado: 1000 })).toEqual({ texto: "Pagada", tono: "ok" });
+    const r = resumenPagoNota({ estado: "pendiente", total: 1000, cobrado: 400 });
+    expect(r.tono).toBe("aviso");
+    expect(r.texto).toMatch(/^Saldo .*600/);
+  });
+});
+
+describe("estadoCobroFactura", () => {
+  const hoy = "2026-07-10";
+  it("nota de crédito no aplica", () => {
+    expect(estadoCobroFactura({ tipo_doc: 61, vencimiento: null, nota: { estado: "pendiente" } }, hoy)).toBe("no_aplica");
+  });
+  it("sin nota vinculada", () => {
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: "2026-07-01", nota: null }, hoy)).toBe("sin_nota");
+  });
+  it("nota pagada = cobrada; pendiente vencida o no", () => {
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: "2026-07-01", nota: { estado: "pagada" } }, hoy)).toBe("cobrada");
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: "2026-07-01", nota: { estado: "pendiente" } }, hoy)).toBe("vencida");
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: "2026-07-20", nota: { estado: "pendiente" } }, hoy)).toBe("con_saldo");
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: null, nota: { estado: "pendiente" } }, hoy)).toBe("con_saldo");
+  });
+  it("nota anulada no aplica", () => {
+    expect(estadoCobroFactura({ tipo_doc: 33, vencimiento: null, nota: { estado: "anulada" } }, hoy)).toBe("no_aplica");
+  });
+});
+
+describe("totalesListadoNotas vencido", () => {
+  it("suma el saldo de las vencidas y excluye anuladas y saldadas", () => {
+    const filas: FilaListado[] = [
+      { total: 100000, venta: 80000, costo: 60000, cobrado: 40000, anulada: false, vencimiento: "2026-07-01" },
+      { total: 50000, venta: 40000, costo: 30000, cobrado: 50000, anulada: false, vencimiento: "2026-07-01" },
+      { total: 70000, venta: 50000, costo: 40000, cobrado: 0, anulada: true, vencimiento: "2026-07-01" },
+      { total: 30000, venta: 20000, costo: 10000, cobrado: 0, anulada: false, vencimiento: "2026-08-01" },
+    ];
+    const t = totalesListadoNotas(filas, "2026-07-10");
+    expect(t.vencido).toBe(60000);
+    expect(t.saldo).toBe(90000);
+    expect(t.cobrado).toBe(90000);
+  });
+  it("sin `hoy` el vencido es 0", () => {
+    const f: FilaListado = { total: 100, venta: 80, costo: 60, cobrado: 0, anulada: false, vencimiento: "2020-01-01" };
+    expect(totalesListadoNotas([f]).vencido).toBe(0);
   });
 });
