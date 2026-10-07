@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarCorreoTexto } from "@/lib/email/send";
 import { SIN_PERMISO, checkPermiso, getPerfilActual } from "@/lib/auth/rol";
+import { remitenteDe } from "@/lib/email/remitente";
 import { parseDestinatarios } from "@/lib/email/destinatarios";
 import { htmlATexto, sanearHtml } from "@/lib/email/sanear-html";
 import {
@@ -14,13 +15,6 @@ import {
   validarAdjuntos,
   type AdjuntoSubido,
 } from "@/lib/email/adjuntos";
-
-// Remitente según el usuario que envía: Victor sale con su casilla; el resto
-// con la casilla de ventas.
-const REMITENTES: Record<string, string> = {
-  "vpooleyf@outlook.com": "Victor Pooley <vpooley@tulbless.cl>",
-};
-const REMITENTE_DEFAULT = "Ventas Tulbless <ventas@tulbless.cl>";
 
 export type EnviarCorreoState = {
   error?: string;
@@ -107,8 +101,7 @@ export async function enviarCorreoNuevo(
     archivos.push({ filename: a.filename, content: buf });
   }
 
-  const from =
-    (perfil.email && REMITENTES[perfil.email]) || REMITENTE_DEFAULT;
+  const from = remitenteDe(perfil.email);
 
   let enviado: { id: string; from: string };
   try {

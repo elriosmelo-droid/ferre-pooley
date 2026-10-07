@@ -10,6 +10,8 @@ type Correo = {
   id: string;
   de: string | null;
   para: string[];
+  cc: string[] | null;
+  cco: string[] | null;
   asunto: string | null;
   texto: string | null;
   html: string | null;
@@ -18,12 +20,6 @@ type Correo = {
   leido: boolean;
   direccion: "entrante" | "saliente";
 };
-
-// Extrae el email de un "Nombre <email@x>" o devuelve el texto si ya es email.
-function soloEmail(de: string | null): string {
-  if (!de) return "";
-  return de.match(/<([^>]+)>/)?.[1] ?? de.trim();
-}
 
 function fmtFechaHora(iso: string) {
   return new Date(iso).toLocaleString("es-CL", {
@@ -52,7 +48,7 @@ export default async function CorreoDetallePage({
 
   const { data } = await supabase
     .from("correos")
-    .select("id, de, para, asunto, texto, html, adjuntos, recibido_at, leido, direccion")
+    .select("id, de, para, cc, cco, asunto, texto, html, adjuntos, recibido_at, leido, direccion")
     .eq("id", id)
     .maybeSingle();
 
@@ -67,28 +63,40 @@ export default async function CorreoDetallePage({
     await supabase.from("correos").update({ leido: true }).eq("id", id);
   }
 
-  const responderHref = `/correos/nuevo?para=${encodeURIComponent(
-    soloEmail(correo.de)
-  )}&asunto=${encodeURIComponent(
-    correo.asunto?.startsWith("Re:") ? correo.asunto : `Re: ${correo.asunto ?? ""}`
-  )}`;
-
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
         <Link href={volver} className="text-sm text-slate-500 hover:text-slate-700">
           ← {esEntrante ? "Recibidos" : "Enviados"}
         </Link>
-        {esEntrante && puedeEscribir && (
-          <Link
-            href={responderHref}
-            className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 0 1 5 5v1" />
-            </svg>
-            Responder
-          </Link>
+        {puedeEscribir && (
+          <div className="flex flex-wrap items-center gap-2">
+            {esEntrante && (
+              <>
+                <Link
+                  href={`/correos/nuevo?responder=${correo.id}`}
+                  className="inline-flex items-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 0 1 5 5v1" />
+                  </svg>
+                  Responder
+                </Link>
+                <Link
+                  href={`/correos/nuevo?responder=${correo.id}&todos=1`}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  Responder a todos
+                </Link>
+              </>
+            )}
+            <Link
+              href={`/correos/nuevo?reenviar=${correo.id}`}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Reenviar
+            </Link>
+          </div>
         )}
       </div>
 
@@ -110,6 +118,18 @@ export default async function CorreoDetallePage({
             <span className="font-medium text-slate-500">Para: </span>
             {correo.para.join(", ") || "—"}
           </p>
+          {(correo.cc ?? []).length > 0 && (
+            <p>
+              <span className="font-medium text-slate-500">Cc: </span>
+              {(correo.cc ?? []).join(", ")}
+            </p>
+          )}
+          {!esEntrante && (correo.cco ?? []).length > 0 && (
+            <p>
+              <span className="font-medium text-slate-500">Cco: </span>
+              {(correo.cco ?? []).join(", ")}
+            </p>
+          )}
           <p className="text-xs text-slate-400">{fmtFechaHora(correo.recibido_at)}</p>
         </div>
 

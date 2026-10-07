@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { PerfilForm, type PerfilData } from "./perfil-form";
+import { FirmaForm } from "./firma-form";
+import { APP_URL } from "@/lib/app-url";
+import { firmaPorDefecto } from "@/lib/email/firma";
+import { correoDeRemitente, remitenteDe } from "@/lib/email/remitente";
 
 export default async function PerfilPage() {
   const supabase = await createClient();
@@ -12,7 +16,7 @@ export default async function PerfilPage() {
     ? await supabase
         .from("perfiles")
         .select(
-          "nombre, razon_social, rut_empresa, direccion_empresa, telefono_empresa, correo_aviso"
+          "nombre, razon_social, rut_empresa, direccion_empresa, telefono_empresa, correo_aviso, firma_html"
         )
         .eq("user_id", user.id)
         .maybeSingle()
@@ -34,6 +38,17 @@ export default async function PerfilPage() {
       <PerfilForm
         perfil={(perfil as PerfilData | null) ?? null}
         correoCuenta={user?.email ?? ""}
+      />
+
+      <FirmaForm
+        firmaGuardada={perfil?.firma_html ?? null}
+        firmaPorDefecto={firmaPorDefecto({
+          nombre: perfil?.nombre,
+          razonSocial: perfil?.razon_social,
+          telefono: perfil?.telefono_empresa,
+          correo: correoDeRemitente(remitenteDe(user?.email ?? null)),
+          logoUrl: `${APP_URL}/logo-full.png`,
+        })}
       />
     </div>
   );

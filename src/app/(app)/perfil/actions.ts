@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { htmlATexto, sanearHtml } from "@/lib/email/sanear-html";
 
 export type PerfilFormState = {
   error?: string;
@@ -82,6 +83,40 @@ export async function guardarPerfil(
   if (error) {
     console.error("Error al guardar perfil:", error.message);
     return { error: "No se pudo guardar el perfil. Intenta nuevamente." };
+  }
+
+  revalidatePath("/perfil");
+  return { success: true };
+}
+
+export type FirmaFormState = { error?: string; success?: boolean };
+
+// Firma de correo del usuario. Se sanea igual que el cuerpo de un correo. Si
+// queda vacía se guarda null y vuelve a usarse la de por defecto.
+export async function guardarFirma(
+  _prev: FirmaFormState,
+  formData: FormData
+): Promise<FirmaFormState> {
+  const bruto = String(formData.get("firma_html") ?? "");
+  if (bruto.length > 50000) return { error: "La firma es demasiado larga." };
+  const html = sanearHtml(bruto);
+  const vacia = htmlATexto(html) === "" && !/<img\b/i.test(html);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "No se pudo verificar tu sesión. Vuelve a iniciar sesión." };
+  }
+
+  const { error } = await supabase
+    .from("perfiles")
+    .update({ firma_html: vacia ? null : html })
+    .eq("user_id", user.id);
+  if (error) {
+    console.error("Error al guardar firma:", error.message);
+    return { error: "No se pudo guardar la firma. Intenta nuevamente." };
   }
 
   revalidatePath("/perfil");

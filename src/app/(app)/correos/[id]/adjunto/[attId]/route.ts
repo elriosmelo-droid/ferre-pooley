@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilActual } from "@/lib/auth/rol";
 import { tienePermiso } from "@/lib/auth/permisos";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { BUCKET_ADJUNTOS } from "@/lib/email/adjuntos";
 
 export const maxDuration = 60;
 
@@ -15,9 +17,6 @@ export async function GET(
     return new Response("No autorizado", { status: 401 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return new Response("Resend no configurado", { status: 500 });
-
   const { id, attId } = await params;
   const supabase = await createClient();
 
@@ -30,9 +29,36 @@ export async function GET(
   if (!correo) return new Response("Correo no encontrado", { status: 404 });
 
   // El adjunto pedido debe pertenecer a este correo.
-  const adjuntos = (correo.adjuntos ?? []) as { id: string; filename?: string }[];
+  const adjuntos = (correo.adjuntos ?? []) as {
+    id: string;
+    filename?: string;
+    content_type?: string;
+    ruta?: string;
+  }[];
   const adj = adjuntos.find((a) => a.id === attId);
   if (!adj) return new Response("Adjunto no encontrado", { status: 404 });
+
+  // Correo enviado desde la app: el archivo vive en Storage (bucket privado).
+  // La membresía ya se validó arriba y el correo salió de la consulta con RLS.
+  if (adj.ruta) {
+    const { data: archivo, error } = await createAdminClient()
+      .storage.from(BUCKET_ADJUNTOS)
+      .download(adj.ruta);
+    if (error || !archivo) {
+      return new Response("No se pudo descargar el adjunto", { status: 502 });
+    }
+    const nombre = (adj.filename || "adjunto").replace(/["\r\n]/g, "");
+    return new Response(new Uint8Array(await archivo.arrayBuffer()), {
+      headers: {
+        "Content-Type": adj.content_type || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${nombre}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return new Response("Resend no configurado", { status: 500 });
 
   // 1. Metadata + URL firmada del adjunto.
   const metaResp = await fetch(
