@@ -7,12 +7,14 @@ import { resumenEntrega } from "@/lib/entregas";
 import { NotasVentaTabla, type NotaVentaRow } from "./notas-venta-tabla";
 import { requirePermiso } from "@/lib/auth/rol";
 import { puedeVerCostos, tienePermiso } from "@/lib/auth/permisos";
+import { esNotaCredito } from "@/lib/dte-doc";
+import { vencimientoEfectivo } from "@/lib/estado-cuenta";
 
 // Fila tal como vuelve de la consulta: con los ítems, que solo sirven para
 // calcular el margen y no viajan al cliente.
 type NotaConItems = Omit<
   NotaVentaRow,
-  "venta" | "costo" | "cobrado" | "fechaVenta" | "entrega"
+  "venta" | "costo" | "cobrado" | "fechaVenta" | "entrega" | "vencimiento" | "nCobros"
 > & {
   nota_venta_items: {
     cantidad: number;
@@ -22,7 +24,13 @@ type NotaConItems = Omit<
     cantidad_entregada: number;
   }[];
   pagos_nota_venta: { monto: number }[];
-  ventas_sii: { tipo_doc: number; fecha_emision: string | null }[];
+  ventas_sii: {
+    tipo_doc: number;
+    fecha_emision: string | null;
+    forma_pago: number | null;
+    term_pago_dias: number | null;
+    fecha_vencimiento_manual: string | null;
+  }[];
 };
 
 export default async function NotasVentaPage() {
@@ -34,9 +42,9 @@ export default async function NotasVentaPage() {
   const { data, error } = await supabase
     .from("notas_venta")
     .select(
-      `id, folio, created_at, total, estado, clientes(nombre), cotizaciones(id, folio),
+      `id, folio, created_at, total, estado, vendedor, clientes(nombre), cotizaciones(id, folio),
        nota_venta_items(cantidad, costo, precio, descuento, cantidad_entregada), pagos_nota_venta(monto),
-       ventas_sii(tipo_doc, fecha_emision)`
+       ventas_sii(tipo_doc, fecha_emision, forma_pago, term_pago_dias, fecha_vencimiento_manual)`
     )
     .order("created_at", { ascending: false });
 
@@ -52,6 +60,21 @@ export default async function NotasVentaPage() {
       // Sin «ver costos» el costo no viaja al navegador.
       costo: verCostos ? costo : 0,
       cobrado: (pagos_nota_venta ?? []).reduce((s, p) => s + p.monto, 0),
+      nCobros: (pagos_nota_venta ?? []).length,
+      // Vence la factura más temprana; las notas de crédito no vencen.
+      vencimiento:
+        (ventas_sii ?? [])
+          .filter((v) => !esNotaCredito(v.tipo_doc))
+          .map((v) =>
+            vencimientoEfectivo(
+              v.fecha_vencimiento_manual,
+              v.fecha_emision,
+              v.forma_pago,
+              v.term_pago_dias
+            )
+          )
+          .filter((v): v is string => !!v)
+          .sort()[0] ?? null,
       entrega: resumenEntrega(nota_venta_items ?? []),
       // La venta se fecha por la emisión de su factura, no por el día en que
       // se digitó la nota: si no, una puesta al día de la carga mete las
@@ -79,7 +102,11 @@ export default async function NotasVentaPage() {
           No se pudieron cargar las notas de venta. Intenta nuevamente.
         </p>
       ) : (
-        <NotasVentaTabla notas={notas} verCostos={verCostos} />
+        <NotasVentaTabla
+          notas={notas}
+          verCostos={verCostos}
+          puedeEscribir={puedeEscribir}
+        />
       )}
     </div>
   );

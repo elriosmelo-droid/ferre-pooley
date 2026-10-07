@@ -7,7 +7,9 @@ import { formatCLP } from "@/lib/money";
 import { formatPct } from "@/lib/totals";
 import { totalesListadoNotas } from "@/lib/cobros";
 import { diaChile, hoyChile, ultimosMeses } from "@/lib/fecha";
-import { NotaEstadoBadge, type NotaVentaEstado } from "./nota-estado-badge";
+import { type NotaVentaEstado } from "./nota-estado-badge";
+import { EstadoPagoMenu } from "./estado-pago-menu";
+import { RangoMonto, dentroDeRango, hayRango } from "@/components/filtros";
 
 const ESTADO_LABEL: Record<NotaVentaEstado, string> = {
   pendiente: "Pendiente de pago",
@@ -34,6 +36,11 @@ export type NotaVentaRow = {
   fechaVenta: string;
   // Estado de entrega de la nota y conteo de ítems por estado.
   entrega: ReturnType<typeof resumenEntrega>;
+  // Vencimiento de su factura (la más temprana); null si no tiene factura.
+  vencimiento: string | null;
+  vendedor: string | null;
+  // Cantidad de abonos registrados, para avisar al volver a pendiente.
+  nCobros: number;
 };
 
 // 'AAAA-MM-DD' a 'DD/MM/AAAA'.
@@ -45,15 +52,22 @@ function formatFecha(iso: string): string {
 export function NotasVentaTabla({
   notas,
   verCostos = true,
+  puedeEscribir = false,
 }: {
   notas: NotaVentaRow[];
   verCostos?: boolean;
+  puedeEscribir?: boolean;
 }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState("");
   const [entrega, setEntrega] = useState("");
+  const [cobro, setCobro] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+  const [vendedor, setVendedor] = useState("");
+  const hoy = useMemo(() => hoyChile(), []);
   // Atajos por mes: el mes en curso y los dos anteriores. Setean desde/hasta,
   // así que no son un filtro aparte y se pueden ajustar a mano después.
   const meses = useMemo(() => ultimosMeses(hoyChile(), 3), []);
@@ -88,13 +102,34 @@ export function NotasVentaTabla({
         if (entrega === "sin_entregar" && e !== "pendiente") return false;
         if (entrega === "entregadas" && e !== "entregada") return false;
       }
+      if (cobro) {
+        // Solo cuenta lo que se espera cobrar: sin anuladas ni saldadas.
+        if (n.estado === "anulada" || n.total - n.cobrado <= 0) return false;
+        if (cobro === "vencidas" && !(n.vencimiento && n.vencimiento < hoy)) {
+          return false;
+        }
+      }
+      if (!dentroDeRango(n.total, montoMin, montoMax)) return false;
+      if (vendedor && n.vendedor !== vendedor) return false;
       if (q) {
         const hay = `${n.folio} ${n.clientes?.nombre ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [notas, desde, hasta, busqueda, estado, entrega]);
+  }, [
+    notas,
+    desde,
+    hasta,
+    busqueda,
+    estado,
+    entrega,
+    cobro,
+    montoMin,
+    montoMax,
+    vendedor,
+    hoy,
+  ]);
 
   // Las anuladas quedan fuera de todos los totales: no facturaron, no se
   // cobran y no dejaron margen, así que sumarlas afirmaría una venta que no
@@ -107,8 +142,13 @@ export function NotasVentaTabla({
       costo: n.costo,
       cobrado: n.cobrado,
       anulada: n.estado === "anulada",
-    }))
+      vencimiento: n.vencimiento,
+    })),
+    hoy
   );
+  const vendedores = Array.from(
+    new Set(notas.map((n) => n.vendedor).filter((v): v is string => !!v))
+  ).sort();
   const estados = Array.from(
     new Set(notas.map((n) => n.estado))
   ) as NotaVentaEstado[];
@@ -176,7 +216,51 @@ export function NotasVentaTabla({
             <option value="entregadas">Entregadas</option>
           </select>
         </label>
-        {(desde || hasta || busqueda || estado || entrega) && (
+        <label className="flex flex-col gap-1 text-xs text-slate-500">
+          Cobro
+          <select
+            value={cobro}
+            onChange={(e) => setCobro(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Todos</option>
+            <option value="saldo">Con saldo por cobrar</option>
+            <option value="vencidas">Vencidas</option>
+          </select>
+        </label>
+        <RangoMonto
+          min={montoMin}
+          max={montoMax}
+          onChange={(a, b) => {
+            setMontoMin(a);
+            setMontoMax(b);
+          }}
+        />
+        {vendedores.length > 1 && (
+          <label className="flex flex-col gap-1 text-xs text-slate-500">
+            Vendedor
+            <select
+              value={vendedor}
+              onChange={(e) => setVendedor(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">Todos</option>
+              {vendedores.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {(desde ||
+          hasta ||
+          busqueda ||
+          estado ||
+          entrega ||
+          cobro ||
+          vendedor ||
+          hayRango(montoMin, montoMax)) && (
           <button
             type="button"
             onClick={() => {
@@ -185,6 +269,10 @@ export function NotasVentaTabla({
               setBusqueda("");
               setEstado("");
               setEntrega("");
+              setCobro("");
+              setMontoMin("");
+              setMontoMax("");
+              setVendedor("");
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
           >
@@ -218,6 +306,17 @@ export function NotasVentaTabla({
             </button>
           );
         })}
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2 text-sm">
+        <span className="rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-800">
+          Falta por cobrar: {formatCLP(tot.saldo)}
+        </span>
+        {tot.vencido > 0 && (
+          <span className="rounded-full bg-red-50 px-3 py-1 font-medium text-red-700">
+            Vencido: {formatCLP(tot.vencido)}
+          </span>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -294,7 +393,14 @@ export function NotasVentaTabla({
                     })()}
                   </td>
                   <td className="px-4 py-3">
-                    <NotaEstadoBadge estado={nota.estado} />
+                    <EstadoPagoMenu
+                      notaVentaId={nota.id}
+                      estado={nota.estado}
+                      total={nota.total}
+                      cobrado={nota.cobrado}
+                      nCobros={nota.nCobros}
+                      editable={puedeEscribir}
+                    />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {nota.estado === "anulada" || nota.entrega.estado === "sin_items" ? (
@@ -359,6 +465,38 @@ export function NotasVentaTabla({
                       </span>
                     </>
                   )}
+                </td>
+              </tr>
+              <tr className="border-t border-slate-200">
+                <td colSpan={9} className="px-4 py-3">
+                  <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-sm">
+                    <span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Total{" "}
+                      </span>
+                      {formatCLP(tot.total)}
+                    </span>
+                    <span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Cobrado{" "}
+                      </span>
+                      {formatCLP(tot.cobrado)}
+                    </span>
+                    <span className="text-amber-700">
+                      <span className="text-xs font-medium uppercase tracking-wide">
+                        Falta por cobrar{" "}
+                      </span>
+                      {formatCLP(tot.saldo)}
+                    </span>
+                    {tot.vencido > 0 && (
+                      <span className="text-red-600">
+                        <span className="text-xs font-medium uppercase tracking-wide">
+                          de eso, vencido{" "}
+                        </span>
+                        {formatCLP(tot.vencido)}
+                      </span>
+                    )}
+                  </div>
                 </td>
               </tr>
             </tfoot>
