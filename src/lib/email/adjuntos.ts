@@ -1,3 +1,6 @@
+export const BUCKET_ADJUNTOS = "correo-adjuntos"; // privado
+export const BUCKET_IMAGENES = "correo-imagenes"; // público (fotos del cuerpo)
+
 // Límite total de adjuntos por correo. Gmail usa 25 MB; Resend admite 40.
 export const MAX_ADJUNTOS_BYTES = 25 * 1024 * 1024;
 export const MAX_ADJUNTOS_CANTIDAD = 15;

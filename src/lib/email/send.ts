@@ -48,20 +48,26 @@ export async function enviarCorreo({
   }
 }
 
-// Envía un correo de texto plano (redactado desde la app). Devuelve el id de
-// Resend y el remitente usado, para guardarlo en la bandeja de Enviados.
+// Envía un correo redactado desde la app. Devuelve el id de Resend y el
+// remitente usado, para guardarlo en la bandeja de Enviados.
 export async function enviarCorreoTexto({
   para,
+  cc,
+  cco,
   asunto,
   html,
   texto,
   from: fromArg,
+  adjuntos,
 }: {
-  para: string;
+  para: string[];
+  cc?: string[];
+  cco?: string[];
   asunto: string;
   html?: string;
   texto?: string;
   from?: string;
+  adjuntos?: { filename: string; content: Buffer }[];
 }): Promise<{ id: string; from: string }> {
   const from = fromArg || process.env.RESEND_FROM;
   if (!from) {
@@ -74,9 +80,12 @@ export async function enviarCorreoTexto({
   const payload = {
     from,
     to: para,
+    cc: cc?.length ? cc : undefined,
+    bcc: cco?.length ? cco : undefined,
     subject: asunto,
     html: html || undefined,
     text: texto || undefined,
+    attachments: adjuntos?.length ? adjuntos : undefined,
   } as CreateEmailOptions;
   const { data, error } = await getResend().emails.send(payload);
 
