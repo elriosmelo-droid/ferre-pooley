@@ -59,8 +59,9 @@ estado de pago de su nota vinculada ("Pagada", "Saldo $X", "Sin nota").
 
 ## 3. Filtros nuevos (client-side)
 
-- **Compras**: estado de pago, vencidas, rango de monto, atajos de mes, con o sin
-  orden de compra.
+- **Compras**: estado de pago (pagadas / con deuda / sin cargar), vencidas, rango
+  de monto, atajos de mes. (Sin filtro por orden de compra: `compras_sii` no
+  tiene vínculo con ellas.)
 - **Ventas**: cobrada / con saldo / vencida, con o sin nota vinculada, rango de
   monto, atajos de mes.
 - **Notas de venta**: vencidas, rango de monto, vendedor.
